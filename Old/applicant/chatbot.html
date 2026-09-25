@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}AI Career Guide - Multibiz{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            
+            <!-- Header Badge -->
+            <div class="d-flex justify-content-end align-items-center mb-3">
+                <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill small fw-semibold">
+                    <i class="fa-solid fa-wand-magic-sparkles me-1 text-warning"></i> AI Career Intelligence Engine
+                </span>
+            </div>
+
+            <!-- Chatbot Master Card -->
+            <div class="chatbot-wrapper mb-4 animate-slide-up">
+                <!-- Chatbot Header -->
+                <div class="chatbot-header d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-primary bg-opacity-25 p-2 rounded-3 text-info fs-4 border border-info border-opacity-25">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <h5 class="fw-bold text-white mb-0">Multibiz Career Copilot</h5>
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill" style="font-size: 0.7rem;">
+                                    <i class="fa-solid fa-circle text-success me-1" style="font-size: 0.5rem;"></i> Active
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-light px-3" id="btnRestart" title="Restart Assessment">
+                        <i class="fa-solid fa-rotate-right me-1"></i> Restart
+                    </button>
+                </div>
+
+                <!-- Assessment Step Progress Bar -->
+                <div class="bg-dark bg-opacity-10 px-4 py-2 border-bottom d-flex align-items-center justify-content-between">
+                    <span class="text-muted small fw-semibold" id="stepCounterText">Assessment Progress: Step 1 of 5</span>
+                    <div class="progress flex-grow-1 ms-3" style="height: 6px; max-width: 260px;">
+                        <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated auto-progress-bar" id="assessmentProgressBar" role="progressbar" data-progress="20"></div>
+                    </div>
+                </div>
+
+                <!-- Chat Feed Scroll Area -->
+                <div class="chatbot-feed-box" id="chatFeed">
+                    <!-- Bot Greeting -->
+                    <div class="chat-bubble-pro chat-bubble-bot">
+                        <div class="d-flex align-items-center gap-2 mb-1 text-primary fw-bold small">
+                            <i class="fa-solid fa-robot"></i> Multibiz AI Copilot
+                        </div>
+                        <div>
+                            Welcome <strong>{{ user.first_name }}</strong>! 👋 I will guide you through a 2-minute diagnostic assessment to analyze your key technical competencies, career ambitions, and calculate your optimal career match scores. Let's begin!
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Options / Answers Interactive Container -->
+                <div class="p-3 bg-light border-top" id="optionsWrapper">
+                    <div class="small fw-semibold text-muted mb-2 px-1">Select an answer:</div>
+                    <div id="optionsContainer" class="d-flex flex-column gap-2">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" style="display: none;">
+                <div class="custom-card p-4 p-lg-5 bg-white border-0 shadow-sm rounded-4 mb-4">
+                    <div class="text-center mb-4 pb-3 border-bottom">
+                        <div class="bg-success bg-opacity-10 text-success p-3 rounded-circle d-inline-block fs-1 mb-2">
+                            <i class="fa-solid fa-award"></i>
+                        </div>
+                        <h3 class="fw-bold text-dark mb-1">Assessment Complete!</h3>
+                        
+                        <div class="d-inline-flex align-items-center gap-2 bg-light px-4 py-2 rounded-pill border">
+                            <span class="text-muted small fw-bold">Updated Employability Score:</span>
+                            <span class="fw-extrabold text-primary fs-5" id="resScoreBadge">88%</span>
+                        </div>
+                    </div>
+
+                    <h5 class="fw-bold text-dark mb-3">
+                        <i class="fa-solid fa-sparkles text-primary me-2"></i>Personalized Matched Openings
+                    </h5>
+
+                    <div class="row g-3" id="recommendationsList">
+                        <!-- Populated dynamically by JS -->
+                    </div>
+
+                    <div class="d-flex justify-content-end align-items-center mt-4 pt-3 border-top">
+                        <a href="{% url 'applicant_jobs' %}" class="btn btn-primary-custom px-4">
+                            <i class="fa-solid fa-magnifying-glass me-1"></i> Browse All Openings
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // Assessment Questionnaire Data passed safely from Django context
+    const questions = {{ questions_json|safe }};
+    let currentQIndex = 0;
+    let userAnswers = [];
+
+    const chatFeed = document.getElementById('chatFeed');
+    const optionsContainer = document.getElementById('optionsContainer');
+    const optionsWrapper = document.getElementById('optionsWrapper');
+    const resultsSection = document.getElementById('resultsSection');
+    const recommendationsList = document.getElementById('recommendationsList');
+    const stepCounterText = document.getElementById('stepCounterText');
+    const assessmentProgressBar = document.getElementById('assessmentProgressBar');
+    const resScoreBadge = document.getElementById('resScoreBadge');
+
+    function appendMessage(sender, text) {
+        const div = document.createElement('div');
+        div.className = `chat-bubble-pro ${sender === 'bot' ? 'chat-bubble-bot' : 'chat-bubble-user'}`;
+        if (sender === 'bot') {
+            div.innerHTML = `<div class="d-flex align-items-center gap-2 mb-1 text-primary fw-bold small"><i class="fa-solid fa-robot"></i> Multibiz AI Copilot</div><div>${text}</div>`;
+        } else {
+            div.innerHTML = `<div>${text}</div>`;
+        }
+        chatFeed.appendChild(div);
+        chatFeed.scrollTop = chatFeed.scrollHeight;
+    }
+
+    function updateProgress(index) {
+        const total = questions.length;
+        const current = Math.min(index + 1, total);
+        const pct = Math.round((current / total) * 100);
+        stepCounterText.innerText = `Assessment Progress: Step ${current} of ${total}`;
+        assessmentProgressBar.style.width = pct + "%";
+    }
+
+    function showQuestion(index) {
+        if (index >= questions.length) {
+            submitAssessment();
+            return;
+        }
+
+        updateProgress(index);
+        const q = questions[index];
+        
+        // Brief typing simulation
+        setTimeout(() => {
+            appendMessage('bot', `<strong>Diagnostic ${q.id} of ${questions.length}:</strong><br>${q.question}`);
+            
+            optionsContainer.innerHTML = '';
+            q.options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'chat-option-tile';
+                btn.innerHTML = `
+                    <span><i class="fa-regular fa-circle-dot text-primary me-2"></i> ${opt.text}</span>
+                    <i class="fa-solid fa-chevron-right text-muted small"></i>
+                `;
+                btn.addEventListener('click', () => {
+                    selectAnswer(q, opt);
+                });
+                optionsContainer.appendChild(btn);
+            });
+        }, 350);
+    }
+
+    function selectAnswer(question, option) {
+        appendMessage('user', option.text);
+        optionsContainer.innerHTML = '<div class="text-muted small p-2"><i class="fa-solid fa-spinner fa-spin text-primary me-2"></i> Computing affinity vectors...</div>';
+
+        userAnswers.push({
+            question_number: question.id,
+            question_text: question.question,
+            answer_text: option.text,
+            answer_value: option.value,
+            category: question.category,
+            score_value: option.score
+        });
+
+        currentQIndex++;
+        showQuestion(currentQIndex);
+    }
+
+    function submitAssessment() {
+        stepCounterText.innerText = 'Assessment Progress: Finalizing ML Model';
+        assessmentProgressBar.style.width = '100%';
+        appendMessage('bot', '⚡ <strong>Calculating Results:</strong> Mapping your skills against qualification taxonomies and active vacancies...');
+        optionsWrapper.style.display = 'none';
+
+        fetch("{% url 'chatbot_submit_assessment' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            body: JSON.stringify({ answers: userAnswers })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                appendMessage('bot', `🎉 <strong>Complete!</strong> Your updated employability benchmark is <strong>${data.employability_score}%</strong>. Scroll below to explore your customized match roster.`);
+                resScoreBadge.innerText = `${data.employability_score}%`;
+
+                recommendationsList.innerHTML = '';
+                data.recommendations.forEach(r => {
+                    const card = document.createElement('div');
+                    card.className = 'col-md-6';
+                    card.innerHTML = `
+                        <div class="job-card-pro">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge badge-match badge-match-excellent">
+                                        <i class="fa-solid fa-bolt text-warning"></i> ${r.match_score}% Match
+                                    </span>
+                                    <span class="text-muted small">${r.type}</span>
+                                </div>
+                                <h5 class="fw-bold text-dark mb-1">${r.title}</h5>
+                                <div class="text-secondary small fw-semibold mb-2">
+                                    <i class="fa-solid fa-building me-1 text-primary"></i> ${r.company} &bull; ${r.location}
+                                </div>
+                            </div>
+                            <div class="border-top pt-3 mt-3 d-flex justify-content-between align-items-center">
+                                <span class="badge bg-light text-secondary border small">Verified Match</span>
+                                <a href="/jobs/careers/${r.job_id}/" class="btn btn-sm btn-primary-custom px-4">
+                                    View & Apply
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                    recommendationsList.appendChild(card);
+                });
+
+                resultsSection.style.display = 'block';
+                setTimeout(() => {
+                    resultsSection.scrollIntoView({ behavior: 'smooth' });
+                }, 300);
+            } else {
+                appendMessage('bot', 'Error processing assessment: ' + (data.error || 'Server error'));
+            }
+        })
+        .catch(err => {
+            appendMessage('bot', 'Error submitting assessment: ' + err);
+        });
+    }
+
+    document.getElementById('btnRestart').addEventListener('click', () => {
+        currentQIndex = 0;
+        userAnswers = [];
+        optionsWrapper.style.display = 'block';
+        chatFeed.innerHTML = `
+            <div class="chat-bubble-pro chat-bubble-bot">
+                <div class="d-flex align-items-center gap-2 mb-1 text-primary fw-bold small"><i class="fa-solid fa-robot"></i> Multibiz AI Copilot</div>
+                <div>Assessment restarted. Let's find your best career opportunities!</div>
+            </div>
+        `;
+        resultsSection.style.display = 'none';
+        showQuestion(0);
+    });
+
+    // Start questionnaire
+    showQuestion(0);
+</script>
+{% endblock %}

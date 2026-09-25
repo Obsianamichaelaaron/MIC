@@ -1,0 +1,386 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Audit Trail - Multibiz Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .audit-stat-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--box-shadow-sm);
+        transition: all 0.25s ease;
+        padding: 1.25rem;
+    }
+    .audit-stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--box-shadow-md);
+        border-color: #cbd5e1;
+    }
+    .audit-avatar {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+    }
+    .ip-badge {
+        font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 0.76rem;
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 0.25rem 0.55rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+    }
+    .action-badge {
+        font-size: 0.74rem;
+        font-weight: 700;
+        padding: 0.3rem 0.65rem;
+        border-radius: 6px;
+        letter-spacing: 0.2px;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    .action-badge-danger {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+    .action-badge-success {
+        background: #d1fae5;
+        color: #065f46;
+        border: 1px solid #a7f3d0;
+    }
+    .action-badge-info {
+        background: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+    }
+    .action-badge-warning {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
+    .action-badge-secondary {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Top Hero Header Banner (Dark Enterprise Palette) -->
+    <div class="employer-hero-banner mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1 small text-white-50">
+                        <li class="breadcrumb-item text-white-50"><a href="{% url 'admin_dashboard' %}" class="text-white-50 text-decoration-none">Admin Console</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Security Audit Trail</li>
+                    </ol>
+                </nav>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <h3 class="fw-extrabold text-white mb-0">
+                        <i class="fa-solid fa-clipboard-list text-danger me-2"></i>Security Audit Trail
+                    </h3>
+                    <span class="badge bg-danger bg-opacity-25 text-white border border-danger border-opacity-50 rounded-pill px-2.5 py-1 small fw-semibold">
+                        <i class="fa-solid fa-lock me-1"></i> Immutable Ledger
+                    </span>
+                </div>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <a href="{% url 'admin_users' %}" class="btn btn-primary-custom btn-sm px-3.5 py-2 shadow-sm d-inline-flex align-items-center gap-1.5" style="font-size: 0.85rem; border-radius: 10px;">
+                    <i class="fa-solid fa-users-gear"></i> Manage Users
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Metrics Summary Strip -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="audit-stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small fw-semibold">Total Audit Events</div>
+                        <div class="fs-4 fw-bold text-dark mt-1">{{ total_logs_count }}</div>
+                    </div>
+                    <div class="audit-avatar" style="background: rgba(59, 130, 246, 0.1); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.2);">
+                        <i class="fa-solid fa-list-check"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="audit-stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small fw-semibold">Logged Today</div>
+                        <div class="fs-4 fw-bold text-success mt-1">{{ today_logs_count }}</div>
+                    </div>
+                    <div class="audit-avatar" style="background: rgba(16, 185, 129, 0.1); color: #059669; border: 1px solid rgba(16, 185, 129, 0.2);">
+                        <i class="fa-solid fa-calendar-day"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="audit-stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small fw-semibold">Active Operators</div>
+                        <div class="fs-4 fw-bold text-info mt-1">{{ distinct_admins_count }}</div>
+                    </div>
+                    <div class="audit-avatar" style="background: rgba(14, 165, 233, 0.1); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.2);">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="audit-stat-card">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="text-muted small fw-semibold">Security Actions</div>
+                        <div class="fs-4 fw-bold text-danger mt-1">{{ security_actions_count }}</div>
+                    </div>
+                    <div class="audit-avatar" style="background: rgba(239, 68, 68, 0.1); color: #dc2626; border: 1px solid rgba(239, 68, 68, 0.2);">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search & Multi-Faceted Filters Form -->
+    <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 mb-4">
+        <form method="GET" action="{% url 'admin_audit_trail' %}">
+            <div class="row g-2 align-items-center">
+                <!-- Search Query -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
+                        <input type="text" name="q" value="{{ search_query }}" class="form-control bg-light border-start-0 ps-0" placeholder="Search by description, operator, target, IP...">
+                    </div>
+                </div>
+
+                <!-- Action Type Filter -->
+                <div class="col-lg-3 col-md-6">
+                    <select name="action_type" class="form-select bg-light" onchange="this.form.submit()">
+                        <option value="">All Action Categories</option>
+                        {% for act in distinct_actions %}
+                            <option value="{{ act.val }}" {% if action_type == act.val %}selected{% endif %}>{{ act.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Target Entity Filter -->
+                <div class="col-lg-2 col-md-4">
+                    <select name="target_type" class="form-select bg-light" onchange="this.form.submit()">
+                        <option value="">All Targets</option>
+                        {% for tgt in distinct_targets %}
+                            <option value="{{ tgt.val }}" {% if target_type == tgt.val %}selected{% endif %}>{{ tgt.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Date Range Filter -->
+                <div class="col-lg-2 col-md-4">
+                    <select name="date_range" class="form-select bg-light" onchange="this.form.submit()">
+                        <option value="" {% if not date_range %}selected{% endif %}>All Time</option>
+                        <option value="today" {% if date_range == 'today' %}selected{% endif %}>Today</option>
+                        <option value="7d" {% if date_range == '7d' %}selected{% endif %}>Last 7 Days</option>
+                        <option value="30d" {% if date_range == '30d' %}selected{% endif %}>Last 30 Days</option>
+                    </select>
+                </div>
+
+                <!-- Submit / Reset -->
+                <div class="col-lg-1 col-md-4 d-flex gap-1">
+                    <button type="submit" class="btn btn-primary-custom w-100 p-2 d-flex align-items-center justify-content-center" title="Apply Filters">
+                        <i class="fa-solid fa-filter"></i>
+                    </button>
+                    {% if search_query or action_type or target_type or date_range %}
+                        <a href="{% url 'admin_audit_trail' %}" class="btn btn-outline-secondary p-2 d-flex align-items-center justify-content-center" title="Reset Filters">
+                            <i class="fa-solid fa-xmark"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Audit Logs Main Card -->
+    <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center border-bottom pb-3 mb-3 gap-2">
+            <div>
+                <h5 class="fw-bold text-dark mb-0">
+                    <i class="fa-solid fa-shield-cat text-primary me-2"></i>Audit Log Records
+                </h5>
+                <span class="text-muted small">Showing {{ logs|length }} log entries on this page.</span>
+            </div>
+            <div class="text-muted small">
+                Total Records: <strong>{{ page_obj.paginator.count }}</strong>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table align-middle table-hover mb-0">
+                <thead class="table-light small">
+                    <tr>
+                        <th style="width: 170px;">Timestamp</th>
+                        <th>Administrator</th>
+                        <th>Action Type</th>
+                        <th>Action Description / Details</th>
+                        <th>Target Entity</th>
+                        <th style="width: 140px;">IP Address</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                        <tr>
+                            <!-- Timestamp -->
+                            <td>
+                                <div class="fw-semibold text-dark small" style="font-size: 0.8rem;">
+                                    <i class="fa-regular fa-clock text-muted me-1"></i>{{ log.created_at|date:"M d, Y" }}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.72rem;">
+                                    {{ log.created_at|date:"H:i:s" }} ({{ log.created_at|timesince }} ago)
+                                </div>
+                            </td>
+
+                            <!-- Administrator -->
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="audit-avatar">
+                                        {{ log.admin_name|slice:":1"|upper }}
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark small">{{ log.admin_name }}</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">Operator</div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Action Type -->
+                            <td>
+                                {% if 'delete' in log.action_type or 'withdraw' in log.action_type %}
+                                    <span class="action-badge action-badge-danger">
+                                        <i class="fa-solid fa-trash-can"></i> {{ log.action_type }}
+                                    </span>
+                                {% elif 'create' in log.action_type or 'register' in log.action_type or 'post' in log.action_type or 'apply' in log.action_type or 'accept' in log.action_type %}
+                                    <span class="action-badge action-badge-success">
+                                        <i class="fa-solid fa-circle-plus"></i> {{ log.action_type }}
+                                    </span>
+                                {% elif 'update' in log.action_type or 'edit' in log.action_type or 'schedule' in log.action_type or 'save' in log.action_type or 'reply' in log.action_type %}
+                                    <span class="action-badge action-badge-info">
+                                        <i class="fa-solid fa-pen-to-square"></i> {{ log.action_type }}
+                                    </span>
+                                {% elif 'auth' in log.action_type or 'login' in log.action_type or 'logout' in log.action_type or 'status' in log.action_type %}
+                                    <span class="action-badge action-badge-warning">
+                                        <i class="fa-solid fa-key"></i> {{ log.action_type }}
+                                    </span>
+                                {% else %}
+                                    <span class="action-badge action-badge-secondary">
+                                        <i class="fa-solid fa-bolt"></i> {{ log.action_type }}
+                                    </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Action Description -->
+                            <td>
+                                <div class="small text-dark fw-medium">{{ log.action_description }}</div>
+                            </td>
+
+                            <!-- Target Entity -->
+                            <td>
+                                {% if log.target_type %}
+                                    <span class="badge bg-light text-dark border px-2.5 py-1 text-capitalize fw-semibold" style="font-size: 0.72rem;">
+                                        <i class="fa-solid fa-crosshairs text-primary me-1"></i>{{ log.target_type }}: {{ log.target_name|default:log.target_id|default:"#" }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted small">&mdash;</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- IP Address -->
+                            <td>
+                                <span class="ip-badge">
+                                    <i class="fa-solid fa-network-wired text-muted"></i>
+                                    {{ log.ip_address|default:"127.0.0.1" }}
+                                </span>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <div class="mb-2"><i class="fa-solid fa-clipboard-check text-secondary fs-2 opacity-50"></i></div>
+                                <div class="fw-semibold">No audit logs matching criteria.</div>
+                                <div class="small text-muted">Try adjusting your search keywords or resetting active filters.</div>
+                                {% if search_query or action_type or target_type or date_range %}
+                                    <a href="{% url 'admin_audit_trail' %}" class="btn btn-outline-custom btn-sm mt-3">Reset Filters</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        {% if page_obj.has_other_pages %}
+            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center mt-4 pt-3 border-top gap-2">
+                <div class="text-muted small">
+                    Page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
+                </div>
+                <nav aria-label="Audit log navigation">
+                    <ul class="pagination pagination-sm mb-0">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if action_type %}&action_type={{ action_type }}{% endif %}{% if target_type %}&target_type={{ target_type }}{% endif %}{% if date_range %}&date_range={{ date_range }}{% endif %}">
+                                    &laquo; Prev
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">&laquo; Prev</span></li>
+                        {% endif %}
+
+                        {% for p in page_obj.paginator.page_range %}
+                            {% if p == page_obj.number %}
+                                <li class="page-item active"><span class="page-link">{{ p }}</span></li>
+                            {% elif p >= page_obj.number|add:"-2" and p <= page_obj.number|add:"2" %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ p }}{% if search_query %}&q={{ search_query }}{% endif %}{% if action_type %}&action_type={{ action_type }}{% endif %}{% if target_type %}&target_type={{ target_type }}{% endif %}{% if date_range %}&date_range={{ date_range }}{% endif %}">{{ p }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if action_type %}&action_type={{ action_type }}{% endif %}{% if target_type %}&target_type={{ target_type }}{% endif %}{% if date_range %}&date_range={{ date_range }}{% endif %}">
+                                    Next &raquo;
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">Next &raquo;</span></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,496 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Matched Jobs - Applicant Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+    .job-list-scroll {
+        max-height: calc(100vh - 130px);
+        overflow-y: auto;
+        padding-right: 6px;
+    }
+    .job-list-scroll::-webkit-scrollbar {
+        width: 5px;
+    }
+    .job-list-scroll::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .job-list-scroll::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+    }
+
+    .job-item-card {
+        cursor: pointer;
+        border: 1.5px solid #cbd5e1 !important;
+        border-radius: 16px !important;
+        background: #ffffff !important;
+        padding: 1.25rem;
+        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05) !important;
+    }
+
+    .job-item-card:hover {
+        border-color: #3b82f6 !important;
+        transform: translateY(-2px);
+        box-shadow: 0 12px 26px rgba(37, 99, 235, 0.12) !important;
+    }
+
+    .job-item-card.active {
+        border-color: #2563eb !important;
+        background: #f0f7ff !important;
+        box-shadow: 0 8px 24px rgba(37, 99, 235, 0.16) !important;
+    }
+
+    .job-item-card.active::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 14px;
+        bottom: 14px;
+        width: 4.5px;
+        background: #2563eb;
+        border-top-right-radius: 4px;
+        border-bottom-right-radius: 4px;
+    }
+
+    .job-detail-sticky-pane {
+        position: sticky;
+        top: 70px;
+        max-height: calc(100vh - 90px);
+        overflow-y: auto;
+        background: #ffffff !important;
+        border: 1.5px solid #cbd5e1 !important;
+        border-radius: 20px !important;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08) !important;
+    }
+
+    .job-detail-sticky-pane::-webkit-scrollbar {
+        width: 5px;
+    }
+    .job-detail-sticky-pane::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .job-detail-sticky-pane::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 10px;
+    }
+
+    .spec-card-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem;
+        transition: all 0.2s ease;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .spec-card-box:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Top Hero Header Banner (Dark Enterprise Palette) -->
+    <div class="employer-hero-banner">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1 small text-white-50">
+                        <li class="breadcrumb-item"><a href="{% url 'applicant_dashboard' %}" class="text-white-50 text-decoration-none">Dashboard</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Matched Jobs</li>
+                    </ol>
+                </nav>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <h3 class="fw-extrabold text-white mb-0">
+                        <i class="fa-solid fa-briefcase text-info me-2"></i>Personalized AI Job Directory
+                    </h3>
+                    <span class="badge bg-primary bg-opacity-25 text-white border border-primary border-opacity-50 rounded-pill px-2.5 py-1 small fw-semibold">
+                        <i class="fa-solid fa-wand-magic-sparkles text-warning me-1"></i> Live Match Scoring
+                    </span>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'applicant_profile' %}" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm">
+                    <i class="fa-solid fa-user-pen"></i> Update Skills
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Bar -->
+    <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 mb-4">
+        <form method="GET" action="{% url 'applicant_jobs' %}">
+            <div class="row g-2 align-items-center">
+                <div class="col-lg-5 col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-light text-muted border-end-0"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        <input type="text" name="q" value="{{ query }}" class="form-control bg-light" placeholder="Job title, skill, or keyword...">
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <select name="type" class="form-select bg-light" onchange="this.form.submit()">
+                        <option value="">All Employment Types</option>
+                        <option value="full-time" {% if emp_type == 'full-time' %}selected{% endif %}>Full-time</option>
+                        <option value="part-time" {% if emp_type == 'part-time' %}selected{% endif %}>Part-time</option>
+                        <option value="contract" {% if emp_type == 'contract' %}selected{% endif %}>Contract</option>
+                        <option value="internship" {% if emp_type == 'internship' %}selected{% endif %}>Internship</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <select name="min_match" class="form-select bg-light" onchange="this.form.submit()">
+                        <option value="">Any Match %</option>
+                        <option value="80" {% if min_match == '80' %}selected{% endif %}>80%+ (Excellent)</option>
+                        <option value="60" {% if min_match == '60' %}selected{% endif %}>60%+ (Good)</option>
+                        <option value="40" {% if min_match == '40' %}selected{% endif %}>40%+ (Average)</option>
+                    </select>
+                </div>
+                <div class="col-lg-2 col-md-6">
+                    <button type="submit" class="btn btn-primary-custom w-100">
+                        <i class="fa-solid fa-filter"></i> Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- =========================================================================
+         SPLIT LAYOUT (LEFT: MATCHED LIST, RIGHT: STICKY DETAIL PANE)
+         ========================================================================= -->
+    <div class="row g-4">
+        
+        <!-- Left: Matched Jobs List (5 Cols) -->
+        <div class="col-lg-5 col-xl-5">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="fw-bold text-dark fs-6">
+                    <i class="fa-solid fa-list-ul text-primary me-2"></i>Matched Roles ({{ scored_jobs|length }})
+                </span>
+                {% if query or emp_type or min_match %}
+                    <a href="{% url 'applicant_jobs' %}" class="btn btn-sm btn-outline-secondary rounded-pill py-1 px-2 ui-text-meta">
+                        <i class="fa-solid fa-xmark me-1"></i> Reset
+                    </a>
+                {% endif %}
+            </div>
+
+            <div class="job-list-scroll d-flex flex-column gap-3">
+                {% for item in scored_jobs %}
+                    <div class="job-item-card {% if forloop.first %}active{% endif %}" 
+                         id="job-card-{{ item.job.id }}" 
+                         data-job-id="{{ item.job.id }}">
+                        
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="company-avatar-box">
+                                    {{ item.job.company_name|slice:":1"|upper }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark text-truncate" style="max-width: 160px;">{{ item.job.company_name }}</div>
+                                    <div class="text-muted small"><i class="fa-solid fa-location-dot me-1 text-danger"></i>{{ item.job.location }}</div>
+                                </div>
+                            </div>
+                            <span class="badge {% if item.match_score >= 80 %}badge-match-excellent{% elif item.match_score >= 60 %}badge-match-good{% else %}badge-match-average{% endif %} badge-match shadow-sm">
+                                <i class="fa-solid fa-bolt text-warning"></i> {{ item.match_score }}%
+                            </span>
+                        </div>
+
+                        <h6 class="fw-bold text-dark mb-1">{{ item.job.title }}</h6>
+                        <p class="text-muted small mb-2 text-truncate-2" style="font-size: 0.84rem; line-height: 1.5;">
+                            {{ item.job.description|truncatewords:15 }}
+                        </p>
+
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                            <span class="fw-bold text-success small">{{ item.job.salary_range|default:"Negotiable" }}</span>
+                            {% if item.has_applied %}
+                                <span class="badge bg-secondary px-2 py-1"><i class="fa-solid fa-check me-1"></i> Applied</span>
+                            {% else %}
+                                <span class="badge bg-light text-primary border small">Available</span>
+                            {% endif %}
+                        </div>
+
+                        <!-- Embedded Metadata for right-pane hydration -->
+                        <div class="job-meta d-none" 
+                             id="job-meta-{{ item.job.id }}"
+                             data-id="{{ item.job.id }}"
+                             data-title="{{ item.job.title }}"
+                             data-company="{{ item.job.company_name }}"
+                             data-company-initial="{{ item.job.company_name|slice:':1'|upper }}"
+                             data-location="{{ item.job.location }}"
+                             data-employment-type="{{ item.job.get_employment_type_display }}"
+                             data-salary="{{ item.job.salary_range|default:'Negotiable' }}"
+                             data-match-score="{{ item.match_score }}"
+                             data-has-applied="{% if item.has_applied %}true{% else %}false{% endif %}"
+                             data-posted-at="{{ item.job.posted_at|timesince }} ago"
+                             data-skills="{{ item.job.skills_required|default:'' }}"
+                             data-apply-url="{% url 'apply_job' item.job.pk %}">
+                            <div class="job-desc-source">{{ item.job.description|linebreaksbr }}</div>
+                            <div class="job-req-source">{{ item.job.requirements|linebreaksbr|default:'Demonstrated relevant experience and strong foundational competencies.' }}</div>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="custom-card p-5 bg-white text-center border-0 shadow-sm rounded-4">
+                        <i class="fa-solid fa-magnifying-glass fs-1 text-secondary opacity-50 mb-3"></i>
+                        <h5 class="fw-bold text-dark">No Positions Found</h5>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Right: Sticky Job Dossier Pane (7 Cols) -->
+        <div class="col-lg-7 col-xl-7">
+            <div class="job-detail-sticky-pane p-4 p-lg-5" id="jobDetailPane">
+                {% if scored_jobs.0 %}
+                    {% with first=scored_jobs.0 %}
+                        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-start border-bottom pb-4 mb-4 gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="company-avatar-box fs-3" id="paneCompanyAvatar" style="width: 60px; height: 60px;">
+                                    {{ first.job.company_name|slice:":1"|upper }}
+                                </div>
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill small" id="paneType">
+                                            {{ first.job.get_employment_type_display }}
+                                        </span>
+                                        <span class="badge badge-match badge-match-excellent shadow-sm" id="paneMatchBadge">
+                                            <i class="fa-solid fa-bolt text-warning"></i> <span id="paneMatchScore">{{ first.match_score }}</span>% Match
+                                        </span>
+                                    </div>
+                                    <h3 class="fw-extrabold text-dark mb-1" id="paneTitle">{{ first.job.title }}</h3>
+                                    <div class="text-secondary small fw-semibold" id="paneCompanyMeta">
+                                        <i class="fa-solid fa-building me-1 text-primary"></i> <span id="paneCompany">{{ first.job.company_name }}</span> &bull; 
+                                        <i class="fa-solid fa-location-dot text-danger ms-1 me-1"></i> <span id="paneLocation">{{ first.job.location }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-sm-end">
+                                {% if first.has_applied %}
+                                    <button class="btn btn-secondary px-4 py-2" id="paneTopApplyBtn" disabled>
+                                        <i class="fa-solid fa-check me-1"></i> Already Applied
+                                    </button>
+                                {% else %}
+                                    <a href="{% url 'apply_job' first.job.pk %}" id="paneTopApplyBtn" class="btn btn-primary-custom px-4 py-2 shadow-sm">
+                                        <i class="fa-solid fa-paper-plane me-1"></i> Quick Apply
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Key Specs Pills Grid -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-4">
+                                <div class="p-3 bg-light rounded-3 border">
+                                    <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Compensation</div>
+                                    <div class="fw-bold text-success fs-6 mt-1" id="paneSalary">{{ first.job.salary_range|default:"Negotiable" }}</div>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="p-3 bg-light rounded-3 border">
+                                    <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Work Arrangement</div>
+                                    <div class="fw-bold text-dark fs-6 mt-1" id="paneWorkType">{{ first.job.get_employment_type_display }}</div>
+                                </div>
+                            </div>
+                            <div class="col-sm-4">
+                                <div class="p-3 bg-light rounded-3 border">
+                                    <div class="text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Date Posted</div>
+                                    <div class="fw-bold text-dark fs-6 mt-1" id="panePostedAt">{{ first.job.posted_at|timesince }} ago</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Required Skills Cloud -->
+                        <div class="mb-4 pb-3 border-bottom">
+                            <h6 class="fw-bold text-dark mb-2">
+                                <i class="fa-solid fa-tags text-primary me-2"></i>Required Skills
+                            </h6>
+                            <div class="d-flex flex-wrap gap-1" id="paneSkillsContainer">
+                                {% for s in first.job.get_skills_list %}
+                                    <span class="skill-chip"><i class="fa-solid fa-check text-success me-1"></i>{{ s }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Job Description Body -->
+                        <div class="mb-4 pb-3 border-bottom">
+                            <h6 class="fw-bold text-dark mb-2">
+                                <i class="fa-solid fa-align-left text-primary me-2"></i>Position Description
+                            </h6>
+                            <div class="text-secondary" id="paneDescription" style="line-height: 1.8; font-size: 0.95rem;">
+                                {{ first.job.description|linebreaksbr }}
+                            </div>
+                        </div>
+
+                        <!-- Requirements Section -->
+                        <div class="mb-4 pb-3 border-bottom" id="paneRequirementsSection">
+                            <h6 class="fw-bold text-dark mb-2">
+                                <i class="fa-solid fa-circle-check text-primary me-2"></i>Requirements
+                            </h6>
+                            <div class="text-secondary" id="paneRequirements" style="line-height: 1.8; font-size: 0.95rem;">
+                                {{ first.job.requirements|linebreaksbr|default:"Demonstrated professional experience and strong problem-solving skills." }}
+                            </div>
+                        </div>
+
+                        <!-- Bottom Apply Banner -->
+                        <div class="p-4 bg-light rounded-4 border d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3 mt-4">
+                            <div>
+                                <h6 class="fw-bold text-dark mb-0">Ready to take the next step?</h6>
+                            </div>
+                            <div id="paneBottomBtnContainer">
+                                {% if first.has_applied %}
+                                    <button class="btn btn-secondary px-5 py-2" disabled>
+                                        <i class="fa-solid fa-check me-1"></i> Already Applied
+                                    </button>
+                                {% else %}
+                                    <a href="{% url 'apply_job' first.job.pk %}" id="paneBottomApplyBtn" class="btn btn-primary-custom px-5 py-2 shadow">
+                                        <i class="fa-solid fa-paper-plane me-2"></i> Quick Apply
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endwith %}
+                {% else %}
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-hand-pointer display-4 opacity-50 mb-3"></i>
+                        <h5>Select an opening from the left to view full match details</h5>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    function selectJob(jobId) {
+        document.querySelectorAll('.job-item-card').forEach(function(card) {
+            card.classList.remove('active');
+        });
+        const activeCard = document.getElementById('job-card-' + jobId);
+        if (activeCard) {
+            activeCard.classList.add('active');
+        }
+
+        const meta = document.getElementById('job-meta-' + jobId);
+        if (!meta) return;
+
+        try {
+            const title = meta.getAttribute('data-title') || '';
+            const company = meta.getAttribute('data-company') || '';
+            const companyInitial = meta.getAttribute('data-company-initial') || '';
+            const location = meta.getAttribute('data-location') || '';
+            const employmentType = meta.getAttribute('data-employment-type') || '';
+            const salary = meta.getAttribute('data-salary') || '';
+            const matchScore = meta.getAttribute('data-match-score') || '0';
+            const hasApplied = meta.getAttribute('data-has-applied') === 'true';
+            const postedAt = meta.getAttribute('data-posted-at') || '';
+            const skills = meta.getAttribute('data-skills') || '';
+            const applyUrl = meta.getAttribute('data-apply-url') || '#';
+
+            const descEl = meta.querySelector('.job-desc-source');
+            const reqEl = meta.querySelector('.job-req-source');
+
+            const paneTitle = document.getElementById('paneTitle');
+            if (paneTitle) paneTitle.innerText = title;
+            
+            const paneCompany = document.getElementById('paneCompany');
+            if (paneCompany) paneCompany.innerText = company;
+
+            const paneCompanyAvatar = document.getElementById('paneCompanyAvatar');
+            if (paneCompanyAvatar) paneCompanyAvatar.innerText = companyInitial;
+
+            const paneLocation = document.getElementById('paneLocation');
+            if (paneLocation) paneLocation.innerText = location;
+
+            const paneType = document.getElementById('paneType');
+            if (paneType) paneType.innerText = employmentType;
+
+            const paneSalary = document.getElementById('paneSalary');
+            if (paneSalary) paneSalary.innerText = salary;
+
+            const paneWorkType = document.getElementById('paneWorkType');
+            if (paneWorkType) paneWorkType.innerText = employmentType;
+
+            const panePostedAt = document.getElementById('panePostedAt');
+            if (panePostedAt) panePostedAt.innerText = postedAt;
+
+            const paneMatchScore = document.getElementById('paneMatchScore');
+            if (paneMatchScore) paneMatchScore.innerText = matchScore;
+            
+            const paneDesc = document.getElementById('paneDescription');
+            if (paneDesc && descEl) paneDesc.innerHTML = descEl.innerHTML;
+
+            const paneReq = document.getElementById('paneRequirements');
+            if (paneReq && reqEl) paneReq.innerHTML = reqEl.innerHTML;
+
+            const skillsContainer = document.getElementById('paneSkillsContainer');
+            if (skillsContainer) {
+                skillsContainer.innerHTML = '';
+                if (skills && skills.trim()) {
+                    const skillsArr = skills.split(',');
+                    skillsArr.forEach(function(s) {
+                        const clean = s.trim();
+                        if (clean) {
+                            const chip = document.createElement('span');
+                            chip.className = 'skill-chip';
+                            chip.innerHTML = '<i class="fa-solid fa-check text-success me-1"></i> ' + clean;
+                            skillsContainer.appendChild(chip);
+                        }
+                    });
+                } else {
+                    skillsContainer.innerHTML = '';
+                }
+            }
+
+            const topBtn = document.getElementById('paneTopApplyBtn');
+            const bottomContainer = document.getElementById('paneBottomBtnContainer');
+
+            if (hasApplied) {
+                if (topBtn) {
+                    topBtn.className = 'btn btn-secondary px-4 py-2';
+                    topBtn.removeAttribute('href');
+                    topBtn.setAttribute('disabled', 'disabled');
+                    topBtn.innerHTML = '<i class="fa-solid fa-check me-1"></i> Already Applied';
+                }
+                if (bottomContainer) {
+                    bottomContainer.innerHTML = '<button class="btn btn-secondary px-5 py-2" disabled><i class="fa-solid fa-check me-1"></i> Already Applied</button>';
+                }
+            } else {
+                if (topBtn) {
+                    topBtn.className = 'btn btn-primary-custom px-4 py-2 shadow-sm';
+                    topBtn.href = applyUrl;
+                    topBtn.removeAttribute('disabled');
+                    topBtn.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Quick Apply';
+                }
+                if (bottomContainer) {
+                    bottomContainer.innerHTML = '<a href="' + applyUrl + '" id="paneBottomApplyBtn" class="btn btn-primary-custom px-5 py-2 shadow"><i class="fa-solid fa-paper-plane me-2"></i> Quick Apply</a>';
+                }
+            }
+
+            if (window.innerWidth < 992) {
+                const detailPane = document.getElementById('jobDetailPane');
+                if (detailPane) detailPane.scrollIntoView({ behavior: 'smooth' });
+            }
+        } catch (e) {
+            console.error('Error hydrating job details:', e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.job-item-card').forEach(function(card) {
+            card.addEventListener('click', function() {
+                const jobId = this.getAttribute('data-job-id');
+                if (jobId) {
+                    selectJob(jobId);
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

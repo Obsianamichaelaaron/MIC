@@ -1,0 +1,188 @@
+{% include 'includes/header.html' %}
+<style>
+.req-container { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+.req-header { background: url('/images/bg.jpg') center/cover no-repeat; padding: 2rem 0; margin: 0 -1rem 1.75rem; text-align: center; color: white; border-radius: 0 0 16px 16px; }
+.req-header h1 { margin: 0; font-size: clamp(1.4rem, 4vw, 1.8rem); font-weight: 800; letter-spacing: -0.5px; }
+.req-header p { margin: .4rem 0 0; opacity: .9; font-size: .95rem; }
+
+.req-card { background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.04); }
+.req-section-title { font-size: 1.05rem; font-weight: 700; color: #0a3d6b; margin-bottom: 1rem; padding-bottom: .4rem; border-bottom: 2px solid #f1f5f9; display: flex; align-items: center; gap: .5rem; }
+
+.form-group { margin-bottom: 1.25rem; }
+.form-label { display: block; font-size: .85rem; font-weight: 700; color: #334155; margin-bottom: .35rem; }
+.form-label .req-star { color: #dc2626; }
+.form-control { width: 100%; padding: .65rem .85rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: .9rem; box-sizing: border-box; transition: all .2s; font-family: inherit; }
+.form-control:focus { outline: none; border-color: #1866a3; box-shadow: 0 0 0 3px rgba(24,102,163,0.12); }
+.form-hint { font-size: .75rem; color: #64748b; margin-top: .25rem; display: block; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+@media(max-width: 768px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .req-card { padding: 1.25rem; }
+}
+
+.benefit-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; display: flex; align-items: flex-start; gap: .75rem; }
+.benefit-icon { width: 36px; height: 36px; border-radius: 8px; background: #e0f2fe; color: #0369a1; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+
+.btn-submit { background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 100%); color: white; padding: .85rem 2rem; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all .25s; display: inline-flex; align-items: center; gap: .6rem; box-shadow: 0 4px 15px rgba(24,102,163,0.25); }
+.btn-submit:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(24,102,163,0.35); }
+</style>
+
+<div class="req-header">
+    <div style="max-width: 1000px; margin: 0 auto; padding: 0 1rem;">
+        <h1><i class="fas fa-handshake"></i> Request Talent &amp; Applicant Sourcing</h1>
+        <p>Provide your Job Description &amp; Requirements. MultiBiz Admin will review, approve, and publish your opening live to top candidates.</p>
+    </div>
+</div>
+
+<div class="req-container">
+
+    <!-- Benefits row -->
+    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.75rem;">
+        <div class="benefit-card">
+            <div class="benefit-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+            <div>
+                <div style="font-weight:700;font-size:.88rem;color:#0f172a;">AI-Ranked Matchmaking</div>
+                <div style="font-size:.8rem;color:#64748b;">Automatic qualification screening and resume scoring against your job description.</div>
+            </div>
+        </div>
+        <div class="benefit-card">
+            <div class="benefit-icon"><i class="fas fa-shield-halved"></i></div>
+            <div>
+                <div style="font-weight:700;font-size:.88rem;color:#0f172a;">Admin Verified Sourcing</div>
+                <div style="font-size:.8rem;color:#64748b;">MultiBiz Operations validates job specs and features your listing to active jobseekers.</div>
+            </div>
+        </div>
+        <div class="benefit-card">
+            <div class="benefit-icon"><i class="fas fa-envelope-circle-check"></i></div>
+            <div>
+                <div style="font-weight:700;font-size:.88rem;color:#0f172a;">Instant Notifications</div>
+                <div style="font-size:.8rem;color:#64748b;">Receive email updates the moment your job is approved and as applications arrive.</div>
+            </div>
+        </div>
+    </div>
+
+    {% if success %}
+        <div style="background:#f0fdf4;color:#166534;border:1.5px solid #bbf7d0;padding:1.25rem 1.5rem;border-radius:12px;margin-bottom:1.75rem;display:flex;align-items:center;gap:1rem;box-shadow:0 4px 12px rgba(22,101,52,0.06);">
+            <i class="fas fa-check-circle" style="font-size:1.8rem;color:#16a34a;"></i>
+            <div>
+                <div style="font-weight:700;font-size:1rem;">Talent Request Successfully Submitted!</div>
+                <div style="font-size:.88rem;margin-top:2px;">{{ success }}</div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if error %}
+        <div style="background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;padding:1.25rem 1.5rem;border-radius:12px;margin-bottom:1.75rem;display:flex;align-items:center;gap:1rem;">
+            <i class="fas fa-exclamation-circle" style="font-size:1.8rem;color:#ef4444;"></i>
+            <div>
+                <div style="font-weight:700;font-size:1rem;">Please check your input</div>
+                <div style="font-size:.88rem;margin-top:2px;">{{ error }}</div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="req-card">
+        <form method="POST" action="">
+            {% csrf_token %}
+
+            <!-- Section 1: Position Overview -->
+            <div class="req-section-title">
+                <i class="fas fa-briefcase" style="color:#1866a3;"></i> 1. Position &amp; Headcount Overview
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Position Title Needed <span class="req-star">*</span></label>
+                    <input type="text" name="title" required class="form-control" placeholder="e.g., Senior Full Stack Python / Django Engineer" value="{{ request.POST.title }}">
+                    <span class="form-hint">The target role name to be published on the job board.</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Number of Applicants Needed / Headcount</label>
+                    <input type="number" name="headcount" min="1" max="100" class="form-control" value="{{ request.POST.headcount|default:'1' }}">
+                    <span class="form-hint">Number of openings for this role.</span>
+                </div>
+            </div>
+
+            <!-- Section 2: Work Setup & Compensation -->
+            <div class="req-section-title" style="margin-top:1.5rem;">
+                <i class="fas fa-building" style="color:#1866a3;"></i> 2. Terms, Location &amp; Compensation
+            </div>
+
+            <div class="grid-3">
+                <div class="form-group">
+                    <label class="form-label">Employment Type</label>
+                    <select name="employment_type" class="form-control">
+                        <option value="full-time" {% if request.POST.employment_type == 'full-time' %}selected{% endif %}>Full-time</option>
+                        <option value="part-time" {% if request.POST.employment_type == 'part-time' %}selected{% endif %}>Part-time</option>
+                        <option value="contract"  {% if request.POST.employment_type == 'contract' %}selected{% endif %}>Contract / Project-based</option>
+                        <option value="internship"{% if request.POST.employment_type == 'internship' %}selected{% endif %}>Internship</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Location / Work Setup</label>
+                    <input type="text" name="location" class="form-control" placeholder="e.g., Makati City / Hybrid" value="{{ request.POST.location|default:employer.company_address }}">
+                    <span class="form-hint">Office address or remote/hybrid arrangement.</span>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Offered Salary Range</label>
+                    <input type="text" name="salary_range" class="form-control" placeholder="e.g., 60,000 - 85,000 PHP" value="{{ request.POST.salary_range }}">
+                    <span class="form-hint">Optional / Negotiable</span>
+                </div>
+            </div>
+
+            <div class="grid-2">
+                <div class="form-group">
+                    <label class="form-label">Hiring Urgency</label>
+                    <select name="urgency" class="form-control">
+                        <option value="Immediate" {% if request.POST.urgency == 'Immediate' %}selected{% endif %}>🚨 Immediate (Within 1-2 Weeks)</option>
+                        <option value="Normal" {% if request.POST.urgency == 'Normal' or not request.POST.urgency %}selected{% endif %}>⚡ Normal (Within 30 Days)</option>
+                        <option value="Flexible" {% if request.POST.urgency == 'Flexible' %}selected{% endif %}>📅 Flexible / Pipeline Building</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Key Required Skills</label>
+                    <input type="text" name="skills_required" class="form-control" placeholder="e.g., Python, SQL, REST APIs, Git, Leadership" value="{{ request.POST.skills_required }}">
+                    <span class="form-hint">Comma separated list of must-have technical/soft skills.</span>
+                </div>
+            </div>
+
+            <!-- Section 3: Job Description & Requirements -->
+            <div class="req-section-title" style="margin-top:1.5rem;">
+                <i class="fas fa-file-lines" style="color:#1866a3;"></i> 3. Job Description &amp; Candidate Qualifications
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Detailed Job Description &amp; Responsibilities <span class="req-star">*</span></label>
+                <textarea name="description" rows="5" required class="form-control" placeholder="Outline the main responsibilities, team structure, and day-to-day duties for this role...">{{ request.POST.description }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Candidate Requirements &amp; Qualifications</label>
+                <textarea name="requirements" rows="4" class="form-control" placeholder="Specify education, years of experience, certifications, and required background...">{{ request.POST.requirements }}</textarea>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Special Notes for Admin (Optional)</label>
+                <textarea name="special_notes" rows="2" class="form-control" placeholder="Any specific sourcing instructions or confidentiality notes for the MultiBiz team...">{{ request.POST.special_notes }}</textarea>
+            </div>
+
+            <!-- Submission Actions -->
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2rem; padding-top:1.5rem; border-top:1px solid #e2e8f0; flex-wrap:wrap; gap:1rem;">
+                <a href="/employer/dashboard.php" style="color:#64748b; font-weight:600; text-decoration:none; font-size:.9rem;">
+                    <i class="fas fa-arrow-left"></i> Return to Dashboard
+                </a>
+                <button type="submit" class="btn-submit">
+                    <i class="fas fa-paper-plane"></i> Send Talent Request to Admin
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% include 'includes/footer.html' %}

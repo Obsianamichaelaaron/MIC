@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Create Job Posting - Multibiz Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="employer-hero-banner mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1 small text-white-50">
+                        <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-white-50 text-decoration-none">Admin</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'admin_jobs' %}" class="text-white-50 text-decoration-none">Job Postings</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">New Job</li>
+                    </ol>
+                </nav>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <h3 class="fw-extrabold text-white mb-0">
+                        <i class="fa-solid fa-plus text-warning me-2"></i>Create New Job Posting
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4">
+                <h5 class="fw-bold text-dark mb-3 border-bottom pb-3">
+                    <i class="fa-solid fa-briefcase text-primary me-2"></i>Job Opening Details
+                </h5>
+
+                <form method="POST" action="{% url 'admin_create_job' %}">
+                    {% csrf_token %}
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Company Name</label>
+                            {{ form.company_name }}
+                            {% if form.company_name.errors %}<div class="text-danger small">{{ form.company_name.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold small text-dark">Job Title <span class="text-danger">*</span></label>
+                            {{ form.title }}
+                            {% if form.title.errors %}<div class="text-danger small">{{ form.title.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-dark">Employment Type <span class="text-danger">*</span></label>
+                            {{ form.employment_type }}
+                            {% if form.employment_type.errors %}<div class="text-danger small">{{ form.employment_type.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-dark">Location <span class="text-danger">*</span></label>
+                            {{ form.location }}
+                            {% if form.location.errors %}<div class="text-danger small">{{ form.location.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-dark">Salary Range / Budget</label>
+                            {{ form.salary_range }}
+                            {% if form.salary_range.errors %}<div class="text-danger small">{{ form.salary_range.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-primary mt-4 mb-3 border-bottom pb-2">
+                        <i class="fa-solid fa-brain me-2"></i>AI Candidate Evaluation Criteria
+                    </h6>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold small text-dark">Required Skills (Comma-separated) <span class="text-danger">*</span></label>
+                            {{ form.skills_required }}
+                            <div class="form-text small">Our ML evaluation engine uses these exact skills to score candidates.</div>
+                            {% if form.skills_required.errors %}<div class="text-danger small">{{ form.skills_required.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-dark">Minimum Experience (Years)</label>
+                            {{ form.min_experience_years }}
+                            {% if form.min_experience_years.errors %}<div class="text-danger small">{{ form.min_experience_years.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-dark">Required Education</label>
+                            {{ form.required_education }}
+                            {% if form.required_education.errors %}<div class="text-danger small">{{ form.required_education.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-dark">Required Certifications</label>
+                            {{ form.required_certifications }}
+                            {% if form.required_certifications.errors %}<div class="text-danger small">{{ form.required_certifications.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold small text-dark">Target Degree Majors / Qualifications</label>
+                            {{ form.target_qualifications }}
+                            {% if form.target_qualifications.errors %}<div class="text-danger small">{{ form.target_qualifications.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <h6 class="fw-bold text-primary mt-4 mb-3 border-bottom pb-2">
+                        <i class="fa-solid fa-align-left me-2"></i>Job Description and Requirements
+                    </h6>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold small text-dark">Description <span class="text-danger">*</span></label>
+                            {{ form.description }}
+                            {% if form.description.errors %}<div class="text-danger small">{{ form.description.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold small text-dark">Requirements and Responsibilities <span class="text-danger">*</span></label>
+                            {{ form.requirements }}
+                            {% if form.requirements.errors %}<div class="text-danger small">{{ form.requirements.errors }}</div>{% endif %}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold small text-dark">Posting Status</label>
+                            {{ form.status }}
+                            {% if form.status.errors %}<div class="text-danger small">{{ form.status.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                        <a href="{% url 'admin_jobs' %}" class="btn btn-light px-4">Cancel</a>
+                        <button type="submit" class="btn btn-primary-custom px-5 py-2 fw-bold shadow-sm">
+                            <i class="fa-solid fa-cloud-arrow-up me-2"></i>Create Job Posting
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

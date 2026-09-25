@@ -1,0 +1,725 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Apply for {{ job.title }} - Multibiz{% endblock %}
+
+{% block extra_css %}
+<style>
+    .apply-page-wrapper {
+        min-height: calc(100vh - 140px);
+    }
+    .stepper-container {
+        margin-bottom: 1rem;
+    }
+    .stepper-track {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        position: relative;
+        padding: 0.25rem 0;
+    }
+    .stepper-track::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 15px;
+        height: 1px;
+        background: #dfe7ef;
+        z-index: 0;
+    }
+    .stepper-step {
+        position: relative;
+        z-index: 1;
+        flex: 1;
+        text-align: center;
+        color: #64748b;
+        min-width: 0;
+    }
+    .stepper-step.active {
+        color: #0f172a;
+    }
+    .stepper-step.active .stepper-dot {
+        background: #0b5bd3;
+        border-color: #0b5bd3;
+        box-shadow: 0 0 0 3px rgba(11, 91, 211, 0.12);
+    }
+    .stepper-dot {
+        display: block;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #fff;
+        border: 2px solid #dfe7ef;
+        margin: 0 auto 0.65rem;
+        transition: all 0.2s ease;
+    }
+    .stepper-label {
+        font-size: 0.75rem;
+        line-height: 1.3;
+        display: block;
+        max-width: 120px;
+        margin: 0 auto;
+        font-weight: 500;
+    }
+    .application-panel {
+        border: 1px solid #e2e8f0;
+        background: #f8fafc;
+        border-radius: 1rem;
+        padding: 1.5rem;
+    }
+    .wizard-step-panel {
+        display: none;
+        animation: fadeInWizard 0.2s ease;
+    }
+    .wizard-step-panel.active {
+        display: block;
+    }
+    @keyframes fadeInWizard {
+        from { opacity: 0; transform: translateY(4px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .wizard-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+    }
+    .wizard-btn {
+        border-radius: 10px;
+        padding: 0.72rem 1.1rem;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+    .wizard-btn.secondary {
+        background: #fff;
+        border: 1px solid #dfe7ef;
+        color: #334155;
+    }
+    .wizard-btn.primary {
+        background: #0b5bd3;
+        border: 1px solid #0b5bd3;
+        color: #fff;
+    }
+    .wizard-question-box {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 0.9rem;
+        padding: 1rem 1rem 0.75rem;
+    }
+    .resume-choice-card {
+        border: 1.5px solid var(--mb-border);
+        border-radius: var(--mb-radius-md);
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        transition: all var(--mb-transition-fast);
+        background: #ffffff;
+    }
+    .resume-choice-card:hover {
+        border-color: #93c5fd;
+        background: #f8fafc;
+    }
+    .resume-choice-card:has(input:checked) {
+        border-color: var(--mb-primary);
+        background: #eff6ff;
+        box-shadow: 0 0 0 1px var(--mb-primary);
+    }
+    .ai-feedback-box {
+        border-radius: var(--mb-radius-lg);
+        border: 1px solid #e0e7ff;
+        background: #ffffff;
+        position: relative;
+        overflow: hidden;
+    }
+    .ai-scanning-laser {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #2563eb, #38bdf8, transparent);
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .ai-scanning .ai-scanning-laser {
+        opacity: 1;
+        animation: aiLaserScan 1.4s infinite ease-in-out;
+    }
+    @keyframes aiLaserScan {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(300px); }
+        100% { transform: translateY(0); }
+    }
+    .diagnostic-panel-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: var(--mb-radius-md);
+        padding: 0.85rem 1rem;
+    }
+    .suggestion-item {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: var(--mb-radius-sm);
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    /* Application Studio is a single continuous form. */
+    .apply-page-wrapper .stepper-container {
+        display: none;
+    }
+
+    .apply-page-wrapper .wizard-step-panel,
+    .apply-page-wrapper .wizard-step-panel.active {
+        display: block;
+        animation: none;
+        margin-bottom: 1.5rem;
+    }
+
+    .apply-page-wrapper .next-step-btn,
+    .apply-page-wrapper .prev-step-btn {
+        display: none;
+    }
+
+    .apply-page-wrapper .wizard-actions {
+        justify-content: flex-end;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-3 px-xl-5 py-3 apply-page-wrapper">
+    
+    <!-- Top Bar: Navigation & Quick Job Dossier -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 pb-2 border-bottom gap-2">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1 small">
+                    <li class="breadcrumb-item"><a href="{% url 'applicant_dashboard' %}" class="text-decoration-none">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'careers' %}" class="text-decoration-none">Careers</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'job_detail_public' job.pk %}" class="text-decoration-none">{{ job.title }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Application Studio</li>
+                </ol>
+            </nav>
+            <div class="d-flex align-items-center gap-3">
+                <div class="company-avatar-box fs-4 shadow-xs" style="width: 44px; height: 44px;">
+                    {{ job.company_name|slice:":1"|upper }}
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h4 class="fw-extrabold text-dark mb-0">{{ job.title }}</h4>
+                        <span class="badge bg-primary bg-opacity-10 text-primary px-2 py-1 rounded-pill small">
+                            {{ job.get_employment_type_display }}
+                        </span>
+                    </div>
+                    <div class="text-secondary small">
+                        <i class="fa-solid fa-building me-1 text-primary"></i> {{ job.company_name }} &bull; 
+                        <i class="fa-solid fa-location-dot text-danger ms-1 me-1"></i> {{ job.location }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+            <div class="text-md-end">
+                <span class="badge {% if match_score >= 80 %}badge-match-excellent{% elif match_score >= 60 %}badge-match-good{% elif match_score >= 40 %}badge-match-average{% else %}badge-match-poor{% endif %} badge-match fs-6 shadow-sm" id="headerMatchBadge">
+                    <i class="fa-solid fa-bolt text-warning"></i> {{ match_score|floatformat:0 }}% AI Match
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Two-Column Viewport Studio -->
+    <form method="POST" enctype="multipart/form-data" id="applicationForm">
+        {% csrf_token %}
+
+        <div class="row g-3">
+            
+            <!-- =========================================================================
+                 LEFT COLUMN: APPLICATION DOSSIER & SUBMISSION (7 COLS)
+                 ========================================================================= -->
+            <div class="col-lg-7">
+                <div class="custom-card p-3 p-lg-4 bg-white border-0 shadow-sm rounded-4 h-100 d-flex flex-column justify-content-between">
+                    <div>
+
+                        <div class="mb-4">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="company-avatar-box fs-5 shadow-xs" style="width: 38px; height: 38px;">
+                                        {{ job.company_name|slice:":1"|upper }}
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold text-dark small text-uppercase text-muted">{{ job.company_name }}</div>
+                                    </div>
+                                </div>
+                                <a href="{% url 'job_detail_public' job.pk %}" class="btn btn-link text-decoration-none p-0 small fw-semibold">View job description</a>
+                            </div>
+
+                        </div>
+                        
+                        <!-- Step 1: Resume & Credentials Selection -->
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                                    <span class="badge bg-danger bg-opacity-10 text-danger rounded-circle p-1" style="width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;">1</span>
+                                    <span>Resume & Credentials</span>
+                                </h6>
+                            </div>
+
+                            <div class="d-flex flex-column gap-2">
+                                {% if profile.resume_file %}
+                                    <label class="resume-choice-card d-flex align-items-center gap-2" for="useProfileResume">
+                                        <input class="form-check-input mt-0" type="radio" name="use_profile_resume" id="useProfileResume" value="true" checked>
+                                        <div class="flex-grow-1">
+                                            <div class="fw-bold text-dark small">Use profile master resume</div>
+                                            <div class="text-muted small text-truncate" style="max-width: 400px; font-size: 0.78rem;">
+                                                <i class="fa-solid fa-file-lines text-primary me-1"></i> {{ profile.resume_file.name }}
+                                            </div>
+                                        </div>
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 small">Verified</span>
+                                    </label>
+                                {% endif %}
+
+                                <label class="resume-choice-card d-flex flex-column gap-2" for="uploadNewResume">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input class="form-check-input mt-0" type="radio" name="use_profile_resume" id="uploadNewResume" value="false" {% if not profile.resume_file %}checked{% endif %}>
+                                        <div class="fw-bold text-dark small">Upload a custom resume for this application</div>
+                                    </div>
+                                    <div class="ps-4">
+                                        <input type="file" name="resume_file" id="resumeFileInput" class="form-control form-control-sm" accept=".pdf,.docx,.doc">
+                                    </div>
+                                </label>
+                            </div>
+
+                            <!-- Rejection Alert (If Non-Resume is uploaded) -->
+                            <div id="applyAiRejectionAlert" class="alert alert-danger d-none mt-2 mb-0 rounded-3 shadow-sm border-0 animate-slide-up p-2">
+                                <div class="d-flex align-items-start gap-2">
+                                    <i class="fa-solid fa-ban text-danger fs-5 mt-1"></i>
+                                    <div>
+                                        <strong class="d-block text-danger small mb-0">Document Upload Cancelled by AI Validator</strong>
+                                        <p class="small text-danger mb-0" id="applyAiRejectionMsg" style="font-size: 0.78rem;">The uploaded file does not appear to be a genuine Resume or CV.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Cover Letter / Pitch -->
+                        <div class="mb-3">
+                            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-2 gap-2">
+                                <h6 class="fw-bold text-dark mb-0 d-flex align-items-center gap-2">
+                                    <span class="badge bg-primary bg-opacity-10 text-primary rounded-circle p-1" style="width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center;">2</span>
+                                    <span>Candidate Pitch & Cover Letter</span>
+                                </h6>
+                                <div class="d-flex align-items-center gap-2">
+                                    <button type="button" class="btn btn-xs btn-outline-primary rounded-pill py-1 px-3 shadow-xs" id="btnAiGenerateLetter">
+                                        <i class="fa-solid fa-wand-magic-sparkles text-primary me-1"></i> AI Generate Pitch
+                                    </button>
+                                    <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill py-1 px-3 shadow-xs" id="btnAiCheckQuality">
+                                        <i class="fa-solid fa-robot text-info me-1"></i> AI Check Quality
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea name="cover_letter" id="coverLetterTextarea" rows="4" class="form-control small" style="resize: vertical; font-size: 0.88rem;" placeholder="Introduce yourself, explain your interest in this role at {{ job.company_name }}, and summarize relevant technical achievements..."></textarea>
+                            <div class="d-flex justify-content-between align-items-center mt-1">
+                                <span class="text-muted small" id="wordCountLabel" style="font-size: 0.75rem;">0 words &bull; 0 characters</span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- Action Footer Buttons -->
+                    <div class="border-top pt-3 d-flex justify-content-between align-items-center gap-2">
+                        <a href="{% url 'job_detail_public' job.pk %}" class="btn btn-sm btn-outline-secondary px-4 py-2">
+                            <i class="fa-solid fa-xmark me-1"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary-custom px-5 py-2 fs-6 shadow-sm" id="btnSubmitApplication">
+                            <i class="fa-solid fa-paper-plane me-2"></i> Submit Application
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- =========================================================================
+                 RIGHT COLUMN: AI QUALITY, FIT & ALIGNMENT COPILOT STUDIO (5 COLS)
+                 ========================================================================= -->
+            <div class="col-lg-5">
+                <div class="ai-feedback-box p-3 p-lg-4 bg-white border shadow-sm rounded-4 h-100 d-flex flex-column justify-content-between position-relative" id="aiDiagnosticBox">
+                    <div class="ai-scanning-laser"></div>
+                    
+                    <div>
+                        <!-- Header -->
+                        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="bg-primary bg-opacity-10 p-2 rounded-circle text-primary fs-5" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="fa-solid fa-brain"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold text-dark mb-0">AI Quality Fit Review</h6>
+                                </div>
+                            </div>
+                            <div>
+                                <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill fw-bold" id="aiReadinessBadge" style="font-size: 0.78rem;">
+                                    <i class="fa-solid fa-shield-check me-1"></i> Application Ready
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Overall Score Gauge -->
+                        <div class="row g-2 align-items-center mb-3">
+                            <div class="col-6">
+                                <div class="p-2 bg-light rounded-3 border text-center">
+                                    <div class="text-muted small" style="font-size: 0.72rem;">Application Strength</div>
+                                    <div class="fw-extrabold text-primary fs-5" id="aiOverallScoreText">{{ match_score|floatformat:0 }}%</div>
+                                    <div class="progress mt-1" style="height: 5px;">
+                                        <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" id="aiOverallProgressBar" role="progressbar" style="width: {{ match_score }}%;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="p-2 bg-light rounded-3 border text-center">
+                                    <div class="text-muted small" style="font-size: 0.7rem;">Resume</div>
+                                    <div class="fw-bold text-dark fs-6" id="aiResumeScoreText">85%</div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="p-2 bg-light rounded-3 border text-center">
+                                    <div class="text-muted small" style="font-size: 0.7rem;">Pitch</div>
+                                    <div class="fw-bold text-dark fs-6" id="aiCoverScoreText">--</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Checkpoints: Resume & Cover Letter Diagnostics -->
+                        <div class="d-flex flex-column gap-2 mb-3">
+                            <!-- Resume Diagnostics -->
+                            <div class="diagnostic-panel-card">
+                                <div class="fw-bold text-dark small mb-1 d-flex align-items-center gap-1" style="font-size: 0.8rem;">
+                                    <i class="fa-solid fa-file-pdf text-danger"></i> Resume Diagnostics
+                                </div>
+                                <ul class="list-unstyled small mb-0 d-flex flex-column gap-1" id="resumeFeedbackList" style="font-size: 0.78rem;">
+                                    {% if profile.resume_file %}
+                                        <li class="text-success"><i class="fa-solid fa-circle-check me-1"></i> Profile master resume verified and attached.</li>
+                                    {% else %}
+                                        <li class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i> Please attach a resume to complete your application.</li>
+                                    {% endif %}
+                                    <li class="text-primary"><i class="fa-solid fa-wand-magic-sparkles me-1"></i> AI skill matching computed against {{ job.title }}.</li>
+                                </ul>
+                            </div>
+
+                            <!-- Cover Letter Diagnostics -->
+                            <div class="diagnostic-panel-card">
+                                <div class="fw-bold text-dark small mb-1 d-flex align-items-center gap-1" style="font-size: 0.8rem;">
+                                    <i class="fa-solid fa-pen-nib text-primary"></i> Cover Letter Diagnostics
+                                </div>
+                                <ul class="list-unstyled small mb-0 d-flex flex-column gap-1" id="coverFeedbackList" style="font-size: 0.78rem;">
+                                </ul>
+                            </div>
+                        </div>
+
+                        <!-- AI Suggestions Box -->
+                        <div id="applyAiSuggestionsBox" class="p-2 bg-light rounded-3 border d-none">
+                            <div class="fw-bold text-dark small mb-1 d-flex align-items-center gap-1" style="font-size: 0.78rem;">
+                                <i class="fa-solid fa-lightbulb text-warning"></i>
+                                <span>AI Suggestions to Strengthen Application:</span>
+                            </div>
+                            <ul class="list-unstyled small mb-0 d-flex flex-column gap-1" id="applyAiSuggestionsList" style="font-size: 0.76rem;">
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </form>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const jobPk = "{{ job.pk }}";
+    const coverTextarea = document.getElementById('coverLetterTextarea');
+    const wordCountLabel = document.getElementById('wordCountLabel');
+    const btnAiGenerate = document.getElementById('btnAiGenerateLetter');
+    const btnAiCheck = document.getElementById('btnAiCheckQuality');
+    const aiBox = document.getElementById('aiDiagnosticBox');
+    const resumeFileInput = document.getElementById('resumeFileInput');
+    const useProfileRadio = document.getElementById('useProfileResume');
+    const uploadNewRadio = document.getElementById('uploadNewResume');
+    const btnSubmitApplication = document.getElementById('btnSubmitApplication');
+
+    // UI elements for AI feedback
+    const applyAiRejectionAlert = document.getElementById('applyAiRejectionAlert');
+    const applyAiRejectionMsg = document.getElementById('applyAiRejectionMsg');
+    const applyAiSuggestionsBox = document.getElementById('applyAiSuggestionsBox');
+    const applyAiSuggestionsList = document.getElementById('applyAiSuggestionsList');
+    const aiReadinessBadge = document.getElementById('aiReadinessBadge');
+    const aiOverallScoreText = document.getElementById('aiOverallScoreText');
+    const aiOverallProgressBar = document.getElementById('aiOverallProgressBar');
+    const aiResumeScoreText = document.getElementById('aiResumeScoreText');
+    const aiCoverScoreText = document.getElementById('aiCoverScoreText');
+    const resumeFeedbackList = document.getElementById('resumeFeedbackList');
+    const coverFeedbackList = document.getElementById('coverFeedbackList');
+
+    function updateWordCount() {
+        const text = (coverTextarea.value || '').trim();
+        const words = text ? text.split(/\s+/).length : 0;
+        const chars = text.length;
+        wordCountLabel.innerText = `${words} words \u2022 ${chars} characters`;
+    }
+
+    if (coverTextarea) {
+        coverTextarea.addEventListener('input', function() {
+            updateWordCount();
+        });
+        updateWordCount();
+    }
+
+    // 1. AI Generate Tailored Cover Letter
+    if (btnAiGenerate) {
+        btnAiGenerate.addEventListener('click', function() {
+            btnAiGenerate.disabled = true;
+            btnAiGenerate.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Generating...';
+
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', csrfToken);
+
+            fetch(`/applications/apply/${jobPk}/ajax/ai-generate-cover-letter/`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success' && data.cover_letter) {
+                    coverTextarea.value = data.cover_letter;
+                    updateWordCount();
+                    // Auto-run AI check on newly generated letter
+                    runAiCheck();
+                }
+            })
+            .catch(err => {
+                console.error('Error generating cover letter:', err);
+            })
+            .finally(() => {
+                btnAiGenerate.disabled = false;
+                btnAiGenerate.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles text-primary me-1"></i> AI Generate Pitch';
+            });
+        });
+    }
+
+    // 2. AI Quality & Correctness Checker
+    function runAiCheck() {
+        aiBox.classList.add('ai-scanning');
+        if (btnAiCheck) {
+            btnAiCheck.disabled = true;
+            btnAiCheck.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Analyzing...';
+        }
+
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', csrfToken);
+        formData.append('cover_letter', coverTextarea ? coverTextarea.value : '');
+        formData.append('use_profile_resume', useProfileRadio && useProfileRadio.checked ? 'true' : 'false');
+
+        if (resumeFileInput && resumeFileInput.files.length > 0) {
+            formData.append('resume_file', resumeFileInput.files[0]);
+        }
+
+        fetch(`/applications/apply/${jobPk}/ajax/ai-check/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'error' || (data.is_valid_resume === false && data.rejection_reason)) {
+                // ==========================================
+                // 1. CANCEL UPLOAD: NOT A VALID RESUME / EMPTY
+                // ==========================================
+                if (resumeFileInput && resumeFileInput.files.length > 0) {
+                    resumeFileInput.value = '';
+                }
+
+                if (applyAiRejectionAlert && applyAiRejectionMsg) {
+                    applyAiRejectionMsg.innerText = data.rejection_reason || 'The uploaded file does not appear to be a genuine Resume or CV. Missing essential professional sections (e.g. Work History, Education, Skills).';
+                    applyAiRejectionAlert.classList.remove('d-none');
+                }
+
+                if (applyAiSuggestionsBox) applyAiSuggestionsBox.classList.add('d-none');
+
+                aiOverallScoreText.innerText = '0%';
+                aiOverallProgressBar.style.width = '0%';
+                aiResumeScoreText.innerText = '0%';
+                aiCoverScoreText.innerText = '0%';
+
+                aiReadinessBadge.className = 'badge bg-danger bg-opacity-10 text-danger px-3 py-1 rounded-pill fw-bold';
+                aiReadinessBadge.innerHTML = '<i class="fa-solid fa-ban me-1"></i> Upload Cancelled: Not a Resume';
+
+                if (resumeFeedbackList) {
+                    resumeFeedbackList.innerHTML = `<li class="text-danger"><i class="fa-solid fa-ban me-1"></i> ${data.rejection_reason || 'Document is not a valid resume.'}</li>`;
+                }
+
+                if (btnSubmitApplication) {
+                    btnSubmitApplication.disabled = true;
+                }
+            } else if (data.status === 'success' && data.has_resume === false) {
+                // ==========================================
+                // 2. NO RESUME ATTACHED YET
+                // ==========================================
+                if (applyAiRejectionAlert) applyAiRejectionAlert.classList.add('d-none');
+                if (applyAiSuggestionsBox) applyAiSuggestionsBox.classList.add('d-none');
+
+                aiOverallScoreText.innerText = '0%';
+                aiOverallProgressBar.style.width = '0%';
+                aiResumeScoreText.innerText = '0%';
+                aiCoverScoreText.innerText = `${data.cover_score || 0}%`;
+
+                aiReadinessBadge.className = 'badge bg-danger bg-opacity-10 text-danger px-3 py-1 rounded-pill fw-bold';
+                aiReadinessBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> Incomplete: Resume Required';
+
+                if (resumeFeedbackList) {
+                    resumeFeedbackList.innerHTML = `<li class="text-warning"><i class="fa-solid fa-triangle-exclamation me-1"></i> Please attach a verified resume to submit your application.</li>`;
+                }
+
+                if (btnSubmitApplication) {
+                    btnSubmitApplication.disabled = true;
+                }
+            } else if (data.status === 'success' && data.is_valid_resume === true) {
+                // ==========================================
+                // 3. VALID RESUME: SHOW STRENGTH & SUGGESTIONS
+                // ==========================================
+                if (applyAiRejectionAlert) applyAiRejectionAlert.classList.add('d-none');
+                if (btnSubmitApplication) btnSubmitApplication.disabled = false;
+
+                // Update Overall Score
+                const overall = data.overall_score || 0;
+                aiOverallScoreText.innerText = `${overall}%`;
+                aiOverallProgressBar.style.width = `${overall}%`;
+
+                // Update Readiness Badge
+                aiReadinessBadge.className = `badge bg-${data.readiness_class || 'primary'} bg-opacity-10 text-${data.readiness_class || 'primary'} px-3 py-1 rounded-pill fw-bold`;
+                aiReadinessBadge.innerHTML = `<i class="fa-solid fa-shield-check me-1"></i> ${data.readiness_badge}`;
+
+                // Update Sub Scores
+                aiResumeScoreText.innerText = `${data.resume_score}%`;
+                aiCoverScoreText.innerText = `${data.cover_score}%`;
+
+                // Update Resume Feedback List
+                if (data.resume_feedback && data.resume_feedback.length > 0) {
+                    resumeFeedbackList.innerHTML = '';
+                    data.resume_feedback.forEach(item => {
+                        const li = document.createElement('li');
+                        li.className = `text-${item.type || 'dark'}`;
+                        li.innerHTML = `<i class="fa-solid ${item.icon || 'fa-check'} me-1"></i> ${item.text}`;
+                        resumeFeedbackList.appendChild(li);
+                    });
+                }
+
+                // Update Cover Letter Feedback List
+                if (data.cover_feedback && data.cover_feedback.length > 0) {
+                    coverFeedbackList.innerHTML = '';
+                    data.cover_feedback.forEach(item => {
+                        const li = document.createElement('li');
+                        li.className = `text-${item.type || 'dark'}`;
+                        li.innerHTML = `<i class="fa-solid ${item.icon || 'fa-check'} me-1"></i> ${item.text}`;
+                        coverFeedbackList.appendChild(li);
+                    });
+                }
+
+                // Update AI Suggestions List
+                if (data.resume_suggestions && data.resume_suggestions.length > 0 && applyAiSuggestionsList && applyAiSuggestionsBox) {
+                    applyAiSuggestionsList.innerHTML = '';
+                    data.resume_suggestions.forEach(sug => {
+                        const li = document.createElement('li');
+                        li.className = 'suggestion-item d-flex align-items-start gap-2 text-secondary';
+                        li.innerHTML = `<i class="fa-solid fa-arrow-right text-primary mt-1" style="font-size: 0.72rem;"></i><span>${sug}</span>`;
+                        applyAiSuggestionsList.appendChild(li);
+                    });
+                    applyAiSuggestionsBox.classList.remove('d-none');
+                } else if (applyAiSuggestionsBox) {
+                    applyAiSuggestionsBox.classList.add('d-none');
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Error running AI check:', err);
+        })
+        .finally(() => {
+            aiBox.classList.remove('ai-scanning');
+            if (btnAiCheck) {
+                btnAiCheck.disabled = false;
+                btnAiCheck.innerHTML = '<i class="fa-solid fa-robot text-info me-1"></i> AI Check Quality';
+            }
+        });
+    }
+
+    if (btnAiCheck) {
+        btnAiCheck.addEventListener('click', runAiCheck);
+    }
+
+    if (resumeFileInput) {
+        resumeFileInput.addEventListener('change', function() {
+            if (uploadNewRadio) uploadNewRadio.checked = true;
+            runAiCheck();
+        });
+    }
+
+    if (useProfileRadio) {
+        useProfileRadio.addEventListener('change', runAiCheck);
+    }
+
+    const stepPanels = document.querySelectorAll('.wizard-step-panel');
+    const stepItems = document.querySelectorAll('.stepper-step');
+    const nextButtons = document.querySelectorAll('.next-step-btn');
+    const prevButtons = document.querySelectorAll('.prev-step-btn');
+    let currentStep = 1;
+
+    function renderWizardStep(step) {
+        stepPanels.forEach(panel => {
+            panel.classList.toggle('active', Number(panel.dataset.stepPanel) === step);
+        });
+
+        stepItems.forEach((item, index) => {
+            const isActive = index + 1 === step;
+            item.classList.toggle('active', isActive);
+        });
+    }
+
+    nextButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (currentStep < 4) {
+                currentStep += 1;
+                renderWizardStep(currentStep);
+            }
+        });
+    });
+
+    prevButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (currentStep > 1) {
+                currentStep -= 1;
+                renderWizardStep(currentStep);
+            }
+        });
+    });
+
+    renderWizardStep(currentStep);
+
+    // Initial check on load
+    setTimeout(runAiCheck, 300);
+});
+</script>
+{% endblock %}
+

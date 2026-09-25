@@ -1,0 +1,139 @@
+{% include 'includes/header.html' %}
+<div class="container py-4">
+    <!-- Header Banner -->
+    <div style="background:linear-gradient(135deg,#0a3d6b 0%,#1866a3 58%,#2196f3 100%);color:#fff;padding:1.6rem 2rem;border-radius:16px;margin-bottom:1.75rem;box-shadow:0 8px 24px rgba(10,61,107,0.18);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+            <div>
+                <p style="margin:0 0 .3rem;font-size:.85rem;color:rgba(255,255,255,0.75);">
+                    <a href="/admin/dashboard.php" style="color:rgba(255,255,255,0.85);text-decoration:none;">Admin</a> / Jobs Management
+                </p>
+                <h1 style="margin:0;font-size:1.65rem;font-weight:700;"><i class="fas fa-briefcase" style="color:#f59e0b;margin-right:.5rem;"></i> Job Vacancies & Postings</h1>
+                <p style="margin:.3rem 0 0;font-size:.9rem;color:rgba(255,255,255,0.85);">Manage client company job listings, requirements, statuses, and candidate pools.</p>
+            </div>
+            <div style="display:flex;gap:.5rem;">
+                <a href="/admin/post_job.php" style="background:#f59e0b;color:#1e293b;border:none;padding:.6rem 1.25rem;border-radius:8px;text-decoration:none;font-size:.88rem;font-weight:700;display:inline-flex;align-items:center;gap:.4rem;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+                    <i class="fas fa-plus-circle"></i> Post New Vacancy
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if posted_success %}
+        <div style="background:#dcfce7;border:1px solid #22c55e;color:#15803d;padding:.85rem 1.25rem;border-radius:10px;margin-bottom:1.5rem;font-weight:600;display:flex;align-items:center;gap:.5rem;">
+            <i class="fas fa-check-circle"></i> Job vacancy posted and published successfully!
+        </div>
+    {% endif %}
+    {% if updated_success %}
+        <div style="background:#dcfce7;border:1px solid #22c55e;color:#15803d;padding:.85rem 1.25rem;border-radius:10px;margin-bottom:1.5rem;font-weight:600;display:flex;align-items:center;gap:.5rem;">
+            <i class="fas fa-check-circle"></i> Job vacancy updated successfully!
+        </div>
+    {% endif %}
+
+    <!-- Filter Strip -->
+    <div style="background:#fff;padding:1.25rem;border-radius:14px;border:1px solid #e2e8f0;box-shadow:0 2px 10px rgba(0,0,0,0.04);margin-bottom:1.75rem;">
+        <form method="GET" action="" style="display:flex;flex-wrap:wrap;gap:1rem;align-items:center;">
+            <div style="flex:1;min-width:240px;">
+                <input type="text" name="search" value="{{ search }}" placeholder="Search by job title, hiring company, skills, or location..."
+                       style="width:100%;padding:.65rem .9rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.88rem;background:#f8fafc;box-sizing:border-box;">
+            </div>
+            <div style="min-width:180px;">
+                <select name="status" onchange="this.form.submit()" style="width:100%;padding:.65rem .9rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.88rem;background:#f8fafc;box-sizing:border-box;">
+                    <option value="">All Statuses</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                    <option value="draft" {% if status_filter == 'draft' %}selected{% endif %}>Draft</option>
+                    <option value="closed" {% if status_filter == 'closed' %}selected{% endif %}>Closed</option>
+                </select>
+            </div>
+            <button type="submit" style="padding:.65rem 1.25rem;background:#1866a3;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;">
+                <i class="fas fa-search"></i> Search
+            </button>
+            {% if search or status_filter %}
+                <a href="/admin/jobs.php" style="color:#64748b;text-decoration:none;font-size:.85rem;font-weight:600;">Clear</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Jobs Table -->
+    <div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;box-shadow:0 2px 12px rgba(0,0,0,0.04);overflow:hidden;">
+        <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;text-align:left;font-size:.88rem;">
+                <thead>
+                    <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;color:#475569;font-size:.78rem;text-transform:uppercase;letter-spacing:.5px;">
+                        <th style="padding:1rem 1.25rem;">Job Opening</th>
+                        <th style="padding:1rem 1.25rem;">Hiring Client</th>
+                        <th style="padding:1rem 1.25rem;">Type & Location</th>
+                        <th style="padding:1rem 1.25rem;">Candidates</th>
+                        <th style="padding:1rem 1.25rem;">Status</th>
+                        <th style="padding:1rem 1.25rem;">Posted Date</th>
+                        <th style="padding:1rem 1.25rem;text-align:right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for job in jobs %}
+                        <tr style="border-bottom:1px solid #f1f5f9;transition:background 0.15s ease;">
+                            <td style="padding:1.1rem 1.25rem;">
+                                <div style="font-weight:700;color:#0f172a;font-size:.95rem;">{{ job.title }}</div>
+                                {% if job.salary_range %}
+                                    <div style="font-size:.75rem;color:#16a34a;font-weight:600;margin-top:.15rem;">{{ job.salary_range }}</div>
+                                {% endif %}
+                            </td>
+                            <td style="padding:1.1rem 1.25rem;">
+                                <div style="font-weight:600;color:#1e293b;"><i class="fas fa-building" style="color:#94a3b8;margin-right:.3rem;"></i> {{ job.employer.company_name|default:"MultiBiz Partner" }}</div>
+                            </td>
+                            <td style="padding:1.1rem 1.25rem;">
+                                <div style="font-weight:600;color:#334155;">{{ job.employment_type|title }}</div>
+                                <div style="font-size:.78rem;color:#64748b;"><i class="fas fa-map-marker-alt"></i> {{ job.location }}</div>
+                            </td>
+                            <td style="padding:1.1rem 1.25rem;">
+                                <a href="/admin/candidates.php?job_id={{ job.job_id }}" style="background:#e0f2fe;color:#0369a1;padding:.35rem .75rem;border-radius:20px;text-decoration:none;font-weight:700;font-size:.78rem;display:inline-flex;align-items:center;gap:.35rem;">
+                                    <i class="fas fa-users-viewfinder"></i> {{ job.applicant_count|default:job.applications.count }} Candidates
+                                </a>
+                            </td>
+                            <td style="padding:1.1rem 1.25rem;">
+                                <span style="display:inline-block;padding:.25rem .65rem;border-radius:12px;font-size:.75rem;font-weight:700;
+                                    {% if job.status == 'active' %}background:#dcfce7;color:#15803d;
+                                    {% elif job.status == 'draft' %}background:#fef3c7;color:#b45309;
+                                    {% else %}background:#f1f5f9;color:#64748b;{% endif %}">
+                                    {{ job.status|title }}
+                                </span>
+                            </td>
+                            <td style="padding:1.1rem 1.25rem;color:#64748b;font-size:.82rem;">
+                                {{ job.posted_at|date:"M d, Y" }}
+                            </td>
+                            <td style="padding:1.1rem 1.25rem;text-align:right;">
+                                <div style="display:inline-flex;gap:.4rem;align-items:center;">
+                                    <a href="/admin/edit_job.php?id={{ job.job_id }}" style="padding:.4rem .7rem;border:1px solid #cbd5e1;background:#fff;border-radius:6px;color:#334155;text-decoration:none;font-size:.8rem;font-weight:600;" title="Edit Job">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                    <form method="POST" action="" style="display:inline;" onsubmit="return confirm('Toggle status for this job?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="toggle_status">
+                                        <input type="hidden" name="job_id" value="{{ job.job_id }}">
+                                        <button type="submit" style="padding:.4rem .65rem;border:1px solid #cbd5e1;background:#f8fafc;border-radius:6px;color:#475569;cursor:pointer;font-size:.8rem;" title="Toggle Active/Closed">
+                                            <i class="fas fa-power-off"></i>
+                                        </button>
+                                    </form>
+                                    <form method="POST" action="" style="display:inline;" onsubmit="return confirm('Delete this job posting and its mappings?');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_job">
+                                        <input type="hidden" name="job_id" value="{{ job.job_id }}">
+                                        <button type="submit" style="padding:.4rem .65rem;border:1px solid #fecaca;background:#fff;border-radius:6px;color:#dc2626;cursor:pointer;font-size:.8rem;" title="Delete Job">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" style="padding:3rem;text-align:center;color:#64748b;">
+                                <i class="fas fa-briefcase" style="font-size:2rem;color:#cbd5e1;margin-bottom:.5rem;"></i>
+                                <div>No job postings found. Click <strong>Post New Vacancy</strong> to add your first job.</div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

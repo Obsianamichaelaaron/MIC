@@ -1,0 +1,688 @@
+{% include 'includes/header.html' %}
+<style>
+.apply-container { display: none; }
+.application-studio { min-height: calc(100vh - 86px); padding: 1rem 1.25rem 2rem; background: #c7d1dd; color: #1e293b; }
+.studio-shell { max-width: 1240px; margin: 0 auto; }
+.studio-topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: .8rem; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; }
+.studio-crumbs { margin: 0 0 .35rem; color: #64748b; font-size: .72rem; }
+.studio-crumbs a { color: #0b5bd3; text-decoration: none; }
+.studio-job { display: flex; align-items: center; gap: .7rem; }
+.studio-avatar { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 9px; background: #e8f0fe; color: #1866a3; font-weight: 700; }
+.studio-job h1 { margin: 0; color: #0f172a; font-size: 1.3rem; font-weight: 700; }
+.studio-job p { margin: .2rem 0 0; color: #64748b; font-size: .75rem; }
+.studio-match { padding: .35rem .65rem; border-radius: 999px; background: #e8f0fe; color: #1866a3; font-size: .76rem; font-weight: 700; }
+.studio-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(300px, 5fr); gap: 1rem; align-items: stretch; }
+.studio-card { padding: 1.15rem; border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; box-shadow: 0 4px 16px rgba(15,23,42,.06); }
+.studio-card h2 { margin: 0; color: #0f172a; font-size: .98rem; }
+.studio-card-heading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding-bottom: .7rem; margin-bottom: .85rem; border-bottom: 1px solid #e2e8f0; }
+.studio-card-heading a { color: #0b5bd3; font-size: .72rem; font-weight: 600; text-decoration: none; }
+.studio-section { margin-bottom: 1rem; }
+.studio-section-title { display: flex; align-items: center; gap: .45rem; margin-bottom: .55rem; color: #334155; font-size: .82rem; font-weight: 700; }
+.studio-step { display: grid; place-items: center; width: 23px; height: 23px; border-radius: 50%; background: #e8f0fe; color: #0b5bd3; font-size: .7rem; }
+.studio-choice { display: flex; align-items: center; gap: .55rem; padding: .65rem .75rem; margin: .4rem 0; border: 1px solid #dbe4ef; border-radius: 8px; background: #fff; font-size: .76rem; }
+.studio-choice input { flex: 0 0 auto; }
+.studio-choice strong { display: block; color: #334155; }
+.studio-choice small { color: #64748b; }
+.studio-choice-file { width: 100%; margin-top: .45rem; font-size: .75rem; }
+.studio-card textarea { width: 100%; min-height: 120px; box-sizing: border-box; padding: .7rem; border: 1px solid #dbe4ef; border-radius: 8px; resize: vertical; font: inherit; font-size: .82rem; }
+.studio-card textarea:focus, .studio-choice-file:focus { outline: none; border-color: #0b5bd3; }
+.studio-actions { display: flex; justify-content: space-between; gap: .65rem; padding-top: .9rem; margin-top: 1rem; border-top: 1px solid #e2e8f0; }
+.studio-btn { padding: .6rem .9rem; border-radius: 7px; font-size: .78rem; font-weight: 600; text-decoration: none; cursor: pointer; }
+.studio-btn-cancel { border: 1px solid #dbe4ef; background: #fff; color: #334155; }
+.studio-btn-submit { border: 1px solid #0b5bd3; background: #0b5bd3; color: #fff; }
+.studio-diagnostics { display: flex; flex-direction: column; justify-content: space-between; }
+.studio-score-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: .5rem; margin-bottom: .9rem; }
+.studio-score { padding: .7rem .45rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; text-align: center; }
+.studio-score label { display: block; color: #64748b; font-size: .65rem; }
+.studio-score strong { display: block; margin-top: .2rem; color: #0b5bd3; font-size: 1.1rem; }
+.studio-progress { height: 5px; margin-top: .35rem; overflow: hidden; border-radius: 99px; background: #e2e8f0; }
+.studio-progress span { display: block; width: {{ match_score }}%; height: 100%; background: #0b5bd3; }
+.studio-diagnostic { padding: .7rem .8rem; margin-bottom: .55rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
+.studio-diagnostic h3 { margin: 0 0 .3rem; color: #334155; font-size: .78rem; }
+.studio-diagnostic p { margin: 0; color: #64748b; font-size: .72rem; line-height: 1.45; }
+@media (max-width: 850px) { .studio-grid { grid-template-columns: 1fr; } .studio-diagnostics { min-height: auto; } }
+@media (max-width: 550px) { .application-studio { padding: .75rem .5rem 1.5rem; } .studio-topbar { align-items: flex-start; flex-direction: column; } .studio-topbar > .studio-match { align-self: flex-start; } .studio-actions { flex-direction: column-reverse; } .studio-btn { text-align: center; } }
+[data-theme="dark"] .application-studio { background: #0f1117; color: #e2e8f0; }
+[data-theme="dark"] .studio-card, [data-theme="dark"] .studio-choice { background: #1a1d27; border-color: #2d3348; }
+[data-theme="dark"] .studio-job h1, [data-theme="dark"] .studio-card h2, [data-theme="dark"] .studio-section-title, [data-theme="dark"] .studio-choice strong, [data-theme="dark"] .studio-diagnostic h3 { color: #e2e8f0; }
+[data-theme="dark"] .studio-score, [data-theme="dark"] .studio-diagnostic { background: #1e2235; border-color: #2d3348; }
+[data-theme="dark"] .studio-card textarea, [data-theme="dark"] .studio-choice-file { background: #242736; border-color: #2d3348; color: #e2e8f0; }
+</style>
+<style media="not all">
+body {
+    background: #d8e0eb;
+}
+
+/* Responsive Styles */
+.apply-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.apply-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    padding: clamp(1.5rem, 4vw, 2rem);
+    width: 100%;
+    max-width: 1180px;
+    min-height: calc(100vh - 76px);
+}
+
+.apply-title {
+    color: #0056b3;
+    margin-bottom: 1rem;
+    font-size: clamp(1.5rem, 4vw, 2rem);
+    font-weight: 700;
+    text-align: center;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin: 0;
+
+.job-preview {
+    background: #f8f9fa;
+    padding: clamp(1rem, 3vw, 1.5rem);
+    border-radius: 10px;
+    margin-bottom: 2rem;
+}
+
+    margin: 0 0 .45rem;
+    font-size: 1.75rem;
+    line-height: 1.15;
+    color: #333;
+    margin-bottom: 0.5rem;
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+}
+
+.job-company {
+    color: #666;
+    padding: .65rem 1rem;
+    border-radius: 8px;
+    margin: 0 auto 1rem;
+    text-align: center;
+    gap: 0.5rem;
+}
+
+.alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    margin: 0 0 .15rem;
+    font-size: 1.2rem;
+    line-height: 1.25;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    border-left: 4px solid #dc3545;
+}
+
+.match-score-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: clamp(1.5rem, 4vw, 2rem);
+    font-size: .9rem;
+    margin-bottom: 2rem;
+    color: white;
+    text-align: center;
+}
+
+    padding: .65rem .8rem;
+    margin-bottom: .75rem;
+    margin-bottom: 0.5rem;
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+}
+
+.match-score-value {
+    font-size: clamp(2.5rem, 8vw, 3rem);
+    font-weight: 700;
+    margin: 1rem 0;
+}
+    padding: 1.25rem;
+    border-radius: 10px;
+    margin: 0;
+    font-size: clamp(0.95rem, 2.5vw, 1.1rem);
+    margin-top: 0.5rem;
+    line-height: 1.4;
+}
+
+.resume-feedback {
+    margin: 0 0 .25rem;
+    font-size: 1.15rem;
+    font-size: clamp(0.85rem, 2.2vw, 0.95rem);
+    margin-top: 0.75rem;
+    font-style: italic;
+    display: flex;
+    font-size: 2.7rem;
+    margin: .45rem 0;
+    line-height: 1;
+    gap: 0.5rem;
+}
+
+.score-breakdown {
+    background: rgba(255,255,255,0.1);
+    padding: clamp(1rem, 3vw, 1.5rem);
+    border-radius: 10px;
+    font-size: .88rem;
+    margin: .35rem 0 0;
+    line-height: 1.3;
+    text-align: left;
+}
+
+.score-breakdown p {
+    color: rgba(255,255,255,0.9);
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.form-group {
+    font-size: .8rem;
+    margin-top: .45rem;
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #333;
+    font-weight: 500;
+    font-size: clamp(0.95rem, 2.5vw, 1rem);
+}
+    padding: .7rem .8rem;
+    border-radius: 8px;
+    margin-top: .75rem;
+    padding: 0.75rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+    font-size: .78rem;
+    outline: none;
+    border-color: #0056b3;
+}
+    margin-bottom: .75rem;
+.form-textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-size: 1rem;
+    resize: vertical;
+    min-height: 150px;
+    margin-bottom: .3rem;
+}
+
+.file-info {
+    background: #f8f9fa;
+    padding: .5rem .65rem;
+    font-size: .9rem;
+    margin-bottom: 0.5rem;
+}
+
+.file-info p {
+    padding: .6rem .65rem;
+    font-size: .9rem;
+    height: 108px;
+    min-height: 108px;
+    line-height: 1.4;
+}
+
+.file-warning {
+    padding: .55rem .7rem;
+    font-size: clamp(0.85rem, 2vw, 0.9rem);
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: .78rem;
+
+.file-help {
+    color: #666;
+    display: block;
+    font-size: .8rem;
+    margin: 0 0 .35rem;
+}
+
+.form-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    font-size: .75rem;
+}
+
+@media (min-width: 480px) {
+    .form-actions {
+    flex-direction: row;
+    gap: .65rem;
+    margin-top: .9rem;
+}
+
+.submit-button {
+    background: linear-gradient(135deg, #0056b3 0%, #004494 100%);
+    color: white;
+    min-height: 44px;
+    padding: .55rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: .55rem 1rem;
+    transition: all 0.3s ease;
+    flex: 1;
+}
+
+.submit-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 86, 179, 0.3);
+}
+
+.cancel-button {
+    padding: 0.75rem 2rem;
+    border: 2px solid #0056b3;
+    color: #0056b3;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    text-align: center;
+    flex: 1;
+}
+
+.cancel-button:hover {
+    background: #0056b3;
+    color: white;
+    transform: translateY(-2px);
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 480px) {
+    .apply-container {
+        padding: 0 0.5rem;
+    }
+    
+    .apply-card {
+        padding: 1rem;
+        border-radius: 10px;
+        margin: 0.5rem 0;
+    }
+    
+    .match-score-section {
+        padding: 1.25rem;
+        border-radius: 10px;
+    }
+    
+    .form-input,
+    .form-textarea {
+        padding: 0.65rem;
+        font-size: 0.9rem;
+    }
+    
+    .submit-button,
+    .cancel-button {
+        padding: 0.65rem 1.5rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 768px) {
+    .apply-container {
+        max-width: 700px;
+    }
+    
+    .form-actions {
+        justify-content: flex-start;
+    }
+    
+    .submit-button {
+        flex: 2;
+    }
+    
+    .cancel-button {
+        flex: 1;
+    }
+}
+
+/* Dark mode support */
+[data-theme="dark"] .apply-card {
+    background: #1a1d27;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+[data-theme="dark"] .apply-title {
+    color: #7aa2f7;
+}
+[data-theme="dark"] .job-preview {
+    background: #1e2235;
+}
+[data-theme="dark"] .job-preview h3 {
+    color: #e2e8f0;
+}
+[data-theme="dark"] .job-company {
+    color: #94a3b8;
+}
+[data-theme="dark"] .form-label {
+    color: #cbd5e1;
+}
+[data-theme="dark"] .form-input,
+[data-theme="dark"] .form-textarea {
+    background: #242736;
+    border-color: #2d3348;
+    color: #e2e8f0;
+}
+[data-theme="dark"] .file-info {
+    background: #1e2235;
+    color: #cbd5e1;
+}
+[data-theme="dark"] .cancel-button {
+    border-color: #7aa2f7;
+    color: #7aa2f7;
+}
+[data-theme="dark"] .cancel-button:hover {
+    background: #7aa2f7;
+    color: #0f1117;
+}
+</style>
+
+<style media="not all">
+/* Compact desktop application workspace */
+body { background: #d8e0eb; }
+.apply-card { background: #fff; box-shadow: 0 4px 20px rgba(0,0,0,.1); }
+.job-preview, .file-info { background: #f8f9fa; }
+.alert-error { background: #f8d7da; color: #721c24; border-left: 4px solid #dc3545; }
+.match-score-section { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; text-align: center; }
+.match-score-title, .match-score-value { color: #fff; }
+.match-feedback, .resume-feedback, .score-breakdown p { color: rgba(255,255,255,.9); }
+.form-label { display: block; color: #333; font-weight: 500; }
+.form-input, .form-textarea { width: 100%; border: 2px solid #e0e0e0; border-radius: 8px; font-family: inherit; box-sizing: border-box; }
+.form-input:focus, .form-textarea:focus { outline: none; border-color: #0056b3; }
+.form-textarea { resize: vertical; }
+.file-info p, .file-help { color: #666; }
+.file-warning { color: #dc3545; display: flex; align-items: center; gap: .5rem; }
+.submit-button { background: linear-gradient(135deg, #0056b3 0%, #004494 100%); color: #fff; border: 0; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: .5rem; }
+.cancel-button { border: 2px solid #0056b3; color: #0056b3; border-radius: 8px; text-decoration: none; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.apply-container {
+    width: 100% !important;
+    max-width: 1180px !important;
+    min-height: calc(100vh - 76px);
+    margin: 0 auto !important;
+    padding: .75rem 1rem 1rem !important;
+    box-sizing: border-box;
+}
+.apply-card {
+    box-sizing: border-box;
+    margin: 0 !important;
+    padding: 1.25rem 1.5rem !important;
+    border-radius: 12px !important;
+}
+.apply-title {
+    margin: 0 0 .45rem !important;
+    font-size: 1.75rem !important;
+    line-height: 1.15;
+}
+.job-preview {
+    margin: 0 auto 1rem !important;
+    padding: .65rem 1rem !important;
+    border-radius: 8px;
+    text-align: center;
+}
+.job-preview h3 {
+    margin: 0 0 .15rem !important;
+    font-size: 1.2rem !important;
+    line-height: 1.25;
+}
+.job-company {
+    justify-content: center;
+    gap: .4rem;
+    margin: 0;
+    font-size: .9rem !important;
+}
+.alert-error {
+    margin: 0 0 .75rem !important;
+    padding: .65rem .8rem !important;
+}
+.apply-workspace {
+    display: grid;
+    grid-template-columns: minmax(0, 40%) minmax(0, 60%);
+    gap: 1.25rem;
+    align-items: stretch;
+}
+.match-score-section {
+    margin: 0 !important;
+    padding: 1.25rem !important;
+    border-radius: 10px !important;
+}
+.match-score-title {
+    margin: 0 0 .25rem !important;
+    font-size: 1.15rem !important;
+}
+.match-score-value {
+    margin: .45rem 0 !important;
+    font-size: 2.7rem !important;
+    line-height: 1;
+}
+.match-feedback {
+    margin: .35rem 0 0 !important;
+    font-size: .88rem !important;
+    line-height: 1.3;
+}
+.resume-feedback {
+    margin: .45rem 0 0 !important;
+    font-size: .8rem !important;
+}
+.score-breakdown {
+    margin-top: .75rem !important;
+    padding: .7rem .8rem !important;
+    border-radius: 8px !important;
+}
+.score-breakdown p {
+    font-size: .78rem !important;
+    line-height: 1.4;
+}
+.apply-workspace form {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+.form-group {
+    margin-bottom: .75rem !important;
+}
+.form-label {
+    margin-bottom: .3rem !important;
+    font-size: .9rem !important;
+}
+.form-input {
+    padding: .5rem .65rem !important;
+    font-size: .9rem !important;
+}
+.form-textarea {
+    height: 108px !important;
+    min-height: 108px !important;
+    padding: .6rem .65rem !important;
+    font-size: .9rem !important;
+}
+.file-info {
+    padding: .55rem .7rem !important;
+}
+.file-info p,
+.file-warning {
+    font-size: .78rem !important;
+    line-height: 1.35;
+}
+.file-warning {
+    margin: 0 0 .35rem !important;
+}
+.file-help {
+    margin-top: .25rem;
+    font-size: .75rem !important;
+}
+.form-actions {
+    flex-direction: row !important;
+    gap: .65rem !important;
+    margin-top: auto !important;
+    padding-top: .2rem;
+}
+.submit-button,
+.cancel-button {
+    min-height: 44px;
+    padding: .55rem 1rem !important;
+    font-size: .9rem !important;
+}
+@media (max-width: 767px) {
+    .apply-container {
+        min-height: 0;
+        padding: .5rem !important;
+    }
+    .apply-card {
+        padding: 1rem !important;
+    }
+    .apply-workspace {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .form-actions {
+        margin-top: .25rem !important;
+    }
+}
+@media (prefers-color-scheme: dark) {
+    [data-theme="dark"] .apply-workspace { color: #e2e8f0; }
+}
+</style>
+
+<div class="application-studio">
+    <div class="studio-shell">
+        <header class="studio-topbar">
+            <div>
+                <p class="studio-crumbs"><a href="dashboard.php">Dashboard</a> / <a href="jobs.php">Jobs</a> / {{ job.title }} / Application Studio</p>
+                <div class="studio-job"><div class="studio-avatar">{{ job.employer.company_name|slice:":1"|upper|default:"M" }}</div><div><h1>{{ job.title }}</h1><p><i class="fas fa-building"></i> {{ job.employer.company_name|default:"Multibiz Partner" }} · <i class="fas fa-location-dot"></i> {{ job.location }}</p></div></div>
+            </div>
+            <span class="studio-match"><i class="fas fa-bolt"></i> {{ match_score|floatformat:0 }}% AI Match</span>
+        </header>
+        {% if error %}
+            <div style="background:#fee2e2;border:1px solid #ef4444;color:#b91c1c;padding:.85rem 1.25rem;border-radius:10px;margin-bottom:1.25rem;display:flex;align-items:center;gap:.75rem;font-size:.9rem;font-weight:600;">
+                <i class="fas fa-exclamation-triangle" style="font-size:1.2rem;color:#dc2626;"></i>
+                <span>{{ error }}</span>
+            </div>
+        {% endif %}
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="studio-grid">
+                <section class="studio-card">
+                    <div class="studio-card-heading"><h2>Application Dossier and Submission</h2><a href="job_details.php?id={{ job.job_id }}">View job description</a></div>
+                    <div class="studio-section"><div class="studio-section-title"><span class="studio-step">1</span> Resume and Credentials</div>
+                        {% if profile.resume_file %}<label class="studio-choice"><input type="radio" name="use_existing_resume" value="1" checked><span><strong>Use profile master resume</strong><small><i class="fas fa-file-lines"></i> {{ profile.resume_file }}</small></span></label>{% endif %}
+                        <label class="studio-choice"><input type="radio" name="use_existing_resume" value="0" {% if not profile.resume_file %}checked{% endif %}><span><strong>Upload a custom resume for this application</strong><input class="studio-choice-file" type="file" name="resume" accept=".pdf,.doc,.docx"></span></label>
+                    </div>
+                    <div class="studio-section"><div class="studio-section-title"><span class="studio-step">2</span> Candidate Pitch and Cover Letter</div><textarea name="cover_letter" placeholder="Introduce yourself, explain your interest in this role, and summarize relevant achievements..."></textarea><small style="display:block;margin-top:.3rem;color:#64748b;font-size:.7rem">Optional cover letter</small></div>
+                    <div class="studio-actions"><a class="studio-btn studio-btn-cancel" href="job_details.php?id={{ job.job_id }}"><i class="fas fa-xmark"></i> Cancel</a><button class="studio-btn studio-btn-submit" type="submit"><i class="fas fa-paper-plane"></i> Submit Application</button></div>
+                </section>
+                <aside class="studio-card studio-diagnostics"><div><div class="studio-card-heading"><h2><i class="fas fa-brain" style="color:#0b5bd3"></i> AI Quality Fit Review</h2><span class="studio-match">Application Ready</span></div><div class="studio-score-grid"><div class="studio-score"><label>Application Strength</label><strong>{{ match_score|floatformat:0 }}%</strong><div class="studio-progress"><span></span></div></div><div class="studio-score"><label>Resume</label><strong>{% if profile.resume_file %}85%{% else %}0%{% endif %}</strong></div><div class="studio-score"><label>Pitch</label><strong>--</strong></div></div><div class="studio-diagnostic"><h3><i class="fas fa-file-pdf" style="color:#dc3545"></i> Resume Diagnostics</h3><p>{% if profile.resume_file %}<span style="color:#2e7d32">Profile master resume verified and attached.</span>{% else %}<span style="color:#b7791f">Please attach a resume to complete your application.</span>{% endif %}<br><span style="color:#1866a3">AI skill matching computed against {{ job.title }}.</span></p></div><div class="studio-diagnostic"><h3><i class="fas fa-pen-nib" style="color:#0b5bd3"></i> Cover Letter Diagnostics</h3><p>Add a focused cover letter to strengthen your application.</p></div></div></aside>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="apply-container">
+    <div class="apply-card">
+        <h1 class="apply-title">
+            <i class="fas fa-paper-plane"></i> Apply for Job
+        </h1>
+        
+        <div class="job-preview">
+            <h3>{{ job.title }}</h3>
+            <p class="job-company">
+                <i class="fas fa-building"></i> 
+                {% if job.company_name %}{{ job.company_name }}{% else %}Company Not Specified {% endif %}
+            </p>
+        </div>
+        
+        {% if error %}
+            <div class="alert-error">
+                <i class="fas fa-exclamation-circle"></i> {{ error }}
+            </div>
+        {% endif %}
+        
+        <div class="apply-workspace">
+        <!-- Match Score Display -->
+        <div class="match-score-section">
+            <h3 class="match-score-title">
+                <i class="fas fa-star"></i> Your Match Score
+            </h3>
+            <div class="match-score-value">
+                {{ final_match_score|floatformat:1 }}%
+            </div>
+            <p class="match-feedback">
+                {{ match_feedback }}
+            </p>
+            {% if resume_feedback %}
+                <p class="resume-feedback">
+                    <i class="fas fa-file-pdf"></i> {{ resume_feedback }}
+                </p>
+            {% endif %}
+            
+            <div class="score-breakdown">
+                <p>
+                    <i class="fas fa-info-circle"></i> <strong>Score Breakdown:</strong> 
+                    Base Match Score: <strong>{{ match_score|floatformat:1 }}%</strong>
+                    {% if resume_quality_score > 0 %}
+                        + Resume Quality: <strong>+{{ resume_quality_score|floatformat:1 }}%</strong>
+                    {% endif %}
+                    <br><em style="color: rgba(255,255,255,0.8);">Note: Base score matches what will be stored and shown in jobs listing.</em>
+                </p>
+            </div>
+        </div>
+        
+        <form method="POST" action="" enctype="multipart/form-data">
+    {% csrf_token %}
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-file-pdf"></i> Resume (PDF, Max 5MB)
+                </label>
+                {% if applicant.resume_file %}
+                    <div class="file-info">
+                        <p>
+                            <i class="fas fa-info-circle"></i> Current resume from profile: 
+                            <strong>{{ applicant.resume_file }}</strong>
+                        </p>
+                        <p style="color: #999; margin-top: 0.25rem;">
+                            You can upload a different resume for this specific application, or leave empty to use your profile resume.
+                        </p>
+                    </div>
+                {% else %}
+                    <p class="file-warning">
+                        <i class="fas fa-exclamation-triangle"></i> No resume in your profile. Please upload a resume for this application.
+                    </p>
+                {% endif %}
+                <input type="file" name="resume" accept=".pdf,.doc,.docx" class="form-input">
+                <small class="file-help">
+                    <i class="fas fa-info-circle"></i> PDF, DOC, or DOCX accepted. Maximum file size: 5MB
+                </small>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label">
+                    <i class="fas fa-file-alt"></i> Cover Letter (Optional)
+                </label>
+                <textarea name="cover_letter" class="form-textarea" placeholder="Write your cover letter here...">{{ cover_letter|default:"" }}</textarea>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="submit-button">
+                    <i class="fas fa-paper-plane"></i> Submit Application
+                </button>
+                <a href="job_details.php?id={{ job.job_id }}" class="cancel-button">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+            </div>
+        </form>
+        </div>
+    </div>
+</div>
+
+{% include 'includes/footer.html' %}
