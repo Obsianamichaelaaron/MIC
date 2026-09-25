@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ job.title }} - MULTIBIZ INTERNATIONAL CORPORATION</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        
+        .navbar {
+            background: white;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #0056b3;
+            text-decoration: none;
+        }
+        
+        .navbar-menu {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .navbar-menu a {
+            color: #333;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        .navbar-menu a:hover {
+            color: #0056b3;
+        }
+        
+        .btn-login {
+            background: linear-gradient(135deg, #0056b3 0%, #004494 100%);
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+        
+        .job-details {
+            background: white;
+            padding: 3rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+        }
+        
+        .back-link {
+            color: #0056b3;
+            text-decoration: none;
+            margin-bottom: 2rem;
+            display: inline-block;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .job-header {
+            margin-bottom: 2rem;
+        }
+        
+        .job-title {
+            font-size: 2.5rem;
+            color: #0056b3;
+            margin-bottom: 1rem;
+        }
+        
+        .job-company {
+            font-size: 1.3rem;
+            color: #666;
+            margin-bottom: 1rem;
+        }
+        
+        .job-meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .job-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #666;
+        }
+        
+        .job-meta-item i {
+            color: #0056b3;
+        }
+        
+        .job-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 3rem;
+        }
+        
+        .job-main {
+            line-height: 1.8;
+        }
+        
+        .job-section {
+            margin-bottom: 2rem;
+        }
+        
+        .job-section h3 {
+            color: #333;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+        }
+        
+        .job-section p {
+            color: #666;
+            white-space: pre-wrap;
+        }
+        
+        .job-skills {
+            margin-top: 1rem;
+            padding-left: 1.2rem;
+            list-style: disc;
+            color: #ffffff;
+        }
+
+        .skill-tag {
+            display: list-item;
+            color: #ffffff !important;
+            font-size: 0.96rem;
+            font-weight: 500;
+            line-height: 1.8;
+            margin-bottom: 0.2rem;
+            list-style: disc;
+        }
+        
+        .job-sidebar {
+            position: sticky;
+            top: 2rem;
+            height: fit-content;
+        }
+        
+        .sidebar-card {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .sidebar-card h3 {
+            color: #333;
+            margin-bottom: 1rem;
+        }
+        
+        .sidebar-card p {
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+        
+        .btn-apply-large {
+            display: block;
+            width: 100%;
+            background: linear-gradient(135deg, #0056b3 0%, #004494 100%);
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            text-align: center;
+            font-size: 1.1rem;
+            transition: transform 0.2s;
+            margin-top: 1rem;
+        }
+        
+        .btn-apply-large:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-apply-green {
+            background: #4CAF50;
+        }
+        
+        .btn-apply-green:hover {
+            background: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="index.php" class="navbar-brand">
+            <i class="fas fa-briefcase"></i> MULTIBIZ INTERNATIONAL CORPORATION
+        </a>
+        <div class="navbar-menu">
+            <a href="index.php">Home</a>
+            <a href="jobs.php">Browse Jobs</a>
+            <a href="loginregister" class="btn-login">
+                <i class="fas fa-sign-in-alt"></i> Login / Register
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="job-details">
+            <a href="jobs.php" class="back-link">
+                <i class="fas fa-arrow-left"></i> Back to Jobs
+            </a>
+            
+            <div class="job-header">
+                <h1 class="job-title">{{ job.title }}</h1>
+                <p class="job-company">
+                    <i class="fas fa-building"></i> {{ job.company_name|default:"Company Not Specified" }}
+                </p>
+                
+                <div class="job-meta-grid">
+                    <div class="job-meta-item">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>{{ job.location|default:"Location Not Specified" }}</span>
+                    </div>
+                    <div class="job-meta-item">
+                        <i class="fas fa-briefcase"></i>
+                        <span>{{ job.employment_type|title }}</span>
+                    </div>
+                    <div class="job-meta-item">
+                        <i class="fas fa-clock"></i>
+                        <span>Posted {{ job.posted_at|date:"F d, Y" }}</span>
+                    </div>
+                    {% if job.salary_range %}
+                        <div class="job-meta-item">
+                            <i class="fas fa-money-bill-wave"></i>
+                            <span style="color: #4CAF50; font-weight: 600;">{{ job.salary_range }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <div class="job-content">
+                <div class="job-main">
+                    <div class="job-section">
+                        <h3>Job Description</h3>
+                        <p>{{ job.description }}</p>
+                    </div>
+                    
+                    {% if job.requirements %}
+                        <div class="job-section">
+                            <h3>Requirements</h3>
+                            <p>{{ job.requirements }}</p>
+                        </div>
+                    {% endif %}
+                    
+                    {% if job.skills_required %}
+                        <div class="job-section">
+                            <h3>Required Skills</h3>
+                            <ul class="job-skills">
+                                {% for skill in skills %}
+                                    <li class="skill-tag">{{ skill|trim }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="job-sidebar">
+                    <div class="sidebar-card">
+                        <h3>Job Summary</h3>
+                        <p><strong>Location:</strong> {{ job.location }}</p>
+                        <p><strong>Type:</strong> {{ job.employment_type|title }}</p>
+                        {% if job.salary_range %}
+                            <p><strong>Salary:</strong> {{ job.salary_range }}</p>
+                        {% endif %}
+                        <p><strong>Posted:</strong> {{ job.posted_at|date:"M d, Y" }}</p>
+                    </div>
+                    
+                    {% if job.company_name %}
+                        <div class="sidebar-card">
+                            <h3>About Company</h3>
+                            <p><strong>{{ job.company_name }}</strong></p>
+                            {% if job.company_address %}
+                                <p><i class="fas fa-map-marker-alt"></i> {{ job.company_address }}</p>
+                            {% endif %}
+                            {% if job.company_website %}
+                                <p>
+                                    <a href="{{ job.company_website }}" target="_blank" style="color: #0056b3; text-decoration: none;">
+                                        <i class="fas fa-globe"></i> Visit Website
+                                    </a>
+                                </p>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                    
+                    <a href="loginregister?redirect=apply&job_id={{ job_id }}" class="btn-apply-large btn-apply-green">
+                        <i class="fas fa-paper-plane"></i> Apply for this Job
+                    </a>
+                    
+                    <p style="text-align: center; color: #666; margin-top: 1rem; font-size: 0.9rem;">
+                        You need to <a href="loginregister" style="color: #0056b3;">login</a> or <a href="loginregister" style="color: #0056b3;">register</a> to apply
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <footer style="background: #333; color: white; padding: 2rem; text-align: center; margin-top: 4rem;">
+        <p>&copy; {% now "Y" %} MULTIBIZ INTERNATIONAL CORPORATION. All Rights Reserved.</p>
+    </footer>
+</body>
+</html>
+

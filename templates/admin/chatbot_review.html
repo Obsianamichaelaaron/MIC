@@ -1,0 +1,189 @@
+{% include 'includes/header.html' %}
+<link rel="stylesheet" href="../css/chatbot.css">
+
+<div class="container">
+    <div style="margin-bottom: 2rem;">
+        <a href="users.php" style="color: #0056b3; text-decoration: none;">
+            <i class="fas fa-arrow-left"></i> Back to Users
+        </a>
+    </div>
+    
+    {% if success %}
+        <div style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+            {{ success }}
+        </div>
+    {% endif %}
+    
+    {% if error %}
+        <div style="background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+            {{ error }}
+        </div>
+    {% endif %}
+    
+    <div class="chatbot-container">
+        <div class="chatbot-header">
+            <div class="bot-avatar">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div style="flex: 1;">
+                <h1>Admin Assessment Review</h1>
+                <div class="status">
+                    <span class="status-dot"></span>
+                    <span>Reviewing: {{ applicant.first_name }} {{ applicant.last_name }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="question-section active" style="display: block;">
+            <div class="chat-messages" id="chatMessages" style="max-height: 500px; overflow-y: auto;">
+                {% if chatbot_answers %}
+                    <!-- Welcome Message -->
+                    <div class="chat-message bot">
+                        <div class="message-avatar bot">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-bubble bot">
+                            <p>Hello! 👋 I'm here to help you review this applicant's career assessment.</p>
+                            <p style="margin-top: 0.5rem;"><strong>Applicant:</strong> {{ applicant.first_name }} {{ applicant.last_name }}</p>
+                            <p><strong>Email:</strong> {{ applicant.email }}</p>
+                            <p><strong>Current Employability Score:</strong> <span style="color: #0056b3; font-weight: 600;">{{ applicant.employability_score|floatformat:2 }}%</span></p>
+                            {% if chatbot_answers.0.qualification_name %}
+                                <p><strong>Category:</strong> {{ chatbot_answers.0.qualification_name }}</p>
+                            {% endif %}
+                            <span class="message-time">{% now "h:i A" %}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Display all Q&A -->
+                    
+                        <div class="chat-message bot">
+                            <div class="message-avatar bot">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="message-bubble bot">
+                                <h3>Question {{ forloop.counter }}</h3>
+                                <p>{{ answer.question_text }}</p>
+                                {% if category %}
+                                    <p style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">
+                                        <i class="fas fa-tag"></i> Category: <strong>{{ ucfirst(category|title; border-radius: 15px; padding: 1.5rem; margin-top: 1rem;">
+                            <div class="message-avatar bot" style="background: rgba(255,255,255,0.2);">
+                                <i class="fas fa-comments" style="color: #FFD700;"></i>
+                            </div>
+                            <div class="message-bubble bot" style="background: transparent; color: white;">
+                                <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: white;">
+                                    <i class="fas fa-eye"></i> Employer Feedback ({{ feedback_list|length }})
+                                </p>
+                                {% for feedback in feedback_list %}
+                                    <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                                        <p style="color: white; font-weight: 600; margin-bottom: 0.5rem;">
+                                            <i class="fas fa-briefcase"></i> {{ feedback.job_title }}
+                                            {% if feedback.company_name %}
+                                                <span style="opacity: 0.8;"> - {{ feedback.company_name }}</span>
+                                            {% endif %}
+                                        </p>
+                                        <p style="color: rgba(255,255,255,0.95); line-height: 1.6; margin-bottom: 0.5rem;">
+                                            {{ feedback.feedback_message }}
+                                        </p>
+                                        <p style="color: rgba(255,255,255,0.8); font-size: 0.85rem; margin-bottom: 0.25rem;">
+                                            <i class="fas fa-user"></i> Feedback by: {{ feedback.employer_first }} {{ feedback.employer_last }}
+                                        </p>
+                                        <p style="color: rgba(255,255,255,0.8); font-size: 0.85rem; margin-bottom: 0.25rem;">
+                                            <i class="fas fa-tag"></i> Type: {{ feedback.feedback_type|title }} | 
+                                            <i class="fas fa-chart-line"></i> Score: {{ feedback.employability_score|floatformat:2 }}% | 
+                                            <i class="fas fa-info-circle"></i> Status: {{ feedback.application_status|title }}
+                                        </p>
+                                        <p style="color: rgba(255,255,255,0.7); font-size: 0.8rem;">
+                                            <i class="fas fa-clock"></i> {{ feedback.created_at|date:"F d, Y h:i A" }}
+                                        </p>
+                                    </div>
+                                {% endfor %}
+                                <span class="message-time" style="color: rgba(255,255,255,0.8);">{% now "h:i A" %}</span>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="chat-message bot">
+                            <div class="message-avatar bot">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="message-bubble bot">
+                                <p><i class="fas fa-info-circle"></i> No employer feedback has been generated yet for this candidate.</p>
+                                <p style="margin-top: 0.5rem; color: #666;">Feedback will be automatically generated when employers review this candidate's assessment.</p>
+                                <span class="message-time">{% now "h:i A" %}</span>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="chat-message bot">
+                        <div class="message-avatar bot">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-bubble bot">
+                            <p>No chatbot assessment data available for this applicant.</p>
+                            <p style="margin-top: 0.5rem;">The applicant may not have completed the career assessment yet.</p>
+                            <span class="message-time">{% now "h:i A" %}</span>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Admin Score Update Section -->
+            {% if chatbot_answers %}
+                <div style="background: #f8f9fa; padding: 2rem; border-radius: 10px; margin-top: 2rem;">
+                    <h3 style="color: #333; margin-bottom: 1rem;">
+                        <i class="fas fa-edit"></i> Update Employability Score
+                    </h3>
+                    <form method="POST" action="">
+    {% csrf_token %}
+                        <div style="margin-bottom: 1rem;">
+                            <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">
+                                What is the employability score of this applicant?
+                            </label>
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                                <button type="button" class="score-choice-btn" onclick="setScore(25)" style="padding: 1rem; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-weight: 600;">
+                                    25%
+                                </button>
+                                <button type="button" class="score-choice-btn" onclick="setScore(50)" style="padding: 1rem; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-weight: 600;">
+                                    50%
+                                </button>
+                                <button type="button" class="score-choice-btn" onclick="setScore(75)" style="padding: 1rem; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-weight: 600;">
+                                    75%
+                                </button>
+                                <button type="button" class="score-choice-btn" onclick="setScore(100)" style="padding: 1rem; border: 2px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-weight: 600;">
+                                    100%
+                                </button>
+                            </div>
+                            <input type="number" name="employability_score" id="employability_score" 
+                                   value="{{ applicant.employability_score|floatformat:2 }}" 
+                                   min="0" max="100" step="0.01" 
+                                   style="width: 100%; padding: 0.75rem; border: 2px solid #ddd; border-radius: 8px; font-size: 1.1rem; font-weight: 600; text-align: center;"
+                                   required>
+                            <small style="color: #666; display: block; margin-top: 0.5rem; text-align: center;">
+                                Or enter a custom score (0-100)
+                            </small>
+                        </div>
+                        <button type="submit" name="update_score" style="width: 100%; background: linear-gradient(135deg, #0056b3 0%, #004494 100%); color: white; padding: 1rem; border: none; border-radius: 8px; font-weight: 600; font-size: 1.1rem; cursor: pointer;">
+                            <i class="fas fa-save"></i> Update Employability Score
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function setScore(score) {
+    document.getElementById('employability_score').value = score;
+    // Highlight selected button
+    document.querySelectorAll('.score-choice-btn').forEach(btn => {
+        btn.style.background = 'white';
+        btn.style.borderColor = '#ddd';
+    });
+    event.target.style.background = '#0056b3';
+    event.target.style.color = 'white';
+    event.target.style.borderColor = '#0056b3';
+}
+</script>
+
+{% include 'includes/footer.html' %}
+

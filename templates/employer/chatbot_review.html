@@ -1,0 +1,94 @@
+{% include 'includes/header.html' %}
+<link rel="stylesheet" href="../css/chatbot.css">
+
+<div class="container">
+    <div style="margin-bottom: 2rem;">
+        <a href="view_candidate.php?id={{ application_id }}" style="color: #0056b3; text-decoration: none;">
+            <i class="fas fa-arrow-left"></i> Back to Candidate Details
+        </a>
+    </div>
+    
+    <div class="chatbot-container">
+        <div class="chatbot-header">
+            <div class="bot-avatar">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div style="flex: 1;">
+                <h1>Applicant Assessment Review</h1>
+                <div class="status">
+                    <span class="status-dot"></span>
+                    <span>Reviewing: {{ application.first_name }} {{ application.last_name }}</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="question-section active" style="display: block;">
+            <div class="chat-messages" id="chatMessages" style="max-height: 600px; overflow-y: auto;">
+                {% if chatbot_answers %}
+                    <!-- Welcome Message -->
+                    <div class="chat-message bot">
+                        <div class="message-avatar bot">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-bubble bot">
+                            <p>Hello! 👋 I'm here to help you review this applicant's career assessment.</p>
+                            <p style="margin-top: 0.5rem;"><strong>Applicant:</strong> {{ application.first_name }} {{ application.last_name }}</p>
+                            <p><strong>Job Applied:</strong> {{ application.job_title }}</p>
+                            <p><strong>Employability Score:</strong> <span style="color: #0056b3; font-weight: 600;">{{ application.employability_score|floatformat:2 }}%</span></p>
+                            {% if chatbot_answers.0.qualification_name %}
+                                <p><strong>Category:</strong> {{ chatbot_answers.0.qualification_name }}</p>
+                            {% endif %}
+                            <span class="message-time">{% now "h:i A" %}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Display all Q&A -->
+                    
+                        <div class="chat-message bot">
+                            <div class="message-avatar bot">
+                                <i class="fas fa-robot"></i>
+                            </div>
+                            <div class="message-bubble bot">
+                                <h3>Question {{ forloop.counter }}</h3>
+                                <p>{{ answer.question_text }}</p>
+                                {% if category %}
+                                    <p style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">
+                                        <i class="fas fa-tag"></i> Category: <strong>{{ ucfirst(category|title; border-radius: 15px; padding: 1.5rem; margin-top: 1rem;">
+                        <div class="message-avatar bot" style="background: rgba(255,255,255,0.2);">
+                            <i class="fas fa-star" style="color: #FFD700;"></i>
+                        </div>
+                        <div class="message-bubble bot" style="background: transparent; color: white;">
+                            <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: white;">
+                                <i class="fas fa-lightbulb"></i> AI-Generated Feedback
+                            </p>
+                            <p style="color: white; line-height: 1.8; margin-bottom: 1rem;">
+                                {{ feedback_message }}
+                            </p>
+                            {% if pending_count > 0 %}
+                                <p style="color: rgba(255,255,255,0.9); margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.3);">
+                                    <i class="fas fa-info-circle"></i> <strong>Note:</strong> This candidate has {{ pending_count }} other pending application{% if pending_count > 1 %}s{% endif %} in the system.
+                                </p>
+                            {% endif %}
+                            <span class="message-time" style="color: rgba(255,255,255,0.8);">{% now "h:i A" %}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="chat-message bot">
+                        <div class="message-avatar bot">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-bubble bot">
+                            <p>No chatbot assessment data available for this applicant.</p>
+                            <p style="margin-top: 0.5rem;">The applicant may not have completed the career assessment yet.</p>
+                            <span class="message-time">{% now "h:i A" %}</span>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'includes/footer.html' %}
+

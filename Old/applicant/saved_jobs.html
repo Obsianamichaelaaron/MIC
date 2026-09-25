@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Saved Jobs - Multibiz{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Top Hero Header Banner (Dark Enterprise Palette) -->
+    <div class="employer-hero-banner">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1 small text-white-50">
+                        <li class="breadcrumb-item"><a href="{% url 'applicant_dashboard' %}" class="text-white-50 text-decoration-none">Dashboard</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Saved Jobs</li>
+                    </ol>
+                </nav>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <h3 class="fw-extrabold text-white mb-0">
+                        <i class="fa-solid fa-bookmark text-warning me-2"></i>My Bookmarked Jobs
+                    </h3>
+                    <span class="badge bg-primary bg-opacity-25 text-white border border-primary border-opacity-50 rounded-pill px-2.5 py-1 small fw-semibold">
+                        <i class="fa-solid fa-layer-group me-1 text-info"></i> {{ saved_items|length }} Saved Opportunities
+                    </span>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'applicant_jobs' %}" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm">
+                    <i class="fa-solid fa-magnifying-glass"></i> Browse Jobs
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        {% for item in saved_items %}
+            <div class="col-md-6 col-lg-4" id="savedJobCard{{ item.job.id }}">
+                <div class="custom-card p-4 h-100 d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="badge bg-primary bg-opacity-10 text-primary px-3 py-1 rounded-pill small fw-bold">{{ item.job.get_employment_type_display }}</span>
+                            <button class="btn btn-sm btn-light border-0 rounded-circle btn-remove-saved" data-id="{{ item.job.id }}" title="Remove Bookmark">
+                                <i class="fa-solid fa-bookmark text-warning"></i>
+                            </button>
+                        </div>
+                        <h5 class="fw-bold mb-1"><a href="{% url 'job_detail_public' item.job.pk %}" class="text-dark text-decoration-none hover-primary">{{ item.job.title }}</a></h5>
+                        <div class="text-secondary small fw-semibold mb-2"><i class="fa-solid fa-building me-1 text-primary"></i> {{ item.job.company_name }}</div>
+                        <div class="text-muted small mb-3"><i class="fa-solid fa-location-dot me-1 text-danger"></i> {{ item.job.location }}</div>
+                        <p class="text-muted small mb-3">{{ item.job.description|truncatewords:18 }}</p>
+                    </div>
+
+                    <div class="border-top pt-3 d-flex justify-content-between align-items-center">
+                        <span class="fw-bold small text-dark">{{ item.job.salary_range|default:"Negotiable" }}</span>
+                        <a href="{% url 'apply_job' item.job.pk %}" class="btn btn-sm btn-primary-custom px-3">Apply Now</a>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12 text-center py-5">
+                <div class="custom-card p-5 bg-white max-w-700 mx-auto">
+                    <i class="fa-regular fa-bookmark fs-1 text-muted mb-3 opacity-50"></i>
+                    <h4 class="fw-bold text-dark">No Saved Jobs Yet</h4>
+                    <a href="{% url 'applicant_jobs' %}" class="btn btn-primary-custom">Explore Job Listings</a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('.btn-remove-saved').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const jobId = this.getAttribute('data-id');
+            fetch(`/jobs/ajax/toggle-save/${jobId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken
+                }
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && !data.is_saved) {
+                    const card = document.getElementById('savedJobCard' + jobId);
+                    if (card) card.remove();
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

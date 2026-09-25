@@ -1,0 +1,307 @@
+/* Post Job Page Styles */
+
+:root {
+    --primary: #0056b3;
+    --secondary: #ff6b00;
+    --dark: #333;
+    --light: #f8f9fa;
+    --gray: #6c757d;
+    --success: #4CAF50;
+    --danger: #dc3545;
+    --border-color: #eee;
+}
+
+/* Post Job Form Styles */
+.post-job-form {
+    max-width: 800px;
+    width: 100%;
+}
+
+.post-job-form .form-group {
+    margin-bottom: 1.5rem;
+}
+
+.post-job-form .form-group label {
+    display: block;
+    margin-bottom: 0.75rem;
+    color: var(--dark);
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.3px;
+}
+
+.post-job-form .form-group input[type="text"],
+.post-job-form .form-group input[type="email"],
+.post-job-form .form-group input[type="number"],
+.post-job-form .form-group select,
+.post-job-form .form-group textarea {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    background: white;
+    color: var(--dark);
+    box-sizing: border-box;
+}
+
+.post-job-form .form-group input:focus,
+.post-job-form .form-group select:focus,
+.post-job-form .form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(0, 86, 179, 0.1);
+    transform: translateY(-1px);
+}
+
+.post-job-form .form-group textarea {
+    min-height: 120px;
+    resize: vertical;
+    line-height: 1.6;
+}
+
+.post-job-form .form-group input[type="text"]:hover,
+.post-job-form .form-group select:hover,
+.post-job-form .form-group textarea:hover {
+    border-color: #b0b0b0;
+}
+
+/* Form Grid Layout */
+.post-job-form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .post-job-form-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+/* Qualifications Checkbox Group */
+.post-job-qualifications {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    background: white;
+    transition: border-color 0.3s ease;
+}
+
+.post-job-qualifications:hover {
+    border-color: #b0b0b0;
+}
+
+.post-job-qualifications:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px rgba(0, 86, 179, 0.1);
+}
+
+.post-job-qualification-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+    margin-bottom: 0.5rem;
+}
+
+.post-job-qualification-item:last-child {
+    margin-bottom: 0;
+}
+
+.post-job-qualification-item:hover {
+    background: #f8f9fa;
+}
+
+.post-job-qualification-item input[type="checkbox"] {
+    width: auto;
+    margin-top: 0.25rem;
+    cursor: pointer;
+    accent-color: var(--primary);
+    flex-shrink: 0;
+}
+
+.post-job-qualification-item input[type="checkbox"]:checked {
+    accent-color: var(--primary);
+}
+
+.post-job-qualification-item span {
+    flex: 1;
+}
+
+.post-job-qualification-item strong {
+    display: block;
+    color: var(--dark);
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.post-job-qualification-item small {
+    display: block;
+    color: var(--gray);
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.post-job-info-text {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--gray);
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+.post-job-info-text i {
+    color: var(--primary);
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+/* Submit Button */
+.post-job-submit-btn {
+    background: linear-gradient(135deg, var(--primary) 0%, #004494 100%);
+    color: white;
+    padding: 0.875rem 2rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: 'Poppins', sans-serif;
+}
+
+.post-job-submit-btn:hover {
+    background: linear-gradient(135deg, #004494 0%, #003d7a 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0, 86, 179, 0.3);
+}
+
+.post-job-submit-btn:active {
+    transform: translateY(0);
+}
+
+.post-job-submit-btn i {
+    font-size: 1rem;
+}
+
+/* Alert Messages */
+.post-job-alert {
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-left: 4px solid;
+}
+
+.post-job-alert-success {
+    background: #d4edda;
+    color: #155724;
+    border-color: var(--success);
+}
+
+.post-job-alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border-color: var(--danger);
+}
+
+.post-job-alert i {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+}
+
+/* Page Header */
+.post-job-header {
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.post-job-header h1 {
+    margin: 0;
+    color: var(--primary);
+    font-size: 2rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.post-job-header h1 i {
+    font-size: 1.8rem;
+}
+
+/* Empty State */
+.post-job-empty-state {
+    text-align: center;
+    color: var(--gray);
+    padding: 2rem 1rem;
+}
+
+.post-job-empty-state i {
+    font-size: 2rem;
+    color: #ccc;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+/* Scrollbar Styling for Qualifications */
+.post-job-qualifications::-webkit-scrollbar {
+    width: 8px;
+}
+
+.post-job-qualifications::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.post-job-qualifications::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.post-job-qualifications::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* Responsive Enhancements */
+@media (max-width: 768px) {
+    .post-job-form {
+        max-width: 100%;
+    }
+    
+    .post-job-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .post-job-qualifications {
+        max-height: 150px;
+    }
+}
+
+/* Card Alignment */
+.post-job-card {
+    margin-top: 0;
+}
+
+.post-job-card .card {
+    margin-top: 0;
+}
+

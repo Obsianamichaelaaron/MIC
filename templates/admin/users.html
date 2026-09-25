@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}User Management - Multibiz Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="employer-hero-banner mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
+            <div>
+                <h3 class="fw-extrabold text-white mb-1">
+                    <i class="fa-solid fa-users text-warning me-2"></i>User Account Management
+                </h3>
+                <p class="text-white-50 small mb-0">Create new accounts, edit credentials, adjust roles, and manage account statuses.</p>
+            </div>
+            <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createUserModal">
+                <i class="fa-solid fa-user-plus me-1"></i> Create User Account
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 mb-4">
+        <form method="GET" action="{% url 'admin_users' %}">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-5">
+                    <input type="text" name="q" value="{{ query }}" class="form-control bg-light" placeholder="Search by name, email, or keyword...">
+                </div>
+                <div class="col-md-3">
+                    <select name="role" class="form-select bg-light" onchange="this.form.submit()">
+                        <option value="">All Account Roles</option>
+                        <option value="applicant" {% if role_filter == 'applicant' %}selected{% endif %}>Candidate / Applicant</option>
+                        <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Administrator</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select name="status" class="form-select bg-light" onchange="this.form.submit()">
+                        <option value="">All Statuses</option>
+                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
+                        <option value="suspended" {% if status_filter == 'suspended' %}selected{% endif %}>Suspended</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex gap-1">
+                    <button type="submit" class="btn btn-primary-custom flex-grow-1">Filter Users</button>
+                    {% if query or role_filter or status_filter %}
+                        <a href="{% url 'admin_users' %}" class="btn btn-outline-secondary d-flex align-items-center justify-content-center" title="Reset Filters">
+                            <i class="fa-solid fa-xmark"></i>
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Users Table -->
+    <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4">
+        <div class="table-responsive">
+            <table class="table align-middle table-hover mb-0">
+                <thead class="table-light small">
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Contact Phone</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                        <tr>
+                            <td>
+                                <div class="fw-bold text-dark">{{ u.full_name }}</div>
+                                <div class="text-muted small">{{ u.email }}</div>
+                            </td>
+                            <td>
+                                <span class="badge {% if u.role == 'admin' %}bg-danger{% else %}bg-success{% endif %} text-capitalize">
+                                    {{ u.role }}
+                                </span>
+                            </td>
+                            <td class="small text-secondary">{{ u.phone|default:"-" }}</td>
+                            <td>
+                                <span class="badge {% if u.status == 'active' %}bg-success{% elif u.status == 'inactive' %}bg-warning text-dark{% else %}bg-danger{% endif %} text-capitalize">
+                                    {{ u.status }}
+                                </span>
+                            </td>
+                            <td class="text-muted small">{{ u.created_at|date:"M d, Y" }}</td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <!-- Change Status Dropdown -->
+                                    <form method="POST" action="{% url 'admin_users' %}" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="toggle_status">
+                                        <input type="hidden" name="user_id" value="{{ u.user_id }}">
+                                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                                            <option value="active" {% if u.status == 'active' %}selected{% endif %}>Active</option>
+                                            <option value="inactive" {% if u.status == 'inactive' %}selected{% endif %}>Inactive</option>
+                                            <option value="suspended" {% if u.status == 'suspended' %}selected{% endif %}>Suspend</option>
+                                        </select>
+                                    </form>
+
+                                    {% if u.user_id != admin_user.user_id %}
+                                        <form method="POST" action="{% url 'admin_users' %}" class="d-inline" onsubmit="return confirm('Permanently delete account for {{ u.email }}?');">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="delete_user">
+                                            <input type="hidden" name="user_id" value="{{ u.user_id }}">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Account">
+                                                <i class="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="6" class="text-center py-4 text-muted small">No users found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- CREATE USER MODAL -->
+<div class="modal fade" id="createUserModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content rounded-4 border-0 shadow-lg">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title fw-bold">Create New User Account</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{% url 'admin_users' %}">
+                {% csrf_token %}
+                <input type="hidden" name="create_user" value="1">
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">First Name</label>
+                            <input type="text" name="first_name" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Last Name</label>
+                            <input type="text" name="last_name" class="form-control" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold small">Email Address</label>
+                            <input type="email" name="email" class="form-control" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold small">Temporary Password</label>
+                            <input type="password" name="password" class="form-control" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Account Role</label>
+                            <select name="role" class="form-select" id="roleSelect">
+                                <option value="applicant">Applicant / Jobseeker</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-semibold small">Phone Number</label>
+                            <input type="text" name="phone" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary-custom">Create Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

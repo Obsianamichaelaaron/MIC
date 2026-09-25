@@ -1,0 +1,769 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit Profile - Multibiz{% endblock %}
+
+{% block extra_css %}
+<style>
+    .section-title-badge {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: var(--mb-primary-subtle);
+        color: var(--mb-primary);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 0.95rem;
+    }
+    .input-icon-group {
+        position: relative;
+    }
+    .input-icon-group .input-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #94a3b8;
+        font-size: 0.95rem;
+        pointer-events: none;
+        z-index: 4;
+    }
+    .input-icon-group .form-control,
+    .input-icon-group .form-select {
+        padding-left: 2.6rem;
+    }
+    .ai-laser-scanner {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, transparent, #2563eb, #38bdf8, transparent);
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+    .ai-scanning .ai-laser-scanner {
+        opacity: 1;
+        animation: laserScan 1.5s infinite ease-in-out;
+    }
+    @keyframes laserScan {
+        0% { transform: translateY(0); }
+        50% { transform: translateY(120px); }
+        100% { transform: translateY(0); }
+    }
+
+    .resume-preview-frame {
+        width: 100%;
+        height: 680px;
+        border: 1px solid #94a3b8;
+        border-radius: 10px;
+        background: #f8fafc;
+    }
+
+    .resume-preview-file {
+        min-height: 260px;
+        border: 1px dashed #94a3b8;
+        border-radius: 10px;
+        background: #f8fafc;
+    }
+
+    #resumeSectionCard #dropzoneBox,
+    #resumeSectionCard #aiRejectionAlert,
+    #resumeSectionCard #aiAuditContainer,
+    #resumeSectionCard #aiExtractionAlert,
+    #resumeSectionCard #btnAutoParse {
+        display: none !important;
+    }
+
+    @media (max-width: 767.98px) {
+        .resume-preview-frame {
+            height: 520px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Top Hero Header Banner (Dark Enterprise Palette) -->
+    <div class="employer-hero-banner">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1 small text-white-50">
+                        <li class="breadcrumb-item"><a href="{% url 'applicant_dashboard' %}" class="text-white-50 text-decoration-none">Profile Dashboard</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Profile</li>
+                    </ol>
+                </nav>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <h3 class="fw-extrabold text-white mb-0">
+                        <i class="fa-solid fa-user-pen text-info me-2"></i>Candidate Profile
+                    </h3>
+                    <span class="badge bg-primary bg-opacity-25 text-white border border-primary border-opacity-50 rounded-pill px-2.5 py-1 small fw-semibold">
+                        <i class="fa-solid fa-wand-magic-sparkles text-warning me-1"></i> AI Resume Parser
+                    </span>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'applicant_jobs' %}" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm">
+                    <i class="fa-solid fa-briefcase"></i> Explore Jobs
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main 2-Column Grid -->
+    <div class="row g-4">
+        
+        <!-- =========================================================================
+             LEFT COLUMN: CANDIDATE DOSSIER, COMPLETION GAUGE & RESUME VAULT (4 COLS)
+             ========================================================================= -->
+        <div class="col-lg-4 col-xl-4">
+            <div class="d-flex flex-column gap-4">
+                
+                <!-- 1. Identity & Employability Card -->
+                <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4 text-center">
+                    <div class="profile-avatar-wrapper mb-3">
+                        <div class="profile-avatar-fallback" id="avatarPreviewFallback">
+                            {{ user.first_name|slice:":1"|upper }}
+                        </div>
+                    </div>
+
+                    <h5 class="fw-bold text-dark mb-1">{{ user.full_name }}</h5>
+                    <div class="text-muted small mb-2"><i class="fa-regular fa-envelope me-1"></i>{{ user.email }}</div>
+                    
+                    <div class="d-inline-flex align-items-center gap-2 bg-light px-3 py-1 rounded-pill border small mb-4">
+                        <i class="fa-solid fa-circle-check text-success"></i>
+                        <span class="text-secondary fw-semibold">Verified Candidate Account</span>
+                    </div>
+
+                    <!-- Employability Radial Meter -->
+                    <div class="readiness-gauge-box p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold text-dark small"><i class="fa-solid fa-bolt text-warning me-1"></i>Employability Index</span>
+                            <span class="badge bg-primary bg-opacity-10 text-primary small">{{ profile.employability_score }}%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated auto-progress-bar" role="progressbar" data-progress="{{ profile.employability_score }}"></div>
+                        </div>
+                    </div>
+
+                    <!-- Profile Completion Progress -->
+                    <div class="p-3 bg-light rounded-3 border text-start">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="fw-bold text-dark small">Profile Completeness</span>
+                            <span class="fw-bold text-primary small">{{ completion_pct }}%</span>
+                        </div>
+                        <div class="progress mb-3" style="height: 6px;">
+                            <div class="progress-bar bg-success auto-progress-bar" role="progressbar" data-progress="{{ completion_pct }}"></div>
+                        </div>
+
+                        <!-- Milestone Checklist -->
+                        <ul class="milestone-checklist">
+                            <li class="milestone-item">
+                                <span><i class="fa-solid fa-user me-2 text-primary"></i>Personal Information</span>
+                                {% if user.first_name and user.phone %}
+                                    <i class="fa-solid fa-circle-check text-success"></i>
+                                {% else %}
+                                    <i class="fa-regular fa-circle text-muted"></i>
+                                {% endif %}
+                            </li>
+                            <li class="milestone-item">
+                                <span><i class="fa-solid fa-file-pdf me-2 text-danger"></i>Resume Document</span>
+                                {% if profile.resume_file %}
+                                    <i class="fa-solid fa-circle-check text-success"></i>
+                                {% else %}
+                                    <i class="fa-regular fa-circle text-muted"></i>
+                                {% endif %}
+                            </li>
+                            <li class="milestone-item">
+                                <span><i class="fa-solid fa-graduation-cap me-2 text-info"></i>Educational Level</span>
+                                {% if profile.education_level %}
+                                    <i class="fa-solid fa-circle-check text-success"></i>
+                                {% else %}
+                                    <i class="fa-regular fa-circle text-muted"></i>
+                                {% endif %}
+                            </li>
+                            <li class="milestone-item">
+                                <span><i class="fa-solid fa-tags me-2 text-warning"></i>Skills & Competencies</span>
+                                {% if profile.skills %}
+                                    <i class="fa-solid fa-circle-check text-success"></i>
+                                {% else %}
+                                    <i class="fa-regular fa-circle text-muted"></i>
+                                {% endif %}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- 2. Active Resume Vault Card -->
+                <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4">
+                    <h6 class="fw-bold text-dark mb-3">
+                        <i class="fa-solid fa-file-invoice text-primary me-2"></i>Active Resume Document
+                    </h6>
+                    
+                    {% if profile.resume_file %}
+                        <div class="resume-vault-card mb-3">
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <div class="bg-danger bg-opacity-10 text-danger p-3 rounded-3 fs-4">
+                                    <i class="fa-solid fa-file-pdf"></i>
+                                </div>
+                                <div class="overflow-hidden">
+                                    <div class="fw-bold text-dark text-truncate" title="{{ profile.resume_file.name }}">
+                                        {{ profile.resume_file.name|slice:"16:"|default:profile.resume_file.name }}
+                                    </div>
+                                    <span class="badge bg-success bg-opacity-10 text-success small">
+                                        <i class="fa-solid fa-shield-halved me-1"></i> AI Parsed & Verified
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                <a href="{{ profile.resume_file.url }}" target="_blank" class="btn btn-sm btn-outline-primary py-1 px-3">
+                                    <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> View / Download
+                                </a>
+                                <label for="id_resume_file" class="btn btn-sm btn-light border py-1 px-3" style="cursor: pointer;">
+                                    <i class="fa-solid fa-rotate me-1"></i> Replace
+                                </label>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="p-3 bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded-3 mb-3 text-center">
+                            <i class="fa-solid fa-triangle-exclamation text-warning fs-3 mb-2"></i>
+                            <h6 class="fw-bold text-dark mb-1">No Resume Uploaded</h6>
+                        </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- =========================================================================
+             RIGHT COLUMN: EDIT PROFILE & RESUME STUDIO FORM (8 COLS)
+             ========================================================================= -->
+        <div class="col-lg-8 col-xl-8">
+            <form method="POST" enctype="multipart/form-data" id="profileForm" novalidate>
+                {% csrf_token %}
+
+                <!-- SECTION 1: Personal & Contact Dossier -->
+                <div class="custom-card p-4 p-lg-5 bg-white border-0 shadow-sm rounded-4 mb-4">
+                    <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4">
+                        <div class="section-title-badge">1</div>
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">Personal Contact Dossier</h5>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-dark">First Name <span class="text-danger">*</span></label>
+                            <div class="input-icon-group">
+                                <i class="fa-regular fa-user input-icon"></i>
+                                {{ form.first_name }}
+                            </div>
+                            {% if form.first_name.errors %}
+                                <div class="text-danger small mt-1">{{ form.first_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-dark">Last Name <span class="text-danger">*</span></label>
+                            <div class="input-icon-group">
+                                <i class="fa-regular fa-user input-icon"></i>
+                                {{ form.last_name }}
+                            </div>
+                            {% if form.last_name.errors %}
+                                <div class="text-danger small mt-1">{{ form.last_name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-dark">Email Address (Account Login)</label>
+                            <div class="input-icon-group">
+                                <i class="fa-regular fa-envelope input-icon"></i>
+                                <input type="email" class="form-control bg-light" value="{{ user.email }}" readonly>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-dark">Contact Phone Number</label>
+                            <div class="input-icon-group">
+                                <i class="fa-solid fa-phone input-icon"></i>
+                                {{ form.phone }}
+                            </div>
+                            {% if form.phone.errors %}
+                                <div class="text-danger small mt-1">{{ form.phone.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: AI Resume Intelligence & Upload Studio -->
+                <div class="custom-card p-4 p-lg-5 bg-white border-0 shadow-sm rounded-4 mb-4 position-relative" id="resumeSectionCard">
+                    <div class="ai-laser-scanner"></div>
+
+                    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center border-bottom pb-3 mb-4 gap-2">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="section-title-badge">2</div>
+                            <div>
+                                <h5 class="fw-bold text-dark mb-0">Resume Preview</h5>
+                            </div>
+                        </div>
+                        {% if profile.resume_file %}
+                            <a href="{{ profile.resume_file.url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary px-3 py-2">
+                                <i class="fa-solid fa-up-right-from-square me-1"></i> Open Full Size
+                            </a>
+                        {% endif %}
+                    </div>
+
+                    {% if profile.resume_file %}
+                        {% with resume_name=profile.resume_file.name|lower %}
+                            {% if '.pdf' in resume_name %}
+                                <iframe src="{{ profile.resume_file.url }}#toolbar=1&navpanes=0" class="resume-preview-frame" title="Resume preview"></iframe>
+                            {% else %}
+                                <div class="resume-preview-file d-flex flex-column justify-content-center align-items-center text-center p-4">
+                                    <i class="fa-solid fa-file-word text-primary fs-1 mb-3"></i>
+                                    <h6 class="fw-bold text-dark mb-1">{{ profile.resume_file.name|slice:'16:' }}</h6>
+                                    <p class="text-muted small mb-3">This document format cannot be previewed inside the browser.</p>
+                                    <a href="{{ profile.resume_file.url }}" target="_blank" rel="noopener" class="btn btn-primary-custom btn-sm px-3">
+                                        <i class="fa-solid fa-download me-1"></i> Open / Download Resume
+                                    </a>
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+                    {% else %}
+                        <div class="resume-preview-file d-flex flex-column justify-content-center align-items-center text-center p-4">
+                            <i class="fa-regular fa-file-lines text-muted fs-1 mb-3"></i>
+                            <h6 class="fw-bold text-dark mb-1">No resume uploaded yet</h6>
+                            <p class="text-muted small mb-0">Use the Replace button in the profile resume card to upload one.</p>
+                        </div>
+                    {% endif %}
+
+                    <!-- Drag and drop zone -->
+                    <div class="resume-dropzone-box mb-3" id="dropzoneBox">
+                        <div class="resume-dropzone-icon">
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
+                        </div>
+                        <h6 class="fw-bold text-dark mb-1">Drag and drop your resume file here</h6>
+                        
+                        <div class="d-none">
+                            {{ form.resume_file }}
+                        </div>
+
+                        <button type="button" class="btn btn-outline-primary px-4 py-2 rounded-pill" onclick="document.getElementById('id_resume_file').click();">
+                            <i class="fa-solid fa-folder-open me-1"></i> Select File
+                        </button>
+
+                        <div id="fileSelectionFeedback" class="mt-3 text-primary fw-semibold small d-none">
+                            <i class="fa-solid fa-circle-check text-success me-1"></i> Selected: <span id="selectedFileName"></span>
+                        </div>
+                    </div>
+
+                    <!-- Rejection Alert (If Non-Resume is uploaded) -->
+                    <div id="aiRejectionAlert" class="alert alert-danger d-none mb-3 rounded-3 shadow-sm border-0 animate-slide-up">
+                        <div class="d-flex align-items-start gap-3">
+                            <i class="fa-solid fa-ban text-danger fs-4 mt-1"></i>
+                            <div>
+                                <strong class="d-block text-danger mb-1">Document Upload Cancelled by AI Validator</strong>
+                                <p class="small text-danger mb-2" id="aiRejectionMsg">The uploaded file does not appear to be a genuine Resume or CV. Missing essential professional sections (e.g. Work History, Education, Skills).</p>
+                                <div class="small text-muted">Please ensure you upload a valid Resume/CV document containing your work experience and credentials.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- AI Resume Strength & Suggestions Audit Box -->
+                    <div id="aiAuditContainer" class="p-4 rounded-3 border bg-light mb-3 {% if not resume_audit %}d-none{% endif %}">
+                        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center border-bottom pb-3 mb-3 gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="fa-solid fa-brain text-primary fs-5"></i>
+                                <span class="fw-bold text-dark">AI Resume Strength Audit</span>
+                            </div>
+                            <span class="badge {% if resume_audit.strength_level == 'Strong' %}bg-success{% elif resume_audit.strength_level == 'Moderate' %}bg-primary{% else %}bg-warning text-dark{% endif %} px-3 py-2 rounded-pill fw-bold" id="aiStrengthBadge">
+                                Strength: {{ resume_audit.strength_level|default:"Strong" }} ({{ resume_audit.strength_score|default:80 }}%)
+                            </span>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <div class="small text-muted mb-1">Resume Optimization Progress</div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar auto-progress-bar {% if resume_audit.strength_level == 'Strong' %}bg-success{% elif resume_audit.strength_level == 'Moderate' %}bg-primary{% else %}bg-warning{% endif %}" id="aiStrengthProgressBar" data-progress="{{ resume_audit.strength_score|default:80 }}"></div>
+                                </div>
+                            </div>
+                            <div class="col-sm-6 text-sm-end">
+                                <span class="small text-muted" id="aiSectionSummaryText">
+                                    {{ resume_audit.sections_detected|length|default:4 }} core sections verified
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- AI Suggestions List -->
+                        <div>
+                            <div class="fw-bold text-dark small mb-2 d-flex align-items-center gap-1">
+                                <i class="fa-solid fa-lightbulb text-warning"></i> Actionable AI Suggestions to Make Resume Stronger:
+                            </div>
+                            <ul class="list-unstyled small mb-0 d-flex flex-column gap-2" id="aiSuggestionsList">
+                                {% for sug in resume_audit.suggestions %}
+                                    <li class="p-2 bg-white rounded-2 border d-flex align-items-start gap-2">
+                                        <i class="fa-solid fa-arrow-right text-primary mt-1" style="font-size: 0.75rem;"></i>
+                                        <span>{{ sug }}</span>
+                                    </li>
+                                {% empty %}
+                                    <li class="p-2 bg-white rounded-2 border text-success">
+                                        <i class="fa-solid fa-circle-check me-1"></i> Your resume exhibits high structural integrity and rich keyword depth.
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div id="aiExtractionAlert" class="alert alert-success d-none mb-0 rounded-3 shadow-sm border-0">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-wand-magic-sparkles text-success fs-5"></i>
+                            <div>
+                                <strong class="d-block">Extraction Successful!</strong>
+                                <span class="small" id="aiExtractionMsg">Extracted skills and qualifications have been synchronized below.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: Experience & Education Credentials -->
+                <div class="custom-card p-4 p-lg-5 bg-white border-0 shadow-sm rounded-4 mb-4">
+                    <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4">
+                        <div class="section-title-badge">3</div>
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">Experience and Education</h5>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-dark">Years of Professional Experience</label>
+                            <div class="input-icon-group">
+                                <i class="fa-solid fa-briefcase input-icon"></i>
+                                {{ form.experience_years }}
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small text-dark">Highest Educational Attainment</label>
+                            <div class="input-icon-group">
+                                <i class="fa-solid fa-graduation-cap input-icon"></i>
+                                {{ form.education_level }}
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label fw-semibold small text-dark">Degree / Major Qualification Title</label>
+                            <div class="input-icon-group">
+                                <i class="fa-solid fa-award input-icon"></i>
+                                {{ form.qualifications }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 4: Skills Matrix & Dynamic Tag Cloud -->
+                <div class="custom-card p-4 p-lg-5 bg-white border-0 shadow-sm rounded-4 mb-4">
+                    <div class="d-flex align-items-center gap-3 border-bottom pb-3 mb-4">
+                        <div class="section-title-badge">4</div>
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">Technical Competency Matrix</h5>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-dark">Skills List (Comma-separated)</label>
+                        {{ form.skills }}
+                    </div>
+
+                    <!-- Live Active Chips Preview -->
+                    <div class="mb-4">
+                        <div class="small fw-semibold text-muted mb-2">Active Skill Chips (Preview):</div>
+                        <div id="liveSkillChipsContainer" class="d-flex flex-wrap gap-2 p-3 bg-light rounded-3 border min-h-50">
+                            {% for skill in skills_list %}
+                                <span class="skill-active-chip">
+                                    <i class="fa-solid fa-check text-success"></i>
+                                    <span>{{ skill }}</span>
+                                    <i class="fa-solid fa-xmark btn-remove-skill ms-1" onclick="removeSkill('{{ skill|escapejs }}')"></i>
+                                </span>
+                            {% empty %}
+                                <span class="text-muted small">No skills added yet.</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Quick Add Recommended Skills Cloud -->
+                    <div>
+                        <div class="small fw-semibold text-muted mb-2"><i class="fa-solid fa-bolt text-warning me-1"></i>Quick Add Popular Competencies:</div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('Python')"><i class="fa-solid fa-plus text-primary"></i> Python</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('Django')"><i class="fa-solid fa-plus text-primary"></i> Django</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('JavaScript')"><i class="fa-solid fa-plus text-primary"></i> JavaScript</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('React')"><i class="fa-solid fa-plus text-primary"></i> React</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('SQL / MySQL')"><i class="fa-solid fa-plus text-primary"></i> SQL / MySQL</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('PostgreSQL')"><i class="fa-solid fa-plus text-primary"></i> PostgreSQL</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('Docker')"><i class="fa-solid fa-plus text-primary"></i> Docker</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('AWS')"><i class="fa-solid fa-plus text-primary"></i> AWS</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('REST APIs')"><i class="fa-solid fa-plus text-primary"></i> REST APIs</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('Git / GitHub')"><i class="fa-solid fa-plus text-primary"></i> Git / GitHub</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('Agile / Scrum')"><i class="fa-solid fa-plus text-primary"></i> Agile / Scrum</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('UI/UX Design')"><i class="fa-solid fa-plus text-primary"></i> UI/UX Design</span>
+                            <span class="skill-suggest-chip" onclick="addSuggestedSkill('Machine Learning')"><i class="fa-solid fa-plus text-primary"></i> Machine Learning</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Footer -->
+                <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4 d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+                    <a href="{% url 'applicant_dashboard' %}" class="btn btn-outline-secondary px-4 py-2">
+                        <i class="fa-solid fa-xmark me-1"></i> Cancel & Return
+                    </a>
+                    <button type="submit" class="btn btn-primary-custom px-5 py-2 fs-6 shadow" id="btnSubmitProfile">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Save Changes & Update Resume
+                    </button>
+                </div>
+
+            </form>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // 0. Auto-progress-bar initializations
+    document.querySelectorAll('.auto-progress-bar').forEach(function(bar) {
+        const p = bar.getAttribute('data-progress');
+        if (p) {
+            bar.style.width = p + '%';
+        }
+    });
+
+    // 1. Resume File Drag and Drop & Change Handling
+    const fileInput = document.getElementById('id_resume_file');
+    const dropzoneBox = document.getElementById('dropzoneBox');
+    const fileFeedback = document.getElementById('fileSelectionFeedback');
+    const selectedFileName = document.getElementById('selectedFileName');
+    const skillsTextarea = document.getElementById('id_skills');
+    const liveSkillChips = document.getElementById('liveSkillChipsContainer');
+
+    if (fileInput && dropzoneBox) {
+        dropzoneBox.addEventListener('click', function(e) {
+            if (e.target !== fileInput) {
+                fileInput.click();
+            }
+        });
+
+        dropzoneBox.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropzoneBox.classList.add('dragover');
+        });
+
+        dropzoneBox.addEventListener('dragleave', function() {
+            dropzoneBox.classList.remove('dragover');
+        });
+
+        dropzoneBox.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropzoneBox.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileChosen(e.dataTransfer.files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                handleFileChosen(this.files[0]);
+            }
+        });
+    }
+
+    function handleFileChosen(file) {
+        if (!file) return;
+
+        const aiRejectionAlert = document.getElementById('aiRejectionAlert');
+        const aiRejectionMsg = document.getElementById('aiRejectionMsg');
+        const aiAuditContainer = document.getElementById('aiAuditContainer');
+        const aiStrengthBadge = document.getElementById('aiStrengthBadge');
+        const aiStrengthProgressBar = document.getElementById('aiStrengthProgressBar');
+        const aiSuggestionsList = document.getElementById('aiSuggestionsList');
+        const resumeCard = document.getElementById('resumeSectionCard');
+
+        if (aiRejectionAlert) aiRejectionAlert.classList.add('d-none');
+        if (resumeCard) resumeCard.classList.add('ai-scanning');
+
+        // Immediate AI Validation Request
+        const formData = new FormData();
+        formData.append('resume_file', file);
+
+        fetch("{% url 'parse_resume_ajax' %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken
+            },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (resumeCard) resumeCard.classList.remove('ai-scanning');
+
+            if (data.success) {
+                if (!data.is_valid_resume) {
+                    // ==========================================
+                    // 1. CANCEL UPLOAD: NOT A VALID RESUME
+                    // ==========================================
+                    fileInput.value = '';
+                    if (fileFeedback) fileFeedback.classList.add('d-none');
+                    if (aiAuditContainer) aiAuditContainer.classList.add('d-none');
+
+                    if (aiRejectionAlert && aiRejectionMsg) {
+                        aiRejectionMsg.innerText = data.rejection_reason || 'The uploaded file does not appear to be a genuine Resume or CV. Missing essential professional sections (e.g. Work History, Education, Skills).';
+                        aiRejectionAlert.classList.remove('d-none');
+                        aiRejectionAlert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                } else {
+                    // ==========================================
+                    // 2. VALID RESUME: SHOW STRENGTH & SUGGESTIONS
+                    // ==========================================
+                    if (aiRejectionAlert) aiRejectionAlert.classList.add('d-none');
+
+                    if (selectedFileName && fileFeedback) {
+                        selectedFileName.innerText = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)';
+                        fileFeedback.classList.remove('d-none');
+                    }
+
+                    // Update Strength Score & Badge
+                    const score = data.strength_score || 70;
+                    const level = data.strength_level || 'Moderate';
+
+                    if (aiStrengthBadge) {
+                        aiStrengthBadge.className = `badge ${level === 'Strong' ? 'bg-success' : level === 'Moderate' ? 'bg-primary' : 'bg-warning text-dark'} px-3 py-2 rounded-pill fw-bold`;
+                        aiStrengthBadge.innerText = `Strength: ${level} (${score}%)`;
+                    }
+
+                    if (aiStrengthProgressBar) {
+                        aiStrengthProgressBar.className = `progress-bar ${level === 'Strong' ? 'bg-success' : level === 'Moderate' ? 'bg-primary' : 'bg-warning'}`;
+                        aiStrengthProgressBar.style.width = score + '%';
+                    }
+
+                    // Populate AI Suggestions
+                    if (aiSuggestionsList && data.suggestions) {
+                        aiSuggestionsList.innerHTML = '';
+                        if (data.suggestions.length > 0) {
+                            data.suggestions.forEach(sug => {
+                                const li = document.createElement('li');
+                                li.className = 'p-2 bg-white rounded-2 border d-flex align-items-start gap-2';
+                                li.innerHTML = `<i class="fa-solid fa-arrow-right text-primary mt-1" style="font-size: 0.75rem;"></i><span>${sug}</span>`;
+                                aiSuggestionsList.appendChild(li);
+                            });
+                        } else {
+                            aiSuggestionsList.innerHTML = '<li class="p-2 bg-white rounded-2 border text-success"><i class="fa-solid fa-circle-check me-1"></i> Your resume exhibits high structural integrity and rich keyword depth.</li>';
+                        }
+                    }
+
+                    if (aiAuditContainer) aiAuditContainer.classList.remove('d-none');
+
+                    // Auto-sync extracted skills
+                    if (data.skills && data.skills.length > 0 && skillsTextarea) {
+                        const current = skillsTextarea.value ? skillsTextarea.value.split(',').map(s => s.trim()) : [];
+                        data.skills.forEach(s => {
+                            if (!current.includes(s)) current.push(s);
+                        });
+                        skillsTextarea.value = current.filter(Boolean).join(', ');
+                        updateLiveSkillChips();
+                    }
+
+                    // Auto-sync education
+                    if (data.education) {
+                        const eduSelect = document.getElementById('id_education_level');
+                        if (eduSelect) {
+                            for (let opt of eduSelect.options) {
+                                if (opt.value.toLowerCase().includes(data.education.toLowerCase())) {
+                                    eduSelect.value = opt.value;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Auto-sync experience years
+                    if (data.experience_years > 0) {
+                        const expInput = document.getElementById('id_experience_years');
+                        if (expInput) expInput.value = data.experience_years;
+                    }
+                }
+            }
+        })
+        .catch(err => {
+            if (resumeCard) resumeCard.classList.remove('ai-scanning');
+            console.error('Validation error:', err);
+        });
+    }
+
+    // 2. Manual Trigger Button
+    const btnAutoParse = document.getElementById('btnAutoParse');
+    if (btnAutoParse) {
+        btnAutoParse.addEventListener('click', function() {
+            if (!fileInput.files || fileInput.files.length === 0) {
+                alert('Please select or drop a PDF or DOCX resume document first.');
+                return;
+            }
+            handleFileChosen(fileInput.files[0]);
+        });
+    }
+
+    // 3. Dynamic Skills Chip Management
+    function updateLiveSkillChips() {
+        if (!skillsTextarea || !liveSkillChips) return;
+        const val = skillsTextarea.value.trim();
+        if (!val) {
+            liveSkillChips.innerHTML = '<span class="text-muted small">No skills added yet. Add skills to increase match accuracy.</span>';
+            return;
+        }
+
+        const skillsArr = val.split(',').map(s => s.trim()).filter(Boolean);
+        liveSkillChips.innerHTML = '';
+        skillsArr.forEach(s => {
+            const chip = document.createElement('span');
+            chip.className = 'skill-active-chip';
+            chip.innerHTML = `
+                <i class="fa-solid fa-check text-success"></i>
+                <span>${s}</span>
+                <i class="fa-solid fa-xmark btn-remove-skill ms-1" title="Remove skill"></i>
+            `;
+            chip.querySelector('.btn-remove-skill').addEventListener('click', function() {
+                removeSkill(s);
+            });
+            liveSkillChips.appendChild(chip);
+        });
+    }
+
+    function addSuggestedSkill(skill) {
+        if (!skillsTextarea) return;
+        const current = skillsTextarea.value ? skillsTextarea.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+        if (!current.includes(skill)) {
+            current.push(skill);
+            skillsTextarea.value = current.join(', ');
+            updateLiveSkillChips();
+        }
+    }
+
+    function removeSkill(skill) {
+        if (!skillsTextarea) return;
+        const current = skillsTextarea.value ? skillsTextarea.value.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const filtered = current.filter(s => s.toLowerCase() !== skill.toLowerCase());
+        skillsTextarea.value = filtered.join(', ');
+        updateLiveSkillChips();
+    }
+
+    if (skillsTextarea) {
+        skillsTextarea.addEventListener('input', updateLiveSkillChips);
+    }
+
+</script>
+{% endblock %}

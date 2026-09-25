@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Resume Preview - Multibiz{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <div class="text-muted small">Candidate Resume</div>
+            <h3 class="fw-bold text-dark mb-0">{{ applicant.user.full_name }}</h3>
+        </div>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary btn-sm">
+            <i class="fa-solid fa-arrow-left me-1"></i> Back
+        </a>
+    </div>
+
+    <div class="custom-card bg-white border-0 shadow-sm rounded-4 p-3 p-lg-4">
+        <div class="d-flex align-items-center gap-2 border-bottom pb-3 mb-3">
+            <i class="fa-solid fa-file-lines text-primary"></i>
+            <span class="fw-semibold text-dark">{{ resume_name }}</span>
+        </div>
+        {% if is_docx %}
+            <div id="resumeDocumentPreview" class="resume-document-preview" data-resume-url="{{ resume_file_url }}">
+                <div class="text-center text-muted py-5">
+                    <i class="fa-solid fa-spinner fa-spin me-1"></i> Loading original resume...
+                </div>
+            </div>
+        {% else %}
+            <div class="resume-document-preview text-center text-muted py-5">
+                This is a legacy DOC file. Browsers cannot render this format reliably. Please upload the original resume as PDF or DOCX for online viewing.
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .resume-document-preview {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 2.5rem;
+        min-height: 720px;
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        color: #1e293b;
+        line-height: 1.7;
+        white-space: pre-wrap;
+    }
+
+    @media (max-width: 767.98px) {
+        .resume-document-preview {
+            padding: 1.25rem;
+        }
+    }
+</style>
+
+{% if is_docx %}
+<script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+<script src="https://unpkg.com/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+<script>
+    (async function() {
+        const preview = document.getElementById('resumeDocumentPreview');
+        if (!preview) return;
+
+        try {
+            if (!window.docx || typeof window.docx.renderAsync !== 'function') {
+                throw new Error('The DOCX preview library did not load.');
+            }
+            const response = await fetch(preview.dataset.resumeUrl, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error(`Resume request failed: ${response.status}`);
+            const documentBlob = await response.blob();
+            preview.innerHTML = '';
+            await docx.renderAsync(documentBlob, preview, null, {
+                className: 'docx-preview-page',
+                inWrapper: true,
+                breakPages: true,
+                ignoreWidth: false,
+                ignoreHeight: false
+            });
+        } catch (error) {
+            preview.innerHTML = '<div class="text-center text-danger py-5"><i class="fa-solid fa-triangle-exclamation me-1"></i>The original DOCX resume could not be previewed. Please upload it again as PDF if this continues.</div>';
+            console.error('Resume preview error:', error);
+        }
+    })();
+</script>
+{% endif %}
+{% endblock %}

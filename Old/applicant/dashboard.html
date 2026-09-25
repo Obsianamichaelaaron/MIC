@@ -1,0 +1,564 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Profile Dashboard - Multibiz{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- =========================================================================
+         1. APPLICANT HERO BANNER AND COMMAND BAR
+         ========================================================================= -->
+    <div class="applicant-hero-card p-4 p-lg-5 mb-4 shadow-sm animate-slide-up">
+        <div class="row align-items-center g-4 position-relative portal-hero-content">
+            <div class="col-lg-8">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="applicant-avatar-ring">
+                        <div class="applicant-avatar-inner">
+                            {% if profile.profile_pic %}
+                                <img src="{{ profile.profile_pic.url }}" alt="{{ user.full_name }}" class="w-100 h-100 object-fit-cover">
+                            {% else %}
+                                <span>{{ user.first _name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h3 class="fw-extrabold text-white mb-0">{{ user.full_name }}</h3>
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill small">
+                                <i class="fa-solid fa-circle-check me-1"></i> Verified Talent
+                            </span>
+                            <span class="badge bg-primary bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill small">
+                                <i class="fa-solid fa-code me-1"></i> {{ profile.experience_years }} Yrs Exp
+                            </span>
+                        </div>
+                        <p class="text-light text-opacity-75 small mb-0 mt-1">
+                            <i class="fa-solid fa-graduation-cap text-info me-1"></i> {{ profile.education_level|default:"Software Engineer and Tech Professional" }} - 
+                            <i class="fa-solid fa-location-dot text-danger ms-1 me-1"></i> Philippines / Remote
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Profile Completion Bar -->
+                <div class="d-flex align-items-center gap-3 mt-3">
+                    <div class="flex-grow-1 profile-health-meter">
+                        <div class="d-flex justify-content-between text-light text-opacity-90 small mb-1">
+                            <span>Profile Health</span>
+                            <span class="fw-bold">{{ completion_pct }}% Complete</span>
+                        </div>
+                        <div class="progress bg-dark bg-opacity-50" style="height: 6px;">
+                            <div class="progress-bar bg-info progress-bar-striped progress-bar-animated auto-progress-bar" role="progressbar" data-progress="{{ completion_pct }}"></div>
+                        </div>
+                    </div>
+                    {% if completion_pct < 100 %}
+                        <a href="{% url 'applicant_profile' %}" class="btn btn-sm btn-outline-light py-1 px-2 small rounded-pill">
+                            <i class="fa-solid fa-bolt text-warning me-1"></i> Optimize Profile
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Quick Action Command Strip -->
+            <div class="col-lg-4 text-lg-end">
+                <div class="portal-hero-actions flex-lg-column justify-content-lg-end">
+                    <a href="{% url 'applicant_jobs' %}" class="btn btn-primary-custom py-2 px-4 shadow">
+                        <i class="fa-solid fa-wand-magic-sparkles me-2 text-warning"></i> Explore Matched Jobs
+                    </a>
+                    <a href="{% url 'chatbot_view' %}" class="btn btn-outline-light py-2 px-3">
+                        <i class="fa-solid fa-robot text-info me-2"></i> AI Career Copilot
+                    </a>
+                    <a href="{% url 'applicant_profile' %}" class="btn btn-outline-light py-2 px-3">
+                        <i class="fa-solid fa-file-pdf me-2 text-danger"></i> Manage Resume and Skills
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         2. TOP 4 METRIC KPI STAT CARDS
+         ========================================================================= -->
+    <div class="row g-3 mb-4">
+        <!-- Metric 1: Total Applications -->
+        <div class="col-6 col-lg-3">
+            <div class="metric-card-pro metric-primary">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small fw-semibold text-uppercase tracking-wider">Applications</div>
+                        <div class="display-6 fw-extrabold text-dark mt-1">{{ total_apps }}</div>
+                    </div>
+                    <div class="metric-icon-well bg-primary bg-opacity-10 text-primary">
+                        <i class="fa-solid fa-file-signature"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric 2: Shortlisted -->
+        <div class="col-6 col-lg-3">
+            <div class="metric-card-pro metric-info">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small fw-semibold text-uppercase tracking-wider">Shortlisted</div>
+                        <div class="display-6 fw-extrabold text-info mt-1">{{ shortlisted_count }}</div>
+                    </div>
+                    <div class="metric-icon-well bg-info bg-opacity-10 text-info">
+                        <i class="fa-solid fa-star-half-stroke"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric 3: Scheduled Interviews -->
+        <div class="col-6 col-lg-3">
+            <div class="metric-card-pro metric-warning">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small fw-semibold text-uppercase tracking-wider">Interviews</div>
+                        <div class="display-6 fw-extrabold text-warning mt-1">{{ upcoming_interviews|length }}</div>
+                    </div>
+                    <div class="metric-icon-well bg-warning bg-opacity-10 text-warning">
+                        <i class="fa-solid fa-video"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metric 4: Hired / Offers -->
+        <div class="col-6 col-lg-3">
+            <div class="metric-card-pro metric-success">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="text-muted small fw-semibold text-uppercase tracking-wider">Offers and Hired</div>
+                        <div class="display-6 fw-extrabold text-success mt-1">{{ accepted_count }}</div>
+                    </div>
+                    <div class="metric-icon-well bg-success bg-opacity-10 text-success">
+                        <i class="fa-solid fa-award"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         3. MAIN CONTENT GRID (LEFT: JOBS & TRACKERS, RIGHT: AI READINESS & INTERVIEWS)
+         ========================================================================= -->
+    <div class="row g-4">
+        
+        <!-- =====================================================================
+             LEFT COLUMN (8 COLS): RECOMMENDED JOBS & APPLICATION TRACKERS
+             ===================================================================== -->
+        <div class="col-lg-8">
+            
+            <!-- AI Matched Opportunities Card -->
+            <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4 mb-4">
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-3 pb-2 border-bottom gap-2">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-0">
+                            <i class="fa-solid fa-microchip text-primary me-2"></i>AI Matched Job Opportunities
+                        </h5>
+                    </div>
+                    <a href="{% url 'applicant_jobs' %}" class="btn btn-sm btn-outline-custom">
+                        View All ({{ recommended_jobs|length }}) <i class="fa-solid fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+
+                <!-- Job Postings Grid -->
+                <div class="row g-3">
+                    {% for item in recommended_jobs %}
+                        <div class="col-md-6">
+                            <div class="job-card-pro">
+                                <div>
+                                    <!-- Header: Company Monogram & Match Score -->
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="company-avatar-box">
+                                                {{ item.job.company_name|slice:":1"|upper }}
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark text-truncate" style="max-width: 140px;">{{ item.job.company_name }}</div>
+                                                <div class="text-muted small"><i class="fa-solid fa-location-dot me-1"></i>{{ item.job.location|truncatechars:18 }}</div>
+                                            </div>
+                                        </div>
+                                        <span class="badge {% if item.match_score >= 80 %}badge-match-excellent{% elif item.match_score >= 60 %}badge-match-good{% else %}badge-match-average{% endif %} badge-match shadow-sm">
+                                            <i class="fa-solid fa-bolt text-warning"></i> {{ item.match_score }}% Match
+                                        </span>
+                                    </div>
+
+                                    <!-- Job Title -->
+                                    <h6 class="fw-bold mb-2">
+                                        <a href="{% url 'job_detail_public' item.job.pk %}" class="text-dark text-decoration-none hover-primary">
+                                            {{ item.job.title }}
+                                        </a>
+                                    </h6>
+
+                                    <!-- Tags: Employment Type & Salary -->
+                                    <div class="d-flex flex-wrap gap-1 mb-2">
+                                        <span class="badge bg-light text-secondary border small">{{ item.job.get_employment_type_display }}</span>
+                                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 small">
+                                            {{ item.job.salary_range|default:"Negotiable" }}
+                                        </span>
+                                    </div>
+
+                                    <!-- Matched Skills Preview -->
+                                    <div class="mb-3">
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% for sk in item.matched_skills %}
+                                                <span class="skill-chip skill-matched small py-0 px-2" style="font-size: 0.75rem;">
+                                                    <i class="fa-solid fa-check text-primary"></i> {{ sk }}
+                                                </span>
+                                            {% endfor %}
+                                            {% for msk in item.missing_skills %}
+                                                <span class="skill-chip small py-0 px-2 text-muted" style="font-size: 0.75rem;">
+                                                    + {{ msk }}
+                                                </span>
+                                            {% endfor %}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                                    <a href="{% url 'job_detail_public' item.job.pk %}" class="btn btn-sm btn-outline-secondary px-2">
+                                        <i class="fa-solid fa-circle-info"></i> Details
+                                    </a>
+                                    <a href="{% url 'apply_job' item.job.pk %}" class="btn btn-sm btn-primary-custom px-3">
+                                        <i class="fa-solid fa-paper-plane me-1"></i> Quick Apply
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="col-12 text-center py-5">
+                            <div class="bg-light p-4 rounded-4 border text-muted">
+                                <i class="fa-solid fa-wand-magic-sparkles text-primary display-6 mb-3"></i>
+                                <h6>No job recommendations yet</h6>
+                                <a href="{% url 'applicant_profile' %}" class="btn btn-primary-custom btn-sm">
+                                    <i class="fa-solid fa-plus me-1"></i> Add Tech Skills
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Recent Applications Tracker Card -->
+            <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4">
+                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                    <div>
+                        <h5 class="fw-bold text-dark mb-0">
+                            <i class="fa-solid fa-bars-progress text-primary me-2"></i>Live Application Pipeline
+                        </h5>
+                    </div>
+                    <a href="{% url 'my_applications' %}" class="text-primary text-decoration-none small fw-semibold">
+                        Full Tracker ({{ total_apps }}) <i class="fa-solid fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table align-middle table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Role & Company</th>
+                                <th>Match Score</th>
+                                <th>Pipeline Stage</th>
+                                <th>Submitted</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for app in recent_applications %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark">
+                                            <a href="{% url 'job_detail_public' app.job.pk %}" class="text-dark text-decoration-none hover-primary">
+                                                {{ app.job.title }}
+                                            </a>
+                                        </div>
+                                        <div class="text-muted small">{{ app.job.company_name }} &bull; {{ app.job.location }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if app.match_score >= 80 %}badge-match-excellent{% elif app.match_score >= 60 %}badge-match-good{% else %}badge-match-average{% endif %} badge-match">
+                                            {{ app.match_score }}%
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge badge-status badge-status-{{ app.status }}">
+                                            {{ app.get_status_display }}
+                                        </span>
+                                    </td>
+                                    <td class="text-muted small">
+                                        {{ app.applied_at|timesince }} ago
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-1">
+                                            {% with remarks=app.get_remarks_list %}
+                                                {% if remarks %}
+                                                    <button class="btn btn-sm btn-outline-primary py-1 px-2" data-bs-toggle="modal" data-bs-target="#appModal{{ app.id }}" title="View Recruiter Remarks">
+                                                        <i class="fa-solid fa-clock-rotate-left"></i>
+                                                    </button>
+                                                {% endif %}
+                                            {% endwith %}
+                                            <a href="{% url 'job_detail_public' app.job.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" title="View Job Details">
+                                                <i class="fa-solid fa-eye"></i>
+                                            </a>
+                                        </div>
+
+                                        <!-- Remarks Modal -->
+                                        <div class="modal fade" id="appModal{{ app.id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content rounded-4 border-0 shadow-lg">
+                                                    <div class="modal-header border-bottom">
+                                                        <h6 class="modal-title fw-bold text-dark">Application Status History</h6>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body p-4">
+                                                        <h6 class="fw-bold mb-2">{{ app.job.title }} @ {{ app.job.company_name }}</h6>
+                                                        <div class="d-flex flex-column gap-3 mt-3">
+                                                            {% for r in app.get_remarks_list %}
+                                                                <div class="p-3 bg-light rounded-3 border-start border-4 border-primary">
+                                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                        <span class="badge badge-status badge-status-{{ r.status }}">{{ r.status|title }}</span>
+                                                                        <span class="text-muted small">{{ r.timestamp }}</span>
+                                                                    </div>
+                                                                    <div class="text-dark small my-1">{{ r.remarks }}</div>
+                                                                    <div class="text-muted" style="font-size: 0.75rem;">Reviewer: {{ r.reviewed_by }}</div>
+                                                                </div>
+                                                            {% endfor %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        <i class="fa-solid fa-file-circle-check fs-2 text-secondary opacity-50 mb-2"></i>
+                                        <p class="small mb-2">No active job applications found in pipeline.</p>
+                                        <a href="{% url 'applicant_jobs' %}" class="btn btn-sm btn-primary-custom">
+                                            Browse Available Openings
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- =====================================================================
+             RIGHT COLUMN (4 COLS): AI READINESS RADAR, INTERVIEWS, & COPILOT
+             ===================================================================== -->
+        <div class="col-lg-4">
+            
+            <!-- AI Employability & Profile Strength Card -->
+            <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="fa-solid fa-gauge-high text-primary me-2"></i>AI Employability Index
+                    </h6>
+                    <span class="badge bg-primary bg-opacity-10 text-primary small">Live Rating</span>
+                </div>
+
+                <!-- Radial Progress Gauge Box -->
+                <div class="readiness-gauge-box text-center mb-4">
+                    <div class="radial-progress-container" data-score="{{ employability_score }}">
+                        <svg class="radial-progress-svg" viewBox="0 0 100 100">
+                            <defs>
+                                <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#3b82f6" />
+                                    <stop offset="100%" stop-color="#1e40af" />
+                                </linearGradient>
+                            </defs>
+                            <circle class="radial-progress-bg" cx="50" cy="50" r="40"></circle>
+                            <!-- Circumference = 2 * PI * 40 = 251.32 -->
+                            <circle class="radial-progress-val" cx="50" cy="50" r="40"
+                                    stroke-dasharray="251.32"
+                                    stroke-dashoffset="251.32">
+                            </circle>
+                        </svg>
+                        <div class="radial-progress-center">
+                            <span class="fs-2 fw-extrabold text-dark">{{ employability_score }}%</span>
+                            <span class="text-muted" style="font-size: 0.7rem; font-weight: 700; text-transform: uppercase;">Affinity</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4 Breakdown Progress Bars -->
+                <div class="d-flex flex-column gap-3 mb-4">
+                    <div>
+                        <div class="d-flex justify-content-between small fw-semibold mb-1">
+                            <span><i class="fa-solid fa-code text-primary me-1"></i> Tech Skills Coverage</span>
+                            <span>{{ skills_score }}%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-primary auto-progress-bar" role="progressbar" data-progress="{{ skills_score }}"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="d-flex justify-content-between small fw-semibold mb-1">
+                            <span><i class="fa-solid fa-briefcase text-info me-1"></i> Seniority and Experience</span>
+                            <span>{{ exp_score }}%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-info auto-progress-bar" role="progressbar" data-progress="{{ exp_score }}"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="d-flex justify-content-between small fw-semibold mb-1">
+                            <span><i class="fa-solid fa-file-pdf text-danger me-1"></i> Resume Parsing Health</span>
+                            <span>{{ resume_score }}%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-danger auto-progress-bar" role="progressbar" data-progress="{{ resume_score }}"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="d-flex justify-content-between small fw-semibold mb-1">
+                            <span><i class="fa-solid fa-user-check text-success me-1"></i> Profile Completeness</span>
+                            <span>{{ completion_pct }}%</span>
+                        </div>
+                        <div class="progress" style="height: 6px;">
+                            <div class="progress-bar bg-success auto-progress-bar" role="progressbar" data-progress="{{ completion_pct }}"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Smart AI Recommendation Insight Box -->
+                <div class="p-3 bg-light rounded-3 border mb-3">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="fa-solid fa-lightbulb text-warning"></i>
+                        <span class="fw-bold small text-dark">AI Optimization Tip</span>
+                    </div>
+                    <p class="text-secondary small mb-2">{{ ai_tip }}</p>
+                    <a href="{{ ai_tip_url }}" class="btn btn-sm btn-outline-custom w-100 py-1">
+                        {{ ai_tip_badge }} <i class="fa-solid fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+
+                <!-- Skills Cloud Section -->
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold small text-dark">My Skill Stack</span>
+                        <a href="{% url 'applicant_profile' %}" class="small text-primary text-decoration-none">+ Add Skill</a>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for sk in candidate_skills %}
+                            <span class="skill-chip">
+                                <i class="fa-solid fa-check text-success" style="font-size: 0.7rem;"></i> {{ sk }}
+                            </span>
+                        {% empty %}
+                            <span class="text-muted small">No skills listed yet.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upcoming Scheduled Interviews Card -->
+            <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="fa-solid fa-calendar-day text-warning me-2"></i>Upcoming Interviews
+                    </h6>
+                    <span class="badge bg-warning bg-opacity-10 text-dark small fw-semibold">
+                        {{ upcoming_interviews|length }} Scheduled
+                    </span>
+                </div>
+
+                <div class="d-flex flex-column gap-3">
+                    {% for interview in upcoming_interviews %}
+                        <div class="p-3 bg-light rounded-3 border-start border-4 border-warning">
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <div class="interview-date-block">
+                                    <div class="interview-date-month">{{ interview.interview_date|date:"M" }}</div>
+                                    <div class="interview-date-day">{{ interview.interview_date|date:"d" }}</div>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-bold text-dark mb-0">{{ interview.application.job.title }}</div>
+                                    <div class="text-muted small">{{ interview.application.job.company_name|default:"Multibiz Partner" }}</div>
+                                </div>
+                            </div>
+                            
+                            <div class="text-secondary small mb-2">
+                                <i class="fa-solid fa-clock text-primary me-1"></i> {{ interview.start_time|time:"g:i A" }} - {{ interview.end_time|time:"g:i A" }}
+                                <span class="badge bg-white text-dark border ms-2 small">{{ interview.get_interview_type_display|title }}</span>
+                            </div>
+
+                            {% if interview.notes %}
+                                <div class="text-muted small bg-white p-2 rounded mb-2 border">
+                                    <i class="fa-solid fa-note-sticky text-warning me-1"></i> {{ interview.notes }}
+                                </div>
+                            {% endif %}
+
+                            {% if interview.meeting_link %}
+                                <a href="{{ interview.meeting_link }}" target="_blank" class="btn btn-sm btn-primary-custom py-1 w-100">
+                                    <i class="fa-solid fa-video me-1"></i> Join Video Call
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <div class="text-center py-4 text-muted small bg-light rounded-3 border">
+                            <i class="fa-solid fa-calendar-check text-secondary display-6 opacity-50 mb-2"></i>
+                            <div>No upcoming interviews scheduled.</div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- AI Career Copilot Fast Prompts -->
+            <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4">
+                <h6 class="fw-bold text-dark border-bottom pb-3 mb-3">
+                    <i class="fa-solid fa-robot text-info me-2"></i>AI Career Copilot
+                </h6>
+
+                <div class="d-flex flex-column gap-2">
+                    <a href="{% url 'chatbot_view' %}" class="copilot-prompt-pill">
+                        <i class="fa-solid fa-comment-dots text-primary"></i>
+                        <span>How to prepare for coding interviews</span>
+                    </a>
+                    <a href="{% url 'chatbot_view' %}" class="copilot-prompt-pill">
+                        <i class="fa-solid fa-chart-line text-success"></i>
+                        <span>Tech salary benchmarks in 2026</span>
+                    </a>
+                    <a href="{% url 'chatbot_view' %}" class="copilot-prompt-pill">
+                        <i class="fa-solid fa-wand-magic-sparkles text-warning"></i>
+                        <span>ATS resume optimization tips</span>
+                    </a>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // Initialize progress bars & radial meter dynamically from data attributes
+    document.addEventListener("DOMContentLoaded", function () {
+        // 1. Progress bars width initialization
+        document.querySelectorAll(".auto-progress-bar").forEach(function (bar) {
+            const val = bar.getAttribute("data-progress") || "0";
+            bar.style.width = val + "%";
+        });
+
+        // 2. Animate radial progress SVG meter
+        const container = document.querySelector(".radial-progress-container");
+        const circle = document.querySelector(".radial-progress-val");
+        if (container && circle) {
+            const score = parseFloat(container.getAttribute("data-score") || "75");
+            const circumference = 2 * Math.PI * 40; // 251.32
+            const offset = circumference - (score / 100) * circumference;
+            setTimeout(function () {
+                circle.style.strokeDashoffset = offset.toFixed(2);
+            }, 250);
+        }
+    });
+</script>
+{% endblock %}

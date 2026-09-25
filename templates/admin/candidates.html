@@ -1,0 +1,864 @@
+{% include 'includes/header.html' %}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&display=swap');
+
+/* Base Page Layout */
+.cand-page-wrapper {
+    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f1f5f9;
+    min-height: 100vh;
+    padding: 2rem 1.25rem 4rem;
+    box-sizing: border-box;
+}
+
+.cand-page-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Hero Banner */
+.cand-hero-banner {
+    position: relative;
+    background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 55%, #2196f3 100%);
+    color: #ffffff;
+    padding: 2rem 2.25rem;
+    border-radius: 18px;
+    margin-bottom: 1.75rem;
+    box-shadow: 0 10px 30px rgba(10, 61, 107, 0.2);
+    overflow: hidden;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+}
+
+.cand-hero-banner::before {
+    content: '';
+    position: absolute;
+    top: -60px;
+    right: -60px;
+    width: 220px;
+    height: 220px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+.cand-hero-left {
+    position: relative;
+    z-index: 1;
+}
+
+.cand-hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #e0f2fe;
+    margin-bottom: 0.6rem;
+}
+
+.cand-hero-title {
+    font-size: clamp(1.4rem, 2.2vw, 1.85rem);
+    font-weight: 800;
+    margin: 0 0 0.35rem 0;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+
+.cand-hero-subtitle {
+    font-size: 0.92rem;
+    color: rgba(255, 255, 255, 0.88);
+    margin: 0;
+    max-width: 680px;
+    line-height: 1.45;
+}
+
+.cand-hero-actions {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: 0.75rem;
+}
+
+.cand-btn-primary {
+    background: #f59e0b;
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 0.7rem 1.35rem;
+    border-radius: 10px;
+    border: none;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.35);
+}
+
+.cand-btn-primary:hover {
+    background: #d97706;
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(245, 158, 11, 0.45);
+}
+
+/* KPI Overview Grid */
+.cand-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1.15rem;
+    margin-bottom: 1.75rem;
+}
+
+.cand-kpi-card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 1.15rem 1.35rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-top: 3.5px solid #0284c7;
+}
+
+.cand-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.cand-kpi-card.kpi-pending { border-top-color: #f59e0b; }
+.cand-kpi-card.kpi-interviewed { border-top-color: #8b5cf6; }
+.cand-kpi-card.kpi-accepted { border-top-color: #10b981; }
+.cand-kpi-card.kpi-rejected { border-top-color: #ef4444; }
+
+.cand-kpi-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.cand-kpi-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+}
+
+.cand-kpi-value {
+    font-size: 1.85rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+    margin-top: 0.35rem;
+}
+
+.cand-kpi-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    background: #f0f9ff;
+    color: #0284c7;
+    flex-shrink: 0;
+}
+
+.kpi-pending .cand-kpi-icon { background: #fef3c7; color: #d97706; }
+.kpi-interviewed .cand-kpi-icon { background: #ede9fe; color: #7c3aed; }
+.kpi-accepted .cand-kpi-icon { background: #d1fae5; color: #059669; }
+.kpi-rejected .cand-kpi-icon { background: #fee2e2; color: #dc2626; }
+
+/* Filters Toolbar */
+.cand-filter-bar {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 1.15rem 1.4rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    margin-bottom: 1.75rem;
+}
+
+.cand-filter-form {
+    display: grid;
+    grid-template-columns: minmax(260px, 2fr) minmax(220px, 1.4fr) minmax(180px, 1.2fr) auto auto;
+    gap: 0.85rem;
+    align-items: center;
+}
+
+.cand-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.cand-input-wrap i {
+    position: absolute;
+    left: 0.95rem;
+    color: #94a3b8;
+    font-size: 0.9rem;
+    pointer-events: none;
+}
+
+.cand-form-control {
+    width: 100%;
+    padding: 0.65rem 0.9rem 0.65rem 2.4rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 9px;
+    font-size: 0.88rem;
+    background: #f8fafc;
+    color: #1e293b;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cand-form-select {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 9px;
+    font-size: 0.88rem;
+    background: #f8fafc;
+    color: #1e293b;
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cand-form-control:focus,
+.cand-form-select:focus {
+    outline: none;
+    border-color: #0284c7;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.12);
+}
+
+.cand-btn-filter {
+    padding: 0.65rem 1.35rem;
+    background: #1866a3;
+    color: #ffffff;
+    border: none;
+    border-radius: 9px;
+    font-weight: 700;
+    font-size: 0.88rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    white-space: nowrap;
+    transition: background 0.2s, transform 0.15s;
+}
+
+.cand-btn-filter:hover {
+    background: #0a3d6b;
+    transform: translateY(-1px);
+}
+
+.cand-btn-reset {
+    color: #64748b;
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.65rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.cand-btn-reset:hover {
+    color: #0f172a;
+    background: #e2e8f0;
+}
+
+/* Candidate Pipeline Cards Grid */
+.cand-list-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.cand-card {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    padding: 1.25rem 1.6rem;
+    display: grid;
+    grid-template-columns: minmax(320px, 2.3fr) minmax(220px, 1.6fr) 110px 140px minmax(210px, 1.4fr);
+    align-items: center;
+    gap: 1.25rem;
+    transition: all 0.2s ease;
+    position: relative;
+    border-left: 4px solid #cbd5e1;
+}
+
+.cand-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
+    border-color: #cbd5e1;
+}
+
+.cand-card.cat-excellent { border-left-color: #10b981; }
+.cand-card.cat-good { border-left-color: #0284c7; }
+.cand-card.cat-average { border-left-color: #f59e0b; }
+.cand-card.cat-poor { border-left-color: #94a3b8; }
+
+/* Column 1: Candidate Identity */
+.cand-col-identity {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    min-width: 0;
+}
+
+.cand-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%);
+    color: #0284c7;
+    display: grid;
+    place-items: center;
+    font-size: 1.25rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    box-shadow: inset 0 0 0 1px rgba(2, 132, 199, 0.2);
+}
+
+.cand-identity-details {
+    min-width: 0;
+    flex: 1;
+}
+
+.cand-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.25rem;
+}
+
+.cand-name {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cand-rank-badge {
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    white-space: nowrap;
+}
+
+.cand-rank-badge.rank-excellent {
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #bbf7d0;
+}
+
+.cand-rank-badge.rank-good {
+    background: #e0f2fe;
+    color: #0369a1;
+    border: 1px solid #bae6fd;
+}
+
+.cand-rank-badge.rank-average {
+    background: #fef3c7;
+    color: #b45309;
+    border: 1px solid #fde68a;
+}
+
+.cand-rank-badge.rank-poor {
+    background: #f1f5f9;
+    color: #64748b;
+    border: 1px solid #e2e8f0;
+}
+
+.cand-meta-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-top: 0.35rem;
+}
+
+.cand-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.cand-meta-item i {
+    color: #94a3b8;
+    font-size: 0.78rem;
+}
+
+/* Column 2: Applied Role */
+.cand-col-role {
+    min-width: 0;
+}
+
+.cand-col-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94a3b8;
+    margin-bottom: 0.2rem;
+}
+
+.cand-job-title {
+    font-size: 0.94rem;
+    font-weight: 700;
+    color: #0284c7;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cand-company-name {
+    font-size: 0.82rem;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin-top: 0.15rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cand-company-name i {
+    color: #94a3b8;
+}
+
+.cand-date {
+    font-size: 0.74rem;
+    color: #94a3b8;
+    margin-top: 0.25rem;
+}
+
+/* Column 3: AI Match Score */
+.cand-col-score {
+    text-align: center;
+}
+
+.cand-score-val {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #0a3d6b;
+    line-height: 1;
+}
+
+.cand-score-sub {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: 0.2rem;
+}
+
+/* Column 4: Application Status */
+.cand-col-status {
+    text-align: center;
+}
+
+.cand-status-pill {
+    display: inline-block;
+    padding: 0.35rem 0.85rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
+.cand-status-pill.status-pending { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+.cand-status-pill.status-shortlisted { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+.cand-status-pill.status-interviewed { background: #ede9fe; color: #6d28d9; border: 1px solid #ddd6fe; }
+.cand-status-pill.status-accepted { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.cand-status-pill.status-rejected { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+/* Column 5: Action Buttons */
+.cand-col-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+}
+
+.cand-btn-resume {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #334155;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.cand-btn-resume:hover {
+    background: #fee2e2;
+    border-color: #fca5a5;
+    color: #b91c1c;
+}
+
+.cand-btn-review {
+    padding: 0.55rem 1rem;
+    background: #1866a3;
+    color: #ffffff;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: 0.82rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(24, 102, 163, 0.2);
+}
+
+.cand-btn-review:hover {
+    background: #0a3d6b;
+    color: #ffffff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(10, 61, 107, 0.3);
+}
+
+/* Empty State */
+.cand-empty-state {
+    background: #ffffff;
+    padding: 4rem 2rem;
+    text-align: center;
+    border-radius: 16px;
+    border: 1.5px dashed #cbd5e1;
+}
+
+.cand-empty-icon {
+    font-size: 2.75rem;
+    color: #cbd5e1;
+    margin-bottom: 1rem;
+}
+
+.cand-empty-title {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #334155;
+    margin: 0 0 0.5rem 0;
+}
+
+.cand-empty-desc {
+    color: #64748b;
+    font-size: 0.92rem;
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.5;
+}
+
+/* Responsive Media Queries */
+@media (max-width: 1200px) {
+    .cand-card {
+        grid-template-columns: 2fr 1.5fr 1fr 1.5fr;
+        gap: 1rem;
+    }
+    .cand-col-status {
+        display: flex;
+        justify-content: flex-start;
+    }
+    .cand-col-score {
+        text-align: left;
+    }
+    .cand-col-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-end;
+        padding-top: 0.75rem;
+        border-top: 1px dashed #e2e8f0;
+    }
+}
+
+@media (max-width: 900px) {
+    .cand-filter-form {
+        grid-template-columns: 1fr 1fr;
+    }
+    .cand-filter-form .cand-input-wrap {
+        grid-column: 1 / -1;
+    }
+    .cand-btn-filter, .cand-btn-reset {
+        justify-content: center;
+    }
+    .cand-card {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    .cand-col-identity,
+    .cand-col-role,
+    .cand-col-score,
+    .cand-col-status,
+    .cand-col-actions {
+        width: 100%;
+        text-align: left;
+    }
+    .cand-col-actions {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 600px) {
+    .cand-hero-banner {
+        padding: 1.5rem;
+    }
+    .cand-filter-form {
+        grid-template-columns: 1fr;
+    }
+    .cand-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    .cand-col-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .cand-btn-resume, .cand-btn-review {
+        justify-content: center;
+    }
+}
+</style>
+
+<div class="cand-page-wrapper">
+    <div class="cand-page-container">
+
+        <!-- 1. Header Banner -->
+        <div class="cand-hero-banner">
+            <div class="cand-hero-left">
+                <div class="cand-hero-badge">
+                    <i class="fas fa-shield-halved"></i> Admin Console
+                </div>
+                <h1 class="cand-hero-title">
+                    <i class="fas fa-users-viewfinder" style="color: #f59e0b;"></i> Candidate Pipeline & AI Scoring
+                </h1>
+                <p class="cand-hero-subtitle">
+                    Screen applicant resumes, evaluate ML match scores, schedule candidate interviews, and advance applications through the hiring lifecycle.
+                </p>
+            </div>
+            <div class="cand-hero-actions">
+                <a href="/admin/post_job.php" class="cand-btn-primary">
+                    <i class="fas fa-plus-circle"></i> Post New Job
+                </a>
+            </div>
+        </div>
+
+        <!-- 2. KPI Overview Strip -->
+        <div class="cand-kpi-grid">
+            <div class="cand-kpi-card">
+                <div class="cand-kpi-info">
+                    <span class="cand-kpi-label">Total Applications</span>
+                    <span class="cand-kpi-value">{{ total_candidates }}</span>
+                </div>
+                <div class="cand-kpi-icon"><i class="fas fa-layer-group"></i></div>
+            </div>
+            <div class="cand-kpi-card kpi-pending">
+                <div class="cand-kpi-info">
+                    <span class="cand-kpi-label">Under Review</span>
+                    <span class="cand-kpi-value">{{ pending_count }}</span>
+                </div>
+                <div class="cand-kpi-icon"><i class="fas fa-hourglass-half"></i></div>
+            </div>
+            <div class="cand-kpi-card kpi-interviewed">
+                <div class="cand-kpi-info">
+                    <span class="cand-kpi-label">Interviews</span>
+                    <span class="cand-kpi-value">{{ interviewed_count }}</span>
+                </div>
+                <div class="cand-kpi-icon"><i class="fas fa-video"></i></div>
+            </div>
+            <div class="cand-kpi-card kpi-accepted">
+                <div class="cand-kpi-info">
+                    <span class="cand-kpi-label">Hired / Accepted</span>
+                    <span class="cand-kpi-value">{{ accepted_count }}</span>
+                </div>
+                <div class="cand-kpi-icon"><i class="fas fa-check-double"></i></div>
+            </div>
+            <div class="cand-kpi-card kpi-rejected">
+                <div class="cand-kpi-info">
+                    <span class="cand-kpi-label">Archived / Rejected</span>
+                    <span class="cand-kpi-value">{{ rejected_count }}</span>
+                </div>
+                <div class="cand-kpi-icon"><i class="fas fa-circle-xmark"></i></div>
+            </div>
+        </div>
+
+        <!-- 3. Search & Filter Bar -->
+        <div class="cand-filter-bar">
+            <form method="GET" action="" class="cand-filter-form">
+                <div class="cand-input-wrap">
+                    <i class="fas fa-magnifying-glass"></i>
+                    <input type="text" name="search" value="{{ search }}" class="cand-form-control"
+                           placeholder="Search candidate name, email, role, or company...">
+                </div>
+
+                <div>
+                    <select name="job_id" onchange="this.form.submit()" class="cand-form-select">
+                        <option value="0">All Job Openings ({{ jobs|length }})</option>
+                        {% for j in jobs %}
+                            <option value="{{ j.job_id }}" {% if selected_job_id == j.job_id %}selected{% endif %}>
+                                {{ j.title }} ({{ j.employer.company_name|default:"Partner" }})
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <select name="status" onchange="this.form.submit()" class="cand-form-select">
+                        <option value="">All Application Statuses</option>
+                        <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>Pending / Under Review</option>
+                        <option value="shortlisted" {% if status_filter == 'shortlisted' %}selected{% endif %}>Shortlisted</option>
+                        <option value="interviewed" {% if status_filter == 'interviewed' %}selected{% endif %}>Interviewed</option>
+                        <option value="accepted" {% if status_filter == 'accepted' %}selected{% endif %}>Accepted / Approved</option>
+                        <option value="rejected" {% if status_filter == 'rejected' %}selected{% endif %}>Rejected</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="cand-btn-filter">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+
+                {% if search or selected_job_id or status_filter %}
+                    <a href="/admin/candidates.php" class="cand-btn-reset">
+                        <i class="fas fa-rotate-left"></i> Reset
+                    </a>
+                {% endif %}
+            </form>
+        </div>
+
+        <!-- 4. Candidate Pipeline List -->
+        <div class="cand-list-stack">
+            {% for cand in candidates %}
+                <div class="cand-card cat-{{ cand.ranking_category|default:'good' }}">
+                    
+                    <!-- Col 1: Candidate Identity -->
+                    <div class="cand-col-identity">
+                        <div class="cand-avatar">
+                            {{ cand.first_name|slice:":1"|upper }}{{ cand.last_name|slice:":1"|upper }}
+                        </div>
+                        <div class="cand-identity-details">
+                            <div class="cand-name-row">
+                                <h3 class="cand-name">{{ cand.first_name }} {{ cand.last_name }}</h3>
+                                {% if cand.ranking_category == 'excellent' %}
+                                    <span class="cand-rank-badge rank-excellent">
+                                        <i class="fas fa-crown"></i> Elite Match ({{ cand.ml_ranking_score|floatformat:0 }}%)
+                                    </span>
+                                {% elif cand.ranking_category == 'good' %}
+                                    <span class="cand-rank-badge rank-good">
+                                        <i class="fas fa-star"></i> Strong Match ({{ cand.ml_ranking_score|floatformat:0 }}%)
+                                    </span>
+                                {% elif cand.ranking_category == 'average' %}
+                                    <span class="cand-rank-badge rank-average">
+                                        <i class="fas fa-circle-check"></i> Standard Fit ({{ cand.ml_ranking_score|floatformat:0 }}%)
+                                    </span>
+                                {% else %}
+                                    <span class="cand-rank-badge rank-poor">
+                                        {{ cand.ml_ranking_score|floatformat:0 }}% Fit
+                                    </span>
+                                {% endif %}
+                            </div>
+                            <div class="cand-meta-list">
+                                <span class="cand-meta-item"><i class="fas fa-envelope"></i> {{ cand.email }}</span>
+                                {% if cand.phone %}
+                                    <span class="cand-meta-item"><i class="fas fa-phone"></i> {{ cand.phone }}</span>
+                                {% endif %}
+                                <span class="cand-meta-item"><i class="fas fa-graduation-cap"></i> {{ cand.education_level }}</span>
+                                <span class="cand-meta-item"><i class="fas fa-briefcase"></i> {{ cand.experience_years|default:0 }} yr(s) exp</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Col 2: Applied Job & Company -->
+                    <div class="cand-col-role">
+                        <div class="cand-col-label">Applied Position</div>
+                        <div class="cand-job-title" title="{{ cand.job_title }}">{{ cand.job_title }}</div>
+                        <div class="cand-company-name">
+                            <i class="fas fa-building"></i> {{ cand.company_name }}
+                        </div>
+                        <div class="cand-date">
+                            <i class="fas fa-calendar-day"></i> {{ cand.applied_at|date:"M d, Y" }}
+                        </div>
+                    </div>
+
+                    <!-- Col 3: Match Score -->
+                    <div class="cand-col-score">
+                        <div class="cand-col-label">Match Score</div>
+                        <div class="cand-score-val">{{ cand.match_score|floatformat:0 }}%</div>
+                        <div class="cand-score-sub">AI Match</div>
+                    </div>
+
+                    <!-- Col 4: Status -->
+                    <div class="cand-col-status">
+                        <div class="cand-col-label">Stage</div>
+                        <span class="cand-status-pill status-{{ cand.status|lower }}">
+                            {{ cand.status|title }}
+                        </span>
+                    </div>
+
+                    <!-- Col 5: Actions -->
+                    <div class="cand-col-actions">
+                        {% if cand.resume_file %}
+                            <a href="/{{ cand.resume_file }}" target="_blank" class="cand-btn-resume" title="Download Candidate Resume">
+                                <i class="fas fa-file-pdf" style="color: #ef4444;"></i> Resume
+                            </a>
+                        {% endif %}
+                        <a href="/admin/candidates/{{ cand.application_id }}/" class="cand-btn-review">
+                            <i class="fas fa-user-check"></i> Review & Actions
+                        </a>
+                    </div>
+
+                </div>
+            {% empty %}
+                <div class="cand-empty-state">
+                    <i class="fas fa-users-slash cand-empty-icon"></i>
+                    <h3 class="cand-empty-title">No Candidate Submissions Found</h3>
+                    <p class="cand-empty-desc">
+                        There are currently no job applications matching your search query or selected status filters. Try clearing your filters to view all active applications.
+                    </p>
+                </div>
+            {% endfor %}
+        </div>
+
+    </div>
+</div>
