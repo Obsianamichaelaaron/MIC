@@ -186,25 +186,41 @@
             min-height: 640px;
             max-height: 900px;
             overflow: hidden;
+            background: #0a1628;
         }
 
-        .hero-background { position: absolute; inset: 0; }
-        .hero-image {
-            position: absolute; inset: 0;
-            background-size: cover;
-            background-position: center;
-            opacity: 0;
-            transition: opacity 1.2s ease;
+        .hero-background {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
         }
-        .hero-image.active { opacity: 1; }
+        .hero-image {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat;
+            opacity: 0;
+            transition: opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1), transform 6s ease-out;
+            transform: scale(1.04);
+        }
+        .hero-image.active {
+            opacity: 1;
+            transform: scale(1);
+        }
 
         .hero-overlay {
-            position: absolute; inset: 0;
+            position: absolute;
+            inset: 0;
             background: linear-gradient(
-                135deg,
-                rgba(10,22,40,0.88) 0%,
-                rgba(10,22,40,0.55) 50%,
-                rgba(10,22,40,0.35) 100%
+                90deg,
+                rgba(10,22,40,0.92) 0%,
+                rgba(10,22,40,0.72) 40%,
+                rgba(10,22,40,0.35) 75%,
+                rgba(10,22,40,0.20) 100%
             );
             z-index: 1;
         }
