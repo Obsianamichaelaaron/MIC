@@ -17,9 +17,15 @@ function initHeroSlider() {
     
     // Update slide classes
     function updateSlide() {
+        const heroSlides = document.querySelectorAll('.hero-slide-item');
         heroImages.forEach((img, index) => {
             img.classList.toggle('active', index === currentSlide);
         });
+        if (heroSlides.length) {
+            heroSlides.forEach((slide, index) => {
+                slide.classList.toggle('active', index === currentSlide);
+            });
+        }
         heroIndicators.forEach((indicator, index) => {
             indicator.classList.toggle('active', index === currentSlide);
         });
