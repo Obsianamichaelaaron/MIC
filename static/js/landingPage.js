@@ -2,24 +2,24 @@
 
 // Interactive Hero Slider
 function initHeroSlider() {
-    const heroBackground = document.getElementById('heroBackground');
+    const heroImages = document.querySelectorAll('.hero-image');
     const heroIndicators = document.querySelectorAll('.hero-indicator');
     const heroPrev = document.getElementById('heroPrev');
     const heroNext = document.getElementById('heroNext');
+    const heroSection = document.querySelector('.hero');
     
-    if (!heroBackground || !heroPrev || !heroNext) return;
+    if (!heroImages || heroImages.length === 0) return;
     
     let currentSlide = 0;
-    const totalSlides = 3; // Updated to match available images
-    let autoSlideInterval;
+    const totalSlides = heroImages.length;
+    let autoSlideInterval = null;
     let isPaused = false;
     
-    // Update slide position
+    // Update slide classes
     function updateSlide() {
-        const translateX = -currentSlide * 33.333; // 33.333% per slide (for 3 slides)
-        heroBackground.style.transform = `translateX(${translateX}%)`;
-        
-        // Update indicators
+        heroImages.forEach((img, index) => {
+            img.classList.toggle('active', index === currentSlide);
+        });
         heroIndicators.forEach((indicator, index) => {
             indicator.classList.toggle('active', index === currentSlide);
         });
@@ -27,7 +27,7 @@ function initHeroSlider() {
     
     // Go to specific slide
     function goToSlide(slideIndex) {
-        currentSlide = slideIndex;
+        currentSlide = ((slideIndex % totalSlides) + totalSlides) % totalSlides;
         updateSlide();
         resetAutoSlide();
     }
@@ -46,8 +46,9 @@ function initHeroSlider() {
     
     // Auto slide
     function startAutoSlide() {
-        if (!isPaused) {
-            autoSlideInterval = setInterval(nextSlide, 5000); // Change slide every 5 seconds
+        if (!isPaused && totalSlides > 1) {
+            clearInterval(autoSlideInterval);
+            autoSlideInterval = setInterval(nextSlide, 6000);
         }
     }
     
@@ -70,19 +71,26 @@ function initHeroSlider() {
     }
     
     // Event listeners
-    heroNext.addEventListener('click', () => {
-        nextSlide();
-        resetAutoSlide();
-    });
+    if (heroNext) {
+        heroNext.addEventListener('click', (e) => {
+            e.preventDefault();
+            nextSlide();
+            resetAutoSlide();
+        });
+    }
     
-    heroPrev.addEventListener('click', () => {
-        prevSlide();
-        resetAutoSlide();
-    });
+    if (heroPrev) {
+        heroPrev.addEventListener('click', (e) => {
+            e.preventDefault();
+            prevSlide();
+            resetAutoSlide();
+        });
+    }
     
     // Indicator clicks
     heroIndicators.forEach((indicator, index) => {
-        indicator.addEventListener('click', () => {
+        indicator.addEventListener('click', (e) => {
+            e.preventDefault();
             goToSlide(index);
         });
     });
@@ -95,50 +103,12 @@ function initHeroSlider() {
         } else if (e.key === 'ArrowLeft') {
             prevSlide();
             resetAutoSlide();
-        } else if (e.key === ' ') {
-            // Spacebar toggles pause/play
-            isPaused ? resumeAutoSlide() : pauseAutoSlide();
         }
     });
     
-    // Pause auto-slide on hover
-    heroBackground.addEventListener('mouseenter', () => {
-        pauseAutoSlide();
-    });
-    
-    heroBackground.addEventListener('mouseleave', () => {
-        resumeAutoSlide();
-    });
-    
-    // Touch/swipe support for mobile
-    let touchStartX = 0;
-    let touchEndX = 0;
-    
-    heroBackground.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-        pauseAutoSlide();
-    });
-    
-    heroBackground.addEventListener('touchend', (e) => {
-        touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-        setTimeout(resumeAutoSlide, 3000); // Resume after 3 seconds
-    });
-    
-    function handleSwipe() {
-        const swipeThreshold = 50;
-        const diff = touchStartX - touchEndX;
-        
-        if (Math.abs(diff) > swipeThreshold) {
-            if (diff > 0) {
-                // Swipe left - next slide
-                nextSlide();
-            } else {
-                // Swipe right - previous slide
-                prevSlide();
-            }
-            resetAutoSlide();
-        }
+    if (heroSection) {
+        heroSection.addEventListener('mouseenter', pauseAutoSlide);
+        heroSection.addEventListener('mouseleave', resumeAutoSlide);
     }
     
     // Initialize
