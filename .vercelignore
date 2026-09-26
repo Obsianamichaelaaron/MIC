@@ -1,0 +1,12 @@
+.git
+.gitignore
+.github
+.gemini
+__pycache__
+*.pyc
+Old/
+public_html (1)/
+scratch/
+uploads/
+information_schema.sql
+u190037990_mb_db.sql
