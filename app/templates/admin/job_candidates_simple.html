@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block title %}Candidates - {{ job.title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="employer-hero-banner mb-4">
+        <div class="position-relative" style="z-index: 1;">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1 small text-white-50">
+                    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-white-50 text-decoration-none">Admin Console</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'admin_jobs' %}" class="text-white-50 text-decoration-none">Job Postings</a></li>
+                    <li class="breadcrumb-item active text-white" aria-current="page">Candidates</li>
+                </ol>
+            </nav>
+            <h3 class="fw-bold text-white mb-1"><i class="fa-solid fa-users-viewfinder text-warning me-2"></i>{{ job.title }}</h3>
+            <p class="text-white-50 small mb-0">{{ job.employer.company_name|default:'MultiBiz Partner' }} · {{ applications|length }} applicant{{ applications|length|pluralize }}</p>
+        </div>
+    </div>
+
+    <div class="custom-card p-4 bg-white">
+        <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+            <h5 class="fw-bold text-dark mb-0">Applicants</h5>
+        </div>
+        <div class="table-responsive">
+            <table class="table align-middle table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Applicant</th>
+                        <th>Email</th>
+                        <th>Match Score</th>
+                        <th>Status</th>
+                        <th>Applied</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for application in applications %}
+                    <tr>
+                        <td class="fw-semibold">{{ application.applicant.user.full_name }}</td>
+                        <td class="text-muted small">{{ application.applicant.user.email }}</td>
+                        <td><span class="badge bg-primary">{{ application.match_score|floatformat:0 }}%</span></td>
+                        <td><span class="badge bg-light text-dark border text-capitalize">{{ application.status }}</span></td>
+                        <td class="text-muted small">{{ application.applied_at|date:"M d, Y" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="5" class="text-center py-5 text-muted">No applicants for this job yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

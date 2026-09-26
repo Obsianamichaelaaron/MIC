@@ -1,0 +1,702 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Admin Dashboard - Multibiz{% endblock %}
+
+{% block extra_css %}
+<style>
+    .employer-hero-banner {
+        position: relative;
+        overflow: hidden;
+        padding: 1.5rem 1.75rem;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 58%, #2196f3 100%);
+        color: #ffffff;
+        box-shadow: 0 8px 22px rgba(10, 61, 107, 0.16);
+    }
+    .employer-hero-banner::after {
+        content: '';
+        position: absolute;
+        width: 220px;
+        height: 220px;
+        right: -80px;
+        top: -130px;
+        border: 34px solid rgba(255, 255, 255, 0.08);
+        border-radius: 50%;
+    }
+    .portal-hero-content { position: relative; z-index: 1; }
+    .custom-card,
+    .analytics-chart-card {
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06) !important;
+    }
+    .custom-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .custom-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1) !important;
+    }
+    .btn-primary-custom {
+        border: 0;
+        background: #0056b3;
+        color: #ffffff;
+        font-weight: 600;
+    }
+    .btn-primary-custom:hover,
+    .btn-primary-custom:focus {
+        background: #00458f;
+        color: #ffffff;
+    }
+    .badge-match {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        font-weight: 600;
+    }
+    .badge-match-excellent { background: #dcfce7; color: #15803d; }
+    .badge-match-good { background: #dbeafe; color: #1d4ed8; }
+    .badge-match-average { background: #fef3c7; color: #b45309; }
+    .analytics-chart-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-color);
+        border-radius: var(--border-radius-lg);
+        box-shadow: var(--box-shadow-sm);
+        transition: all 0.25s ease;
+        overflow: hidden;
+    }
+    .analytics-chart-card:hover {
+        box-shadow: var(--box-shadow-md);
+        border-color: #cbd5e1;
+    }
+    .chart-container-lg {
+        position: relative;
+        height: 320px;
+        width: 100%;
+        max-width: 100%;
+    }
+    .chart-container-md {
+        position: relative;
+        height: 270px;
+        width: 100%;
+        max-width: 100%;
+    }
+    @media (max-width: 991.98px) {
+        .chart-container-lg {
+            height: 260px;
+        }
+        .chart-container-md {
+            height: 240px;
+        }
+    }
+    @media (max-width: 575.98px) {
+        .chart-container-lg {
+            height: 220px;
+        }
+        .chart-container-md {
+            height: 210px;
+        }
+    }
+    .chart-legend-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 0.76rem;
+        font-weight: 600;
+        padding: 0.25rem 0.55rem;
+        border-radius: 20px;
+        background: rgba(148, 163, 184, 0.1);
+        white-space: nowrap;
+    }
+    .stat-pill {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.55rem;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Top Hero Header Banner (Dark Enterprise Palette) -->
+    <div class="employer-hero-banner mb-4">
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 position-relative portal-hero-content">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1 small text-white-50">
+                        <li class="breadcrumb-item text-white-50">Administration</li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">Operations</li>
+                    </ol>
+                </nav>
+                <div class="d-flex flex-column align-items-start gap-2 mt-1">
+                    <h3 class="fw-extrabold text-white mb-0">
+                        <i class="fa-solid fa-shield-halved text-danger me-2"></i>Operations Center
+                    </h3>
+                    <span class="badge bg-danger bg-opacity-25 text-white border border-danger border-opacity-50 rounded-pill px-2.5 py-1 small fw-semibold">
+                        <i class="fa-solid fa-server me-1"></i> Root Console
+                    </span>
+                </div>
+            </div>
+            <div class="portal-hero-actions justify-content-lg-end">
+                <a href="{% url 'admin_users' %}" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm">
+                    <i class="fa-solid fa-users-gear"></i> Manage Users
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top KPI Highlights Row -->
+    <div class="row g-3 mb-4">
+        <!-- Total Users -->
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 h-100 d-flex flex-column justify-content-between">
+                <div class="d-flex justify-content-between align-items-start">
+                    <span class="text-muted small fw-semibold">Total Users</span>
+                    <span class="badge bg-primary bg-opacity-10 text-primary stat-pill">+{{ new_users_30d }} 30d</span>
+                </div>
+                <div>
+                    <div class="fs-3 fw-bold text-dark mt-1">{{ total_users }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Active Jobs -->
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 h-100 d-flex flex-column justify-content-between">
+                <div class="d-flex justify-content-between align-items-start">
+                    <span class="text-muted small fw-semibold">Active Jobs</span>
+                    <span class="badge bg-success bg-opacity-10 text-success stat-pill">{{ active_jobs }}/{{ total_jobs }}</span>
+                </div>
+                <div>
+                    <div class="fs-3 fw-bold text-success mt-1">{{ active_jobs }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Applications Volume -->
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 h-100 d-flex flex-column justify-content-between">
+                <div class="d-flex justify-content-between align-items-start">
+                    <span class="text-muted small fw-semibold">Applications</span>
+                    <span class="badge bg-warning bg-opacity-10 text-warning stat-pill">+{{ new_apps_30d }} 30d</span>
+                </div>
+                <div>
+                    <div class="fs-3 fw-bold text-warning mt-1">{{ total_applications }}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Average AI Match Score -->
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 h-100 d-flex flex-column justify-content-between">
+                <div class="d-flex justify-content-between align-items-start">
+                    <span class="text-muted small fw-semibold">Avg Match Score</span>
+                    <i class="fa-solid fa-wand-magic-sparkles text-primary" style="font-size: 0.9rem;"></i>
+                </div>
+                <div>
+                    <div class="fs-3 fw-bold text-primary mt-1">{{ avg_match_score }}%</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pending Inquiries -->
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 h-100 d-flex flex-column justify-content-between">
+                <div class="d-flex justify-content-between align-items-start">
+                    <span class="text-muted small fw-semibold">Inquiries</span>
+                    {% if pending_inquiries > 0 %}
+                        <span class="badge bg-danger text-white stat-pill">{{ pending_inquiries }} new</span>
+                    {% else %}
+                        <span class="badge bg-secondary bg-opacity-10 text-muted stat-pill">Clear</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <div class="fs-3 fw-bold text-danger mt-1">{{ pending_inquiries }}</div>
+                    <a href="{% url 'admin_messages' %}" class="text-decoration-none text-muted small">View inquiries &rarr;</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ==============================================
+         VISUAL ANALYTICS & STATISTICAL GRAPHS SECTION
+         ============================================== -->
+    <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mb-3 mt-4">
+        <div>
+            <h4 class="fw-bold text-dark mb-0">
+                <i class="fa-solid fa-chart-pie text-primary me-2"></i>Platform Analytics & Growth Intelligence
+            </h4>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1.5 small fw-semibold">
+                <i class="fa-solid fa-arrows-rotate me-1 fa-spin" style="--fa-animation-duration: 4s;"></i> Live Analytics Engine
+            </span>
+        </div>
+    </div>
+
+    <!-- Analytics Graph Row 1: Platform Growth & User Composition -->
+    <div class="row g-4 mb-4">
+        <!-- Growth & Applications Trend Line Chart -->
+        <div class="col-lg-8">
+            <div class="analytics-chart-card p-4 bg-white h-100">
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center border-bottom pb-3 mb-3 gap-2">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0">
+                            <i class="fa-solid fa-chart-line text-primary me-2"></i>Platform Growth & Activity Timeline
+                        </h6>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="chart-legend-badge text-primary"><i class="fa-solid fa-circle" style="font-size: 0.55rem;"></i> Registrations</span>
+                        <span class="chart-legend-badge text-warning"><i class="fa-solid fa-circle" style="font-size: 0.55rem;"></i> Applications</span>
+                    </div>
+                </div>
+                <div class="chart-container-lg">
+                    <canvas id="growthTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Role Breakdown Doughnut Chart -->
+        <div class="col-lg-4">
+            <div class="analytics-chart-card p-4 bg-white h-100 d-flex flex-column">
+                <div class="border-bottom pb-3 mb-3">
+                    <h6 class="fw-bold text-dark mb-0">
+                        <i class="fa-solid fa-users text-info me-2"></i>User Community Breakdown
+                    </h6>
+                </div>
+                <div class="chart-container-md my-auto">
+                    <canvas id="userCompositionChart"></canvas>
+                </div>
+                <div class="d-flex justify-content-around text-center pt-3 border-top mt-2">
+                    <div>
+                        <div class="small text-muted">Candidates</div>
+                        <div class="fw-bold text-primary fs-6">{{ total_applicants }}</div>
+                    </div>
+                    <div class="border-start"></div>
+                    <div>
+                        <div class="small text-muted">Admins</div>
+                        <div class="fw-bold text-danger fs-6">{{ total_admins }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Graph Row 2: Pipeline Conversion & Job Postings by Type -->
+    <div class="row g-4 mb-4">
+        <!-- Recruitment Pipeline Funnel Bar Chart -->
+        <div class="col-lg-6">
+            <div class="analytics-chart-card p-4 bg-white h-100">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0">
+                            <i class="fa-solid fa-filter text-primary me-2"></i>Recruitment Pipeline Conversion Stages
+                        </h6>
+                    </div>
+                    <span class="badge bg-light text-secondary border px-2.5 py-1 rounded-pill small">{{ total_applications }} Total</span>
+                </div>
+                <div class="chart-container-md">
+                    <canvas id="pipelineFunnelChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Job Postings by Employment Type Chart -->
+        <div class="col-lg-6">
+            <div class="analytics-chart-card p-4 bg-white h-100">
+                <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-3">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0">
+                            <i class="fa-solid fa-briefcase text-success me-2"></i>Job Postings by Employment Type
+                        </h6>
+                    </div>
+                    <span class="badge bg-light text-secondary border px-2.5 py-1 rounded-pill small">{{ total_jobs }} Postings</span>
+                </div>
+                <div class="chart-container-md">
+                    <canvas id="jobTypeChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Graph Row 3: AI Candidate Match Score & Talent Quality Insights -->
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="analytics-chart-card p-4 bg-white">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom pb-3 mb-3 gap-2">
+                    <div>
+                        <h6 class="fw-bold text-dark mb-0">
+                            <i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>AI Talent Alignment & Fitment Quality Spectrum
+                        </h6>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge-match badge-match-excellent py-1 px-2.5" style="font-size: 0.75rem;">Elite: 85%+</span>
+                            <span class="badge-match badge-match-good py-1 px-2.5" style="font-size: 0.75rem;">Strong: 70-84%</span>
+                            <span class="badge-match badge-match-average py-1 px-2.5" style="font-size: 0.75rem;">Moderate: 50-69%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 align-items-center">
+                    <div class="col-lg-8">
+                        <div class="chart-container-md">
+                            <canvas id="matchScoreDistributionChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="p-3 bg-light rounded-4 border">
+                            <div class="d-flex align-items-center gap-2 mb-2">
+                                <i class="fa-solid fa-brain text-primary fs-5"></i>
+                                <span class="fw-bold text-dark small">AI Talent Radar Insights</span>
+                            </div>
+                            
+                            <div class="d-flex flex-column gap-2">
+                                <div class="d-flex justify-content-between align-items-center small p-2 bg-white rounded-3 border">
+                                    <span class="text-muted">Overall Average Fit:</span>
+                                    <span class="fw-bold text-primary">{{ avg_match_score }}%</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center small p-2 bg-white rounded-3 border">
+                                    <span class="text-muted">Elite & Strong Matches:</span>
+                                    <span class="fw-bold text-success">{{ elite_matches|add:strong_matches }} candidates</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center small p-2 bg-white rounded-3 border">
+                                    <span class="text-muted">Active AI Match Models:</span>
+                                    <span class="badge bg-success bg-opacity-10 text-success fw-semibold">100% Operational</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Parse Chart Data passed from Django View
+    let chartData = {
+        trend_labels: ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
+        trend_users: [0, 0, 0, 0, 0, 0],
+        trend_apps: [0, 0, 0, 0, 0, 0],
+        user_role_labels: ['Applicants', 'Administrators'],
+        user_role_data: [0, 0],
+        pipeline_labels: ['Pending Review', 'Reviewed', 'Shortlisted', 'Interview Scheduled', 'Accepted / Hired', 'Rejected'],
+        pipeline_data: [0, 0, 0, 0, 0, 0],
+        job_type_labels: ['Full-Time', 'Part-Time', 'Contract', 'Internship'],
+        job_type_data: [0, 0, 0, 0],
+        match_tier_labels: ['Elite Match (85-100%)', 'Strong Fit (70-84%)', 'Moderate (50-69%)', 'Developing (<50%)'],
+        match_tier_data: [0, 0, 0, 0]
+    };
+
+    try {
+        const rawJson = '{{ chart_data_json|escapejs }}';
+        if (rawJson) {
+            chartData = JSON.parse(rawJson);
+        }
+    } catch (e) {
+        console.error('Error parsing chart data:', e);
+    }
+
+    // Determine current screen metrics and theme
+    function getResponsiveSettings() {
+        const width = window.innerWidth;
+        const isDark = document.documentElement.getAttribute('data-bs-theme') === 'dark';
+        return {
+            isMobile: width < 768,
+            isSmallMobile: width < 480,
+            fontSize: width < 480 ? 10 : (width < 768 ? 11 : 12),
+            gridColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(226, 232, 240, 0.7)',
+            textColor: isDark ? '#94a3b8' : '#64748b',
+            cutout: width < 576 ? '60%' : '70%'
+        };
+    }
+
+    const initialSettings = getResponsiveSettings();
+
+    // Chart.js Global Typography & Styling Defaults
+    Chart.defaults.font.family = "'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif";
+    Chart.defaults.font.size = initialSettings.fontSize;
+    Chart.defaults.color = initialSettings.textColor;
+    Chart.defaults.responsive = true;
+    Chart.defaults.maintainAspectRatio = false;
+    Chart.defaults.resizeDelay = 100;
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+    Chart.defaults.plugins.tooltip.boxPadding = 4;
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+
+    const chartInstances = [];
+
+    // 1. Growth & Submissions Trend Chart (Line / Smooth Area)
+    const ctxTrend = document.getElementById('growthTrendChart');
+    if (ctxTrend) {
+        const trendCanvas = ctxTrend.getContext('2d');
+        const userGradient = trendCanvas.createLinearGradient(0, 0, 0, 280);
+        userGradient.addColorStop(0, 'rgba(59, 130, 246, 0.28)');
+        userGradient.addColorStop(1, 'rgba(59, 130, 246, 0.01)');
+
+        const appGradient = trendCanvas.createLinearGradient(0, 0, 0, 280);
+        appGradient.addColorStop(0, 'rgba(245, 158, 11, 0.25)');
+        appGradient.addColorStop(1, 'rgba(245, 158, 11, 0.01)');
+
+        const trendChart = new Chart(ctxTrend, {
+            type: 'line',
+            data: {
+                labels: chartData.trend_labels,
+                datasets: [
+                    {
+                        label: 'New Registrations',
+                        data: chartData.trend_users,
+                        borderColor: '#3b82f6',
+                        backgroundColor: userGradient,
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#3b82f6',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: initialSettings.isMobile ? 3 : 4,
+                        pointHoverRadius: 6
+                    },
+                    {
+                        label: 'Applications Submitted',
+                        data: chartData.trend_apps,
+                        borderColor: '#f59e0b',
+                        backgroundColor: appGradient,
+                        borderWidth: 2.5,
+                        fill: true,
+                        tension: 0.35,
+                        pointBackgroundColor: '#f59e0b',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                        pointRadius: initialSettings.isMobile ? 3 : 4,
+                        pointHoverRadius: 6
+                    }
+                ]
+            },
+            options: {
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            font: { size: initialSettings.fontSize },
+                            autoSkip: true,
+                            maxRotation: 45
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0,
+                            font: { size: initialSettings.fontSize }
+                        },
+                        grid: { color: initialSettings.gridColor }
+                    }
+                }
+            }
+        });
+        chartInstances.push(trendChart);
+    }
+
+    // 2. User Community Breakdown (Doughnut Chart)
+    const ctxUserRole = document.getElementById('userCompositionChart');
+    if (ctxUserRole) {
+        const userRoleChart = new Chart(ctxUserRole, {
+            type: 'doughnut',
+            data: {
+                labels: chartData.user_role_labels,
+                datasets: [{
+                    data: chartData.user_role_data,
+                    backgroundColor: ['#2563eb', '#06b6d4', '#ef4444'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                cutout: initialSettings.cutout,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: initialSettings.isMobile ? 8 : 10,
+                            padding: initialSettings.isMobile ? 8 : 12,
+                            font: { size: initialSettings.fontSize }
+                        }
+                    }
+                }
+            }
+        });
+        chartInstances.push(userRoleChart);
+    }
+
+    // 3. Recruitment Pipeline Funnel (Bar Chart)
+    const ctxPipeline = document.getElementById('pipelineFunnelChart');
+    if (ctxPipeline) {
+        const pipelineChart = new Chart(ctxPipeline, {
+            type: 'bar',
+            data: {
+                labels: chartData.pipeline_labels,
+                datasets: [{
+                    label: 'Applications in Stage',
+                    data: chartData.pipeline_data,
+                    backgroundColor: [
+                        'rgba(245, 158, 11, 0.85)',
+                        'rgba(99, 102, 241, 0.85)',
+                        'rgba(59, 130, 246, 0.85)',
+                        'rgba(139, 92, 246, 0.85)',
+                        'rgba(16, 185, 129, 0.85)',
+                        'rgba(239, 68, 68, 0.85)'
+                    ],
+                    borderRadius: 6,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            maxRotation: 45,
+                            minRotation: 0,
+                            autoSkip: true,
+                            font: { size: initialSettings.isSmallMobile ? 9 : 10 }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0,
+                            font: { size: initialSettings.fontSize }
+                        },
+                        grid: { color: initialSettings.gridColor }
+                    }
+                }
+            }
+        });
+        chartInstances.push(pipelineChart);
+    }
+
+    // 4. Job Postings by Employment Type Chart (Doughnut)
+    const ctxJobType = document.getElementById('jobTypeChart');
+    if (ctxJobType) {
+        const jobTypeChart = new Chart(ctxJobType, {
+            type: 'doughnut',
+            data: {
+                labels: chartData.job_type_labels,
+                datasets: [{
+                    data: chartData.job_type_data,
+                    backgroundColor: ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#06b6d4'],
+                    borderWidth: 2,
+                    borderColor: '#ffffff',
+                    hoverOffset: 6
+                }]
+            },
+            options: {
+                cutout: initialSettings.cutout,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            boxWidth: initialSettings.isMobile ? 8 : 10,
+                            padding: initialSettings.isMobile ? 8 : 12,
+                            font: { size: initialSettings.fontSize }
+                        }
+                    }
+                }
+            }
+        });
+        chartInstances.push(jobTypeChart);
+    }
+
+    // 5. AI Match Score Distribution Chart
+    const ctxMatchScore = document.getElementById('matchScoreDistributionChart');
+    if (ctxMatchScore) {
+        const matchScoreChart = new Chart(ctxMatchScore, {
+            type: 'bar',
+            data: {
+                labels: chartData.match_tier_labels,
+                datasets: [{
+                    label: 'Candidates in Tier',
+                    data: chartData.match_tier_data,
+                    backgroundColor: [
+                        'rgba(16, 185, 129, 0.85)',
+                        'rgba(59, 130, 246, 0.85)',
+                        'rgba(245, 158, 11, 0.85)',
+                        'rgba(239, 68, 68, 0.85)'
+                    ],
+                    borderRadius: 6,
+                    borderSkipped: false
+                }]
+            },
+            options: {
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: {
+                            autoSkip: true,
+                            maxRotation: 45,
+                            minRotation: 0,
+                            font: { size: initialSettings.isSmallMobile ? 9 : 10 }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0,
+                            font: { size: initialSettings.fontSize }
+                        },
+                        grid: { color: initialSettings.gridColor }
+                    }
+                }
+            }
+        });
+        chartInstances.push(matchScoreChart);
+    }
+
+    // Window Resize Responsive Observer
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function() {
+            const settings = getResponsiveSettings();
+            chartInstances.forEach(function(chart) {
+                if (chart) {
+                    if (chart.options.scales) {
+                        if (chart.options.scales.x && chart.options.scales.x.ticks) {
+                            chart.options.scales.x.ticks.font = { size: settings.isSmallMobile ? 9 : (settings.isMobile ? 10 : 11) };
+                        }
+                        if (chart.options.scales.y && chart.options.scales.y.ticks) {
+                            chart.options.scales.y.ticks.font = { size: settings.fontSize };
+                            chart.options.scales.y.grid.color = settings.gridColor;
+                        }
+                    }
+                    if (chart.options.cutout) {
+                        chart.options.cutout = settings.cutout;
+                    }
+                    chart.resize();
+                    chart.update('none');
+                }
+            });
+        }, 120);
+    });
+});
+</script>
+{% endblock %}
