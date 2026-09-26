@@ -39,7 +39,10 @@ ROOT_URLCONF = 'multibiz.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [
+            BASE_DIR / 'templates',
+            os.path.join(str(BASE_DIR), 'templates'),
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -62,11 +65,24 @@ WSGI_APPLICATION = 'multibiz.wsgi.application'
 ASGI_APPLICATION = 'multibiz.asgi.application'
 
 # Database
-# Default to SQLite for seamless execution; easily switched to MySQL if desired
+# Default to SQLite for seamless execution; easily switched to MySQL/Postgres if desired
+# In Vercel serverless environments (/var/task is read-only), copy to /tmp for write access
+db_path = BASE_DIR / 'db.sqlite3'
+if os.environ.get('VERCEL') == '1' or 'VERCEL' in os.environ:
+    import shutil
+    tmp_db = '/tmp/db.sqlite3'
+    if not os.path.exists(tmp_db) and os.path.exists(db_path):
+        try:
+            shutil.copyfile(str(db_path), tmp_db)
+        except Exception:
+            pass
+    if os.path.exists(tmp_db):
+        db_path = tmp_db
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': str(db_path),
     }
 }
 
