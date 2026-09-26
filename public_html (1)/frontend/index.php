@@ -369,23 +369,36 @@ $featured_jobs_title  = getCMSContent('featured_jobs_title',  'title', 'Featured
             overflow: hidden;
         }
 
-        .hero-background { position: absolute; inset: 0; }
+        .hero-background {
+            position: absolute;
+            inset: 0;
+            width: 300%;
+            display: flex;
+            transition: transform 0.55s ease-in-out;
+        }
         .hero-image {
-            position: absolute; inset: 0;
+            width: 33.333%;
+            min-width: 33.333%;
+            height: 100%;
             background-size: cover;
             background-position: center;
-            opacity: 0;
-            transition: opacity 1.2s ease;
+            position: relative;
+            flex-shrink: 0;
         }
-        .hero-image.active { opacity: 1; }
+        .hero-image::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.05);
+        }
 
         .hero-overlay {
             position: absolute; inset: 0;
             background: linear-gradient(
                 135deg,
-                rgba(10,22,40,0.88) 0%,
-                rgba(10,22,40,0.55) 50%,
-                rgba(10,22,40,0.35) 100%
+                rgba(255,255,255,0.22) 0%,
+                rgba(255,255,255,0.10) 36%,
+                rgba(10,22,40,0.08) 100%
             );
             z-index: 1;
         }
@@ -395,7 +408,7 @@ $featured_jobs_title  = getCMSContent('featured_jobs_title',  'title', 'Featured
             position: absolute;
             bottom: 0; left: 0;
             width: 100%; height: 140px;
-            background: linear-gradient(to top, var(--warm-white), transparent);
+            background: linear-gradient(to top, rgba(250,250,248,0.8), transparent);
         }
 
         .hero-content {
@@ -1771,22 +1784,6 @@ $featured_jobs_title  = getCMSContent('featured_jobs_title',  'title', 'Featured
                 newsTrack.style.transform = `translateX(${newsPosition}px)`;
             });
         }
-
-        // Hero slider
-        let heroIndex = 0;
-        const heroImages     = document.querySelectorAll('.hero-image');
-        const heroIndicators = document.querySelectorAll('.hero-indicator');
-        function setHeroSlide(n) {
-            heroImages.forEach(img => img.classList.remove('active'));
-            heroIndicators.forEach(ind => ind.classList.remove('active'));
-            heroIndex = (n + heroImages.length) % heroImages.length;
-            heroImages[heroIndex].classList.add('active');
-            heroIndicators[heroIndex].classList.add('active');
-        }
-        document.getElementById('heroPrev')?.addEventListener('click', () => setHeroSlide(heroIndex - 1));
-        document.getElementById('heroNext')?.addEventListener('click', () => setHeroSlide(heroIndex + 1));
-        heroIndicators.forEach(ind => ind.addEventListener('click', () => setHeroSlide(parseInt(ind.dataset.index))));
-        setInterval(() => setHeroSlide(heroIndex + 1), 5000);
 
         // Contact form — with validation, fetch submission & DB storage
         const contactForm = document.getElementById('contactForm');

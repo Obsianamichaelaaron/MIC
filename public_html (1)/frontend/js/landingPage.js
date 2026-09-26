@@ -3,145 +3,97 @@
 // Interactive Hero Slider
 function initHeroSlider() {
     const heroBackground = document.getElementById('heroBackground');
+    const heroImages = document.querySelectorAll('.hero-image');
     const heroIndicators = document.querySelectorAll('.hero-indicator');
     const heroPrev = document.getElementById('heroPrev');
     const heroNext = document.getElementById('heroNext');
-    
-    if (!heroBackground || !heroPrev || !heroNext) return;
-    
+
+    if (!heroBackground || !heroPrev || !heroNext || !heroImages.length) return;
+
     let currentSlide = 0;
-    const totalSlides = 3; // Updated to match available images
+    const totalSlides = heroImages.length;
     let autoSlideInterval;
     let isPaused = false;
-    
-    // Update slide position
+
     function updateSlide() {
-        const translateX = -currentSlide * 33.333; // 33.333% per slide (for 3 slides)
+        const translateX = -currentSlide * (100 / totalSlides);
         heroBackground.style.transform = `translateX(${translateX}%)`;
-        
-        // Update indicators
+
         heroIndicators.forEach((indicator, index) => {
             indicator.classList.toggle('active', index === currentSlide);
         });
     }
-    
-    // Go to specific slide
+
     function goToSlide(slideIndex) {
-        currentSlide = slideIndex;
+        currentSlide = (slideIndex + totalSlides) % totalSlides;
         updateSlide();
         resetAutoSlide();
     }
-    
-    // Next slide
+
     function nextSlide() {
-        currentSlide = (currentSlide + 1) % totalSlides;
-        updateSlide();
+        goToSlide(currentSlide + 1);
     }
-    
-    // Previous slide
+
     function prevSlide() {
-        currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
-        updateSlide();
+        goToSlide(currentSlide - 1);
     }
-    
-    // Auto slide
+
     function startAutoSlide() {
-        if (!isPaused) {
-            autoSlideInterval = setInterval(nextSlide, 5000); // Change slide every 5 seconds
-        }
+        if (isPaused) return;
+        autoSlideInterval = setInterval(() => {
+            nextSlide();
+        }, 3000);
     }
-    
-    // Reset auto slide timer
+
     function resetAutoSlide() {
         clearInterval(autoSlideInterval);
         startAutoSlide();
     }
-    
-    // Pause auto-slide
+
     function pauseAutoSlide() {
         isPaused = true;
         clearInterval(autoSlideInterval);
     }
-    
-    // Resume auto-slide
+
     function resumeAutoSlide() {
         isPaused = false;
         startAutoSlide();
     }
-    
-    // Event listeners
-    heroNext.addEventListener('click', () => {
-        nextSlide();
-        resetAutoSlide();
-    });
-    
-    heroPrev.addEventListener('click', () => {
-        prevSlide();
-        resetAutoSlide();
-    });
-    
-    // Indicator clicks
+
+    heroNext.addEventListener('click', () => nextSlide());
+    heroPrev.addEventListener('click', () => prevSlide());
+
     heroIndicators.forEach((indicator, index) => {
-        indicator.addEventListener('click', () => {
-            goToSlide(index);
-        });
+        indicator.addEventListener('click', () => goToSlide(index));
     });
-    
-    // Keyboard navigation
+
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowRight') {
-            nextSlide();
-            resetAutoSlide();
-        } else if (e.key === 'ArrowLeft') {
-            prevSlide();
-            resetAutoSlide();
-        } else if (e.key === ' ') {
-            // Spacebar toggles pause/play
+        if (e.key === 'ArrowRight') nextSlide();
+        else if (e.key === 'ArrowLeft') prevSlide();
+        else if (e.key === ' ') {
             isPaused ? resumeAutoSlide() : pauseAutoSlide();
         }
     });
-    
-    // Pause auto-slide on hover
-    heroBackground.addEventListener('mouseenter', () => {
-        pauseAutoSlide();
-    });
-    
-    heroBackground.addEventListener('mouseleave', () => {
-        resumeAutoSlide();
-    });
-    
-    // Touch/swipe support for mobile
+
+    heroBackground.addEventListener('mouseenter', pauseAutoSlide);
+    heroBackground.addEventListener('mouseleave', resumeAutoSlide);
+
     let touchStartX = 0;
     let touchEndX = 0;
-    
     heroBackground.addEventListener('touchstart', (e) => {
         touchStartX = e.changedTouches[0].screenX;
         pauseAutoSlide();
     });
-    
     heroBackground.addEventListener('touchend', (e) => {
         touchEndX = e.changedTouches[0].screenX;
-        handleSwipe();
-        setTimeout(resumeAutoSlide, 3000); // Resume after 3 seconds
-    });
-    
-    function handleSwipe() {
-        const swipeThreshold = 50;
         const diff = touchStartX - touchEndX;
-        
-        if (Math.abs(diff) > swipeThreshold) {
-            if (diff > 0) {
-                // Swipe left - next slide
-                nextSlide();
-            } else {
-                // Swipe right - previous slide
-                prevSlide();
-            }
-            resetAutoSlide();
+        if (Math.abs(diff) > 50) {
+            if (diff > 0) nextSlide();
+            else prevSlide();
         }
-    }
-    
-    // Initialize
+        setTimeout(resumeAutoSlide, 3000);
+    });
+
     updateSlide();
     startAutoSlide();
 }
