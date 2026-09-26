@@ -8,6 +8,7 @@
         "maxLambdaSize": "15mb",
         "includeFiles": [
           "templates/**",
+          "app/templates/**",
           "static/**",
           "db.sqlite3"
         ]

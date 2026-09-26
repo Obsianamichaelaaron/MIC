@@ -1,0 +1,495 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Candidate Management: {{ job.title }} - Multibiz Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+    .admin-candidates-page {
+        --candidate-ink: #12233f;
+        --candidate-muted: #64748b;
+        --candidate-border: #dbe4ef;
+        --candidate-surface: #ffffff;
+        --candidate-blue: #1769e0;
+    }
+
+    .admin-candidates-page .employer-hero-banner {
+        padding: 1.35rem 1.5rem !important;
+        border-radius: 16px !important;
+        box-shadow: 0 14px 30px rgba(15, 32, 61, 0.18) !important;
+    }
+
+    .admin-candidates-page .employer-hero-banner h3 {
+        font-size: clamp(1.25rem, 2vw, 1.7rem);
+    }
+
+    .admin-candidates-page .candidate-hero-actions {
+        justify-content: flex-end;
+    }
+
+    .admin-candidates-page .candidate-hero-actions .btn {
+        min-height: 38px;
+        border-radius: 9px;
+        white-space: nowrap;
+    }
+
+    .admin-candidates-page .custom-card {
+        border: 1px solid var(--candidate-border) !important;
+        border-radius: 14px !important;
+        box-shadow: 0 5px 18px rgba(15, 32, 61, 0.055) !important;
+    }
+
+    .admin-candidates-page .overview-card {
+        min-height: 92px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        border-bottom-width: 3px !important;
+    }
+
+    .admin-candidates-page .overview-card .text-muted {
+        font-size: 0.76rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+
+    .admin-candidates-page .filter-toolbar {
+        background: #f8fafc !important;
+        padding: 1rem 1.1rem !important;
+    }
+
+    .admin-candidates-page .filter-pill-btn {
+        min-height: 38px;
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #334155;
+        font-size: 0.88rem;
+        line-height: 1.2;
+        padding: 0.45rem 0.9rem;
+    }
+
+    .admin-candidates-page .candidate-filter-pills {
+        flex-wrap: nowrap !important;
+        gap: 0.3rem !important;
+        min-width: 0;
+        overflow: visible;
+    }
+
+    .admin-candidates-page .candidate-filter-pills .filter-pill-btn {
+        flex: 0 0 auto;
+        padding-left: 0.68rem;
+        padding-right: 0.68rem;
+        font-size: 0.82rem;
+    }
+
+    .admin-candidates-page .filter-pill-btn:hover {
+        border-color: #93c5fd;
+        color: var(--candidate-blue);
+        background: #eff6ff;
+    }
+
+    .admin-candidates-page .filter-pill-btn.btn-primary {
+        border-color: var(--candidate-blue);
+        background: var(--candidate-blue);
+        box-shadow: 0 4px 10px rgba(23, 105, 224, 0.2);
+    }
+
+    .admin-candidates-page .filter-pill-btn .badge {
+        min-width: 24px;
+        min-height: 22px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        font-size: 0.76rem;
+        line-height: 1;
+    }
+
+    .admin-candidates-page .filter-toolbar .form-select,
+    .admin-candidates-page .filter-toolbar .form-control {
+        min-height: 42px;
+        border-color: #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        font-size: 0.9rem;
+        line-height: 1.25;
+    }
+
+    .candidate-card-hover {
+        transition: all 0.2s ease-in-out;
+        border: 1px solid #e2e8f0 !important;
+        background: #ffffff;
+    }
+    .candidate-card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04) !important;
+        border-color: #cbd5e1 !important;
+    }
+
+    /* Standardized Status Badges */
+    .status-badge-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        width: 100%;
+        max-width: 170px;
+        padding: 0.38rem 0.75rem;
+        font-size: 0.74rem;
+        font-weight: 600;
+        border-radius: 50rem;
+        line-height: 1.2;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    }
+    .status-badge-pill i {
+        font-size: 0.76rem;
+        flex-shrink: 0;
+    }
+
+    .badge-qual-qualified {
+        background-color: #ecfdf5;
+        color: #059669;
+        border: 1px solid #a7f3d0;
+    }
+    .badge-qual-under {
+        background-color: #fffbeb;
+        color: #b45309;
+        border: 1px solid #fde68a;
+    }
+    .badge-qual-not {
+        background-color: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+    }
+    .badge-notice-sent {
+        background-color: #f0fdf4;
+        color: #16a34a;
+        border: 1px solid #bbf7d0;
+    }
+    .badge-notice-pending {
+        background-color: #f8fafc;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+    }
+
+    .candidate-action-btn {
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        border-radius: 8px;
+        width: 100%;
+        max-width: 170px;
+        white-space: nowrap;
+        transition: all 0.15s ease;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4 admin-candidates-page">
+    <!-- Hero Header -->
+    <div class="employer-hero-banner mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
+            <div>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-1 small text-white-50">
+                        <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-white-50 text-decoration-none">Admin</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'admin_jobs' %}" class="text-white-50 text-decoration-none">Job Postings</a></li>
+                        <li class="breadcrumb-item active text-white" aria-current="page">{{ job.title|truncatechars:28 }}</li>
+                    </ol>
+                </nav>
+                <div class="d-flex align-items-center gap-2 mt-1">
+                    <h3 class="fw-extrabold text-white mb-0">
+                        <i class="fa-solid fa-users-viewfinder text-warning me-2"></i>{{ job.title }}
+                    </h3>
+                    <span class="badge bg-light text-dark rounded-pill px-2.5 py-1 small fw-semibold">
+                        {{ job.company_name }}
+                    </span>
+                </div>
+                <p class="text-white-50 small mb-0 mt-2">
+                    <i class="fa-solid fa-location-dot me-1"></i>{{ job.location }} &bull;
+                    <i class="fa-solid fa-clock me-1"></i>{{ job.get_employment_type_display }} &bull;
+                    <i class="fa-solid fa-peso-sign me-1"></i>{{ job.salary_range|default:"Competitive" }}
+                </p>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2 candidate-hero-actions">
+                <!-- Action: Notify All Qualified Applicants -->
+                <form method="POST" action="{% url 'admin_notify_qualified_applicants' job.id %}" class="d-inline" onsubmit="return confirm('Send Under Review notifications to all qualified applicants?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-warning text-dark fw-bold btn-sm px-3 py-2 shadow-sm">
+                        <i class="fa-solid fa-bell me-1"></i> Notify Qualified ({{ counts.qualified }})
+                    </button>
+                </form>
+
+                <a href="{% url 'admin_export_candidates_excel' job.id %}" class="btn btn-success fw-bold btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-1.5">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>Export Excel (.xlsx)</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Counters -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="custom-card overview-card p-3 bg-white border-0 shadow-sm rounded-4 text-center">
+                <div class="text-muted small">Total Applicants</div>
+                <div class="fs-4 fw-bold text-dark mt-0.5">{{ counts.all }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="custom-card overview-card p-3 bg-white border-0 shadow-sm rounded-4 text-center border-bottom border-primary border-3">
+                <div class="text-muted small">Qualified Candidates</div>
+                <div class="fs-4 fw-bold text-primary mt-0.5">{{ counts.qualified }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="custom-card overview-card p-3 bg-white border-0 shadow-sm rounded-4 text-center border-bottom border-warning border-3">
+                <div class="text-muted small">Under Review</div>
+                <div class="fs-4 fw-bold text-warning text-dark mt-0.5">{{ counts.under_review }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="custom-card overview-card p-3 bg-white border-0 shadow-sm rounded-4 text-center border-bottom border-success border-3">
+                <div class="text-muted small">Shortlisted</div>
+                <div class="fs-4 fw-bold text-success mt-0.5">{{ counts.shortlisted }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Strip & Selection Controls -->
+    <div class="custom-card filter-toolbar p-3 bg-white border-0 shadow-sm rounded-4 mb-4">
+        <div class="row g-3 align-items-center">
+            <!-- Filter Pills -->
+            <div class="col-12 col-xl-7">
+                <div class="d-flex flex-nowrap gap-1.5 align-items-center candidate-filter-pills">
+                    <a href="{% url 'admin_job_candidates' job.id %}{% if selected_sort %}?sort={{ selected_sort }}{% endif %}{% if query %}{% if selected_sort %}&{% else %}?{% endif %}q={{ query }}{% endif %}" class="filter-pill-btn {% if not selected_qual and not selected_status %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                        All <span class="badge bg-white text-dark ms-1.5">{{ counts.all }}</span>
+                    </a>
+                    <a href="{% url 'admin_job_candidates' job.id %}?qual=qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                        Qualified <span class="badge bg-success text-white ms-1.5">{{ counts.qualified }}</span>
+                    </a>
+                    <a href="{% url 'admin_job_candidates' job.id %}?qual=under_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'under_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                        Under Qualified <span class="badge bg-warning text-dark ms-1.5">{{ counts.under_qualified }}</span>
+                    </a>
+                    <a href="{% url 'admin_job_candidates' job.id %}?qual=not_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'not_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                        Not Qualified <span class="badge bg-secondary text-white ms-1.5">{{ counts.not_qualified }}</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Search and Sort Toolbar -->
+            <div class="col-12 col-xl-5">
+                <form method="GET" action="{% url 'admin_job_candidates' job.id %}" class="d-flex align-items-center justify-content-xl-end gap-2">
+                    {% if selected_qual %}<input type="hidden" name="qual" value="{{ selected_qual }}">{% endif %}
+                    {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}
+                    
+                    <div class="input-group input-group-sm" style="min-width: 180px; max-width: 240px;">
+                        <input type="text" name="q" class="form-control" placeholder="Search candidate..." value="{{ query }}">
+                        <button class="btn btn-primary" type="submit" title="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
+                    </div>
+                    {% if selected_qual or selected_status or query or selected_sort != 'score' %}
+                        <a href="{% url 'admin_job_candidates' job.id %}" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center" title="Reset Filters" style="height: 31px; width: 31px; padding: 0; flex-shrink: 0;">
+                            <i class="fa-solid fa-xmark"></i>
+                        </a>
+                    {% endif %}
+                </form>
+            </div>
+        </div>
+
+        {% if candidates %}
+        <div class="d-flex flex-wrap align-items-center justify-content-between pt-3 mt-3 border-top gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-sm btn-outline-success fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs" onclick="exportSelectedExcel()" id="btnExportSelected">
+                    <i class="fa-solid fa-file-excel"></i> Export Selected (.xlsx)
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Candidate List -->
+    <div class="d-flex flex-column gap-3 mb-4">
+        {% for cand in candidates %}
+        <div class="custom-card p-3.5 p-md-4 bg-white border-0 shadow-sm rounded-4 candidate-card-hover position-relative {% if cand.is_top_match and cand.qualification_status == 'qualified' %}border-start border-warning border-4{% endif %}">
+            <div class="row align-items-center g-3">
+                <!-- Checkbox & Avatar & Profile Info -->
+                <div class="col-xl-4 col-lg-4 col-md-12">
+                    <div class="d-flex align-items-center">
+                        <div class="form-check me-2.5 mb-0">
+                            <input class="form-check-input candidate-checkbox" type="checkbox" name="selected_candidates" value="{{ cand.application.id }}">
+                        </div>
+
+                        <div class="position-relative me-3" style="flex-shrink: 0; width: 50px; height: 50px;">
+                            {% if cand.applicant.user.profile_picture %}
+                                <img src="{{ cand.applicant.user.profile_picture.url }}" alt="{{ cand.applicant.user.full_name }}" class="rounded-circle object-fit-cover shadow-sm" style="width: 50px; height: 50px;">
+                            {% else %}
+                                <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold shadow-sm" style="width: 50px; height: 50px; font-size: 1.1rem; border: 1px solid rgba(37,99,235,0.15);">
+                                    {{ cand.applicant.user.first_name|first }}{{ cand.applicant.user.last_name|first }}
+                                </div>
+                            {% endif %}
+                            
+                            {% if cand.is_top_match and cand.qualification_status == 'qualified' %}
+                                <span class="position-absolute badge rounded-pill bg-warning text-dark border border-white shadow-xs" style="top: -6px; right: -8px; font-size: 0.62rem; font-weight: 700; padding: 2px 6px; z-index: 2;" title="Top Ranked Match">
+                                    <i class="fa-solid fa-crown me-0.5" style="font-size: 0.58rem;"></i> #1
+                                </span>
+                            {% else %}
+                                <span class="position-absolute badge rounded-pill bg-light text-dark border shadow-xs" style="top: -6px; right: -8px; font-size: 0.62rem; font-weight: 600; padding: 2px 5px; z-index: 2;">
+                                    #{{ cand.radar_rank }}
+                                </span>
+                            {% endif %}
+                        </div>
+
+                        <div style="flex-grow: 1; min-width: 0;">
+                            <h6 class="fw-bold text-dark mb-1 text-truncate">
+                                <a href="{% url 'view_candidate_resume' cand.application.pk %}" class="text-dark text-decoration-none hover-primary">
+                                    {{ cand.applicant.user.full_name }}
+                                </a>
+                            </h6>
+                            <div class="text-muted small mb-1 text-truncate" style="font-size: 0.8rem;">
+                                <i class="fa-solid fa-envelope me-1"></i>{{ cand.applicant.user.email }}
+                            </div>
+                            <div class="text-muted small" style="font-size: 0.72rem;">
+                                <i class="fa-solid fa-calendar me-1"></i>Applied {{ cand.application.applied_at|date:"M d, Y" }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Score Breakdown & Skills -->
+                <div class="col-xl-4 col-lg-4 col-md-6">
+                    <div class="p-2.5 bg-light rounded-3 border">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small fw-bold text-dark">Overall Match Score</span>
+                            <span class="badge {% if cand.match_score >= 80 %}bg-success{% elif cand.match_score >= 60 %}bg-primary{% elif cand.match_score >= 40 %}bg-warning text-dark{% else %}bg-danger{% endif %} rounded-pill px-2.5 py-0.5 fw-bold">
+                                {{ cand.match_score|floatformat:0 }}%
+                            </span>
+                        </div>
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar {% if cand.match_score >= 80 %}bg-success{% elif cand.match_score >= 60 %}bg-primary{% elif cand.match_score >= 40 %}bg-warning{% else %}bg-danger{% endif %}" style="width: {{ cand.match_score }}%;"></div>
+                        </div>
+
+                        <div class="row g-1 text-center" style="font-size: 0.72rem;">
+                            <div class="col-4">
+                                <div class="text-muted">Skills</div>
+                                <strong class="text-dark">{{ cand.skills_match_score|floatformat:0 }}%</strong>
+                            </div>
+                            <div class="col-4 border-start border-end">
+                                <div class="text-muted">Experience</div>
+                                <strong class="text-dark">{{ cand.exp_match_score|floatformat:0 }}%</strong>
+                            </div>
+                            <div class="col-4">
+                                <div class="text-muted">Education</div>
+                                <strong class="text-dark">{{ cand.edu_match_score|floatformat:0 }}%</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Skills preview -->
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        {% for ms in cand.matched_skills|slice:":3" %}
+                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 0.7rem;">
+                                &check; {{ ms }}
+                            </span>
+                        {% endfor %}
+                        {% for mis in cand.missing_skills|slice:":2" %}
+                            <span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size: 0.7rem;">
+                                &times; {{ mis }}
+                            </span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Status & Qualification Badges -->
+                <div class="col-xl-2 col-lg-2 col-md-3">
+                    <div class="d-flex flex-column gap-1.5 align-items-center justify-content-center">
+                        {% if cand.qualification_status == 'qualified' %}
+                            <div class="status-badge-pill badge-qual-qualified">
+                                <i class="fa-solid fa-circle-check"></i> Qualified
+                            </div>
+                        {% elif cand.qualification_status == 'under_qualified' %}
+                            <div class="status-badge-pill badge-qual-under">
+                                <i class="fa-solid fa-triangle-exclamation"></i> Under Qualified
+                            </div>
+                        {% else %}
+                            <div class="status-badge-pill badge-qual-not">
+                                <i class="fa-solid fa-circle-xmark"></i> Not Qualified
+                            </div>
+                        {% endif %}
+
+                        {% if cand.notification_sent %}
+                            <div class="status-badge-pill badge-notice-sent" title="Dispatched: {{ cand.notification_sent_at|date:'M d, Y H:i'|default:'Recently' }}">
+                                <i class="fa-solid fa-envelope-circle-check"></i> Notified
+                            </div>
+                        {% else %}
+                            <div class="status-badge-pill badge-notice-pending">
+                                <i class="fa-regular fa-clock"></i> Pending Notice
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="col-xl-2 col-lg-2 col-md-3">
+                    <div class="d-flex flex-column gap-2 align-items-center justify-content-center">
+                        <a href="{% url 'view_candidate_resume' cand.application.pk %}" class="candidate-action-btn btn btn-outline-primary shadow-xs">
+                            <i class="fa-solid fa-file-lines"></i> View Resume
+                        </a>
+
+                        <button type="button" class="candidate-action-btn btn {% if cand.notification_sent %}btn-light text-muted border{% else %}btn-primary-custom text-white shadow-xs{% endif %}" onclick="dispatchSingleNotice({{ cand.application.id }}, '{{ cand.applicant.user.full_name|escapejs }}')">
+                            <i class="fa-solid fa-envelope"></i> {% if cand.notification_sent %}Re-dispatch{% else %}Dispatch Notice{% endif %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {% if cand.qualification_reason %}
+            <div class="mt-3 pt-2.5 border-top text-muted small d-flex align-items-start gap-1.5" style="font-size: 0.78rem;">
+                <span class="text-primary fw-bold text-nowrap"><i class="fa-solid fa-clipboard-check me-1"></i>Evaluation Notes:</span>
+                <span>{{ cand.qualification_reason }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="custom-card p-5 bg-white border-0 shadow-sm rounded-4 text-center">
+            <i class="fa-solid fa-user-slash text-muted fs-1 mb-3"></i>
+            <h5 class="fw-bold text-dark">No Candidates Found</h5>
+            <p class="text-muted small mb-0">No applicant records match the selected qualification or search filters.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Hidden Single Notice Dispatch Form -->
+<form id="singleNoticeForm" method="POST" action="" class="d-none">
+    {% csrf_token %}
+</form>
+
+<script>
+function exportSelectedExcel() {
+    const checked = document.querySelectorAll('.candidate-checkbox:checked');
+    let url = "{% url 'admin_export_candidates_excel' job.id %}";
+    if (checked.length > 0) {
+        const params = new URLSearchParams();
+        checked.forEach(cb => params.append('selected_candidates', cb.value));
+        url += '?' + params.toString();
+    }
+    window.location.href = url;
+}
+
+function dispatchSingleNotice(appId, candidateName) {
+    if (confirm('Dispatch qualification status notice to ' + candidateName + '?')) {
+        const form = document.getElementById('singleNoticeForm');
+        const notificationUrl = "{% url 'admin_notify_single_applicant' 0 %}";
+        form.action = notificationUrl.replace('/0/', '/' + appId + '/');
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

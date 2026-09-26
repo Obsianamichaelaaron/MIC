@@ -1,0 +1,885 @@
+{% include 'includes/header.html' %}
+<style>
+.job-details-page {
+    min-height: 100vh;
+    padding: 1.75rem 0 4rem;
+    background: #c7d1dd;
+    font-family: 'DM Sans', sans-serif;
+    color: #0f172a;
+}
+.job-details-page .container {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+.job-details-page .card {
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 18px !important;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08) !important;
+    padding: 2rem !important;
+}
+.job-details-page .details-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.7fr) minmax(290px, .9fr) !important;
+    gap: 2.25rem !important;
+    align-items: start;
+}
+.job-details-page .details-main,
+.job-details-page .details-sidebar {
+    min-width: 0;
+}
+.job-details-page .details-sidebar {
+    position: sticky;
+    top: 96px;
+    align-self: start;
+}
+.job-details-page .details-sidebar > div:first-child {
+    position: static;
+    top: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #ffffff;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+    margin-top: 0 !important;
+}
+.job-details-page .details-sidebar strong {
+    display: block;
+    margin-bottom: .25rem;
+    font-size: .8rem;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #1d4ed8;
+}
+.job-details-page .details-sidebar p {
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    color: #334155;
+}
+.job-details-page .details-copy {
+    max-width: none;
+    padding: 1.15rem 1.2rem !important;
+    border-left: 4px solid #2563eb !important;
+    background: #f8fafc !important;
+    border-radius: 14px !important;
+    box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+}
+.job-details-page .details-copy p {
+    font-size: .92rem;
+    line-height: 1.7;
+    color: #334155;
+}
+.job-details-page .details-main > div > div {
+    margin-bottom: 1.25rem !important;
+}
+.job-details-page .details-main h2 {
+    font-size: 1.15rem;
+    margin: 0 0 1.15rem !important;
+    color: #0f172a;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    padding-bottom: 0.65rem;
+    border-bottom: 2px solid rgba(37, 99, 235, 0.25);
+}
+.job-details-page .details-main h3 {
+    font-size: .96rem;
+    margin: 0 0 .65rem !important;
+    color: #0f172a;
+    font-weight: 700;
+}
+.job-details-page .details-sidebar > div:first-child {
+    padding: 1.4rem !important;
+}
+.job-details-page .details-sidebar h3 {
+    font-size: 1.05rem;
+    margin: 0 0 1.1rem !important;
+    padding-bottom: .7rem;
+    border-bottom: 1px solid #e2e8f0;
+    color: #0f172a;
+}
+.job-details-page .details-sidebar > div:first-child > div {
+    margin-bottom: .9rem !important;
+}
+.job-details-page .details-sidebar > div:first-child > div:last-child {
+    margin-bottom: 0 !important;
+}
+.job-details-page .details-sidebar strong {
+    line-height: 1.35;
+}
+.job-details-page .details-sidebar p {
+    margin-top: .35rem !important;
+    margin-bottom: 0 !important;
+}
+.job-details-page h1 {
+    color: #111827 !important;
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.25rem;
+    margin: 0 0 1.5rem !important;
+    letter-spacing: 0.02em;
+    line-height: 1.15;
+}
+.job-header-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .55rem 1.25rem;
+    margin: -.65rem 0 1.75rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid #e5e7eb;
+    color: #475569;
+    font-size: .88rem;
+}
+.job-header-summary span {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    min-width: 0;
+}
+.job-header-summary i {
+    color: #0056b3;
+    font-size: .8rem;
+}
+.job-details-page .details-sidebar > a {
+    display: block !important;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 1rem;
+    text-align: center;
+}
+.job-details-page h2,
+.job-details-page h3,
+.job-details-page h4 {
+    font-family: 'DM Sans', sans-serif;
+}
+.job-details-page > .container > .card > div:nth-child(3) {
+    align-items: start;
+}
+.job-details-page > .container > .card > div:first-child {
+    margin-bottom: 1.25rem !important;
+}
+.job-details-page [style*="background: #f8f9fa"] {
+    border-radius: 12px !important;
+    border: 1px solid #e5e7eb !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+}
+.job-details-page a {
+    transition: opacity .2s ease, color .2s ease;
+}
+.job-details-page a:hover {
+    opacity: 0.9;
+}
+[data-theme="dark"] .job-details-page {
+    background: #0f1117;
+}
+[data-theme="dark"] .job-details-page .card {
+    background: #1a1d27 !important;
+    border-color: rgba(148, 163, 184, 0.18) !important;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.28) !important;
+}
+[data-theme="dark"] .job-details-page .details-sidebar > div:first-child,
+[data-theme="dark"] .job-details-page .details-copy,
+[data-theme="dark"] .job-details-page [style*="background: #f8f9fa"] {
+    background: #1e2235 !important;
+    border-color: rgba(148, 163, 184, 0.18) !important;
+}
+[data-theme="dark"] .job-details-page h1,
+[data-theme="dark"] .job-details-page h2,
+[data-theme="dark"] .job-details-page h3,
+[data-theme="dark"] .job-details-page h4,
+[data-theme="dark"] .job-details-page strong,
+[data-theme="dark"] .job-details-page p,
+[data-theme="dark"] .job-details-page .details-sidebar p {
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .job-details-page .details-copy p,
+[data-theme="dark"] .job-details-page .details-sidebar p {
+    color: #ffffff !important;
+}
+[data-theme="dark"] .job-details-page .details-sidebar strong {
+    color: #8bb7ff !important;
+}
+[data-theme="dark"] .job-header-summary {
+    border-bottom-color: #2d3348;
+    color: #cbd5e1;
+}
+[data-theme="dark"] .job-header-summary i {
+    color: #8bb7ff;
+}
+@media (max-width: 900px) {
+    .job-details-page { padding-top: .75rem; }
+    .job-details-page .container { padding: 0 .75rem; }
+    .job-details-page .card { padding: 1.35rem !important; }
+    .job-details-page .card > div:first-child { margin-bottom: 1rem !important; }
+    .job-details-page h1 { font-size: 1.85rem; margin-bottom: 1rem !important; }
+    .job-header-summary { margin-bottom: 1.25rem; }
+    .job-details-page .details-layout {
+        grid-template-columns: minmax(0, 1.35fr) minmax(210px, .8fr) !important;
+        gap: 1.25rem !important;
+    }
+    .job-details-page .details-main > div > div {
+        margin-bottom: .9rem !important;
+    }
+    .job-details-page .details-copy {
+        padding: .8rem .95rem !important;
+    }
+    .job-details-page .details-copy p {
+        font-size: .84rem;
+        line-height: 1.45;
+    }
+    .job-details-page .details-sidebar > div:first-child {
+        padding: 1rem !important;
+    }
+}
+@media (max-width: 640px) {
+    .job-details-page { padding: 1rem 0 2.5rem; }
+    .job-details-page .container { padding: 0 .65rem; }
+    .job-details-page .details-layout {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+    .job-details-page .card { padding: 1rem !important; }
+    .job-details-page h1 { font-size: 1.65rem; }
+    .job-header-summary {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: .45rem;
+        margin-top: -.35rem;
+        padding-bottom: 1rem;
+    }
+    .job-details-page .details-main h2 { font-size: 1.05rem; }
+    .job-details-page .details-main h3 { font-size: .92rem; }
+    .job-details-page .details-sidebar { position: static; }
+}
+[data-theme="dark"] .job-details-page {
+    background: #0f1117;
+}
+[data-theme="dark"] .job-details-page .card {
+    background: #1a1d27 !important;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, .3) !important;
+}
+[data-theme="dark"] .job-details-page h2,
+[data-theme="dark"] .job-details-page h3,
+[data-theme="dark"] .job-details-page h4 {
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .job-details-page p {
+    color: #cbd5e1 !important;
+}
+[data-theme="dark"] .job-details-page strong {
+    color: #e2e8f0 !important;
+}
+[data-theme="dark"] .job-details-page .details-sidebar > div:first-child {
+    border-color: #2d3348;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, .25);
+}
+[data-theme="dark"] .job-details-page .details-sidebar h3 {
+    border-bottom-color: #2d3348;
+}
+[data-theme="dark"] .job-details-page [style*="background: #f8f9fa"],
+[data-theme="dark"] .job-details-page [style*="background: white"] {
+    background: #1e2235 !important;
+    color: #cbd5e1 !important;
+}
+[data-theme="dark"] .job-details-page [style*="background: #fff3cd"] {
+    background: #3b321b !important;
+    color: #f8df8b !important;
+    border-color: #d9a900 !important;
+}
+[data-theme="dark"] .job-details-page [style*="background: #d4edda"] {
+    background: #173326 !important;
+    color: #a7e0b8 !important;
+}
+[data-theme="dark"] .job-details-page [style*="background: #f8d7da"] {
+    background: #3b2027 !important;
+    color: #f3a6b2 !important;
+}
+[data-theme="dark"] .job-details-page [style*="background: #e7f3ff"],
+[data-theme="dark"] .job-details-page [style*="background: #e7f3fe"],
+[data-theme="dark"] .job-details-page [style*="background: #e8f4f8"] {
+    background: #172d42 !important;
+    color: #a8d8f5 !important;
+}
+[data-theme="dark"] .job-details-page [style*="background: #f0f0f0"] {
+    background: #252b3a !important;
+    color: #cbd5e1 !important;
+}
+[data-theme="dark"] .job-details-page [style*="background: #fff3cd"] p,
+[data-theme="dark"] .job-details-page [style*="background: #fff3cd"] a,
+[data-theme="dark"] .job-details-page [style*="background: #fff3cd"] i {
+    color: #f8df8b !important;
+}
+</style>
+<div class="job-details-page">
+<div class="container">
+    <div class="card" style="margin-top: 10px; background: #fff; border: 1px solid #e5e7eb;">
+        <div style="margin-bottom: 2rem;">
+            <a href="jobs.php" style="color: #0056b3; text-decoration: none;">
+                <i class="fas fa-arrow-left"></i> Back to Jobs
+            </a>
+        </div>
+
+        <h1 style="margin-bottom: 1rem; color: #111827;">{{ job.title }}</h1>
+
+        <div class="job-header-summary" aria-label="Job summary">
+            <span><i class="fas fa-briefcase"></i> {{ job.employment_type|title }}</span>
+            <span><i class="fas fa-map-marker-alt"></i> {{ job.location|default:"Location Not Specified" }}</span>
+            {% if job.salary_range %}
+                <span><i class="fas fa-money-bill-wave"></i> {{ job.salary_range }}</span>
+            {% endif %}
+        </div>
+
+        <div class="details-layout" style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
+            <div class="details-main">
+                <!-- ========== JOB INFORMATION SECTION ========== -->
+                <div style="margin-bottom: 2rem;">
+                    <h2 style="color: #333; margin-bottom: 1.5rem; padding-bottom: 0.5rem; border-bottom: 2px solid #0056b3;">
+                        <i class="fas fa-info-circle" style="color: #0056b3;"></i> Job Information
+                    </h2>
+
+                    <div style="margin-bottom: 2rem;">
+                        <h3 style="color: #0f172a; margin-bottom: 1rem; font-weight: 700;">
+                            <i class="fas fa-file-alt" style="color: #2563eb;"></i> Job Description
+                        </h3>
+                        <div class="details-copy" style="background: #f8fafc; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #0056b3; border: 1px solid #e2e8f0; border-left-width: 4px;">
+                            <p style="color: #1e293b; line-height: 1.8; margin: 0; white-space: pre-wrap; font-size: 0.95rem;">{{ job.description }}</p>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 2rem;">
+                        <h3 style="color: #0f172a; margin-bottom: 1rem; font-weight: 700;">
+                            <i class="fas fa-tasks" style="color: #2563eb;"></i> Requirements
+                        </h3>
+                        <div class="details-copy" style="background: #f8fafc; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #0056b3; border: 1px solid #e2e8f0; border-left-width: 4px;">
+                            <p style="color: #1e293b; line-height: 1.8; margin: 0; white-space: pre-wrap; font-size: 0.95rem;">{{ job.requirements }}</p>
+                        </div>
+                    </div>
+
+                    {% if job_qualifications %}
+                        <div style="margin-bottom: 2rem;">
+                            <h3 style="color: #0f172a; margin-bottom: 1rem; font-weight: 700;">
+                                <i class="fas fa-graduation-cap" style="color: #2563eb;"></i> Required Qualifications
+                            </h3>
+                            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                                {% for qualification in job_qualifications %}
+                                    <div style="display: flex; align-items: center; padding: 1rem 1rem; background: #f8fafc; border-radius: 12px; border-left: 4px solid #2563eb; box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.15);">
+                                        <i class="fas fa-graduation-cap" style="color: #2563eb; margin-right: 1rem; font-size: 1rem;"></i>
+                                        <div>
+                                            <p style="font-weight: 600; color: #0f172a; margin: 0;">
+                                                {{ qualification.name }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    {% if job.skills_required %}
+                        <div style="margin-bottom: 2rem;">
+                            <h3 style="color: #0f172a; margin-bottom: 1rem; font-weight: 700;">
+                                <i class="fas fa-tools" style="color: #2563eb;"></i> Required Skills
+                            </h3>
+                            <ul style="margin: 0; padding-left: 1.2rem; list-style: disc; color: #1f2937;">
+                                {% for skill in skills %}
+                                    <li style="font-size: 0.95rem; font-weight: 500; line-height: 1.7; margin-bottom: 0.15rem; color: #1f2937;">
+                                        {{ skill }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                </div>
+                <!-- ========== END JOB INFORMATION SECTION ========== -->
+
+                <!-- ========== INTERVIEW SCHEDULE SECTION ========== -->
+                {% if has_application and interviews %}
+                <div style="margin-bottom: 2rem; border: 2px solid #9C27B0; border-radius: 10px; overflow: hidden;">
+                    <div style="background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%); padding: 1.5rem; color: white;">
+                        <h3 style="color: white; margin: 0; display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fas fa-calendar-alt"></i> Interview Schedule
+                        </h3>
+                        <p style="margin: 0.5rem 0 0 0; font-size: 0.95rem; opacity: 0.9;">
+                            Your scheduled interviews for this position
+                        </p>
+                    </div>
+                    
+                    <div style="background: #f8f9fa; padding: 1.5rem;">
+                        {% for interview in interviews %}
+                            <div style="background: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #9C27B0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                                    <div>
+                                        <span style="background: {% if interview.status == 'completed' %}#28a745{% elif interview.status == 'cancelled' %}#dc3545{% elif interview.status == 'rescheduled' %}#ff9800{% else %}#1866a3{% endif %}; color: white; padding: 0.25rem 0.75rem; border-radius: 15px; font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem;">
+                                            {{ interview.status|title }}
+                                        </span>
+                                        <span style="color: #333; font-weight: 600; font-size: 1.1rem;">
+                                            {{ interview.interview_date|date:"F d, Y" }}
+                                        </span>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span style="color: #666; font-size: 0.9rem; display: block;">
+                                            {{ interview.start_time|date:"h:i A" }} - 
+                                            {{ interview.end_time|date:"h:i A" }}
+                                        </span>
+                                        <span style="color: #9C27B0; font-weight: 600; font-size: 0.9rem;">
+                                            {{ interview.status|title }} Interview
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                {% if interview.location %}
+                                    <div style="margin-bottom: 0.75rem; display: flex; align-items: flex-start; gap: 0.5rem;">
+                                        <i class="fas fa-map-marker-alt" style="color: #666; margin-top: 0.25rem;"></i>
+                                        <div>
+                                            <p style="color: #333; font-weight: 600; margin: 0 0 0.25rem 0; font-size: 0.95rem;">
+                                                Location
+                                            </p>
+                                            <p style="color: #666; margin: 0; font-size: 0.9rem;">
+                                                {{ interview.location }}
+                                            </p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                {% if interview.meeting_link %}
+                                    <div style="margin-bottom: 0.75rem; display: flex; align-items: flex-start; gap: 0.5rem;">
+                                        <i class="fas fa-link" style="color: #666; margin-top: 0.25rem;"></i>
+                                        <div>
+                                            <p style="color: #333; font-weight: 600; margin: 0 0 0.25rem 0; font-size: 0.95rem;">
+                                                Meeting Link
+                                            </p>
+                                            <a href="{{ interview.meeting_link }}" 
+                                               target="_blank"
+                                               style="color: #0056b3; text-decoration: none; font-size: 0.9rem; word-break: break-all;">
+                                                {{ interview.meeting_link }}
+                                            </a>
+                                            <p style="color: #666; margin: 0.25rem 0 0 0; font-size: 0.85rem;">
+                                                <i class="fas fa-external-link-alt"></i> Click to join
+                                            </p>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                
+                                {% if interview.notes %}
+                                    <div style="margin-bottom: 0.75rem; padding: 1rem; background: #f0f0f0; border-radius: 6px;">
+                                        <p style="color: #333; font-weight: 600; margin: 0 0 0.5rem 0; font-size: 0.95rem;">
+                                            <i class="fas fa-sticky-note"></i> Interview Notes
+                                        </p>
+                                        <p style="color: #666; margin: 0; line-height: 1.6; font-size: 0.9rem; white-space: pre-wrap;">
+                                            {{ interview.notes }}
+                                        </p>
+                                    </div>
+                                {% endif %}
+                                
+                                {% if interview.status == 'scheduled' %}
+                                    <div style="margin-top: 1rem; padding: 1rem; background: #e8f4f8; border-radius: 6px; border-left: 3px solid #17a2b8;">
+                                        <p style="color: #0c5460; margin: 0; font-size: 0.9rem;">
+                                            <i class="fas fa-bell"></i> 
+                                            <strong>Reminder:</strong> Please join the interview 5-10 minutes before the scheduled time.
+                                            {% if interview.interview_type == 'video' %}Ensure your camera and microphone are working properly.{% elif interview.interview_type == 'phone' %}Ensure you're in a quiet environment with good reception.{% endif %}
+                                        </p>
+                                    </div>
+                                {% elif interview.status == 'completed' %}
+                                    <div style="margin-top: 1rem; padding: 1rem; background: #d4edda; border-radius: 6px; border-left: 3px solid #28a745;">
+                                        <p style="color: #155724; margin: 0; font-size: 0.9rem;">
+                                            <i class="fas fa-check-circle"></i> 
+                                            <strong>Completed:</strong> This interview has been completed. The employer will provide feedback soon.
+                                        </p>
+                                    </div>
+                                {% elif interview.status == 'cancelled' %}
+                                    <div style="margin-top: 1rem; padding: 1rem; background: #f8d7da; border-radius: 6px; border-left: 3px solid #dc3545;">
+                                        <p style="color: #721c24; margin: 0; font-size: 0.9rem;">
+                                            <i class="fas fa-times-circle"></i> 
+                                            <strong>Cancelled:</strong> This interview has been cancelled. Please wait for the employer to reschedule.
+                                        </p>
+                                    </div>
+                                {% endif %}
+                                
+                                <p style="color: #666; font-size: 0.85rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; text-align: center;">
+                                    <i class="fas fa-info-circle"></i> 
+                                    Scheduled by: {{ interview.company_name|default:"Employer" }}
+                                    • Created: {{ interview.created_at|date:"F d, Y h:i A" }}
+                                </p>
+                            </div>
+                        {% endfor %}
+                        
+                        <!-- Add to Calendar Button -->
+                        {% if interviews and interviews.0.status == 'scheduled' %}
+                        <div style="text-align: center; margin-top: 1rem;">
+                            <button onclick="addToCalendar()" 
+                                    style="background: #9C27B0; color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem;">
+                                <i class="fas fa-calendar-plus"></i> Add to Calendar
+                            </button>
+                            <p style="color: #666; font-size: 0.85rem; margin-top: 0.5rem;">
+                                Add this interview to your Google Calendar, Outlook, or other calendar apps
+                            </p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                <!-- ========== END INTERVIEW SCHEDULE SECTION ========== -->
+
+
+                
+                <!-- Employer Remarks/Justification Section (Only if applied) -->
+                {% if has_application and applicant_remarks %}
+                    <div style="margin-bottom: 2rem; border: 2px solid #28a745; border-radius: 10px; overflow: hidden;">
+                        <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 1.5rem; color: white;">
+                            <h3 style="color: white; margin: 0; display: flex; align-items: center; gap: 0.75rem;">
+                                <i class="fas fa-comment-dots"></i> Employer Feedback & Remarks
+                            </h3>
+                            <p style="margin: 0.5rem 0 0 0; font-size: 0.95rem; opacity: 0.9;">
+                                Comments and justification from the employer regarding your application.
+                            </p>
+                        </div>
+                        
+                        <div style="background: #f8f9fa; padding: 1.5rem; border-top: 1px solid #e0e0e0;">
+                            {% for entry in applicant_remarks %}
+                                <div style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 2px dashed #e0e0e0; {% if forloop.last %}border-bottom: none; margin-bottom: 0; padding-bottom: 0;{% endif %}">
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                                        <div>
+                                            
+                                            <span style="background: {{ status_color }}; color: white; padding: 0.25rem 0.75rem; border-radius: 15px; font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem;">
+                                                
+                                            </span>
+                                            {% if entry.reviewed_by %}
+                                                <span style="color: #666; font-size: 0.85rem;">
+                                                    <i class="fas fa-user-circle"></i> {{ entry.reviewed_by }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                        <span style="color: #666; font-size: 0.85rem;">
+                                            <i class="fas fa-clock"></i> {{ entry.timestamp|date:"F d, Y h:i A" }}
+                                        </span>
+                                    </div>
+                                    
+                                    <div style="background: white; padding: 1.25rem; border-radius: 8px; border-left: 4px solid #28a745; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                                        <p style="color: #333; line-height: 1.6; margin: 0; white-space: pre-wrap;">
+                                            <strong style="color: #28a745;">Remarks:</strong><br>
+                                            {{ entry.remarks }}
+                                        </p>
+                                    </div>
+                                    
+                                    {% if entry.status == 'accepted' %}
+                                        <div style="margin-top: 1rem; padding: 1rem; background: linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(32, 201, 151, 0.1) 100%); border-radius: 8px; border-left: 4px solid #28a745;">
+                                            <p style="color: #28a745; margin: 0; font-weight: 600;">
+                                                <i class="fas fa-check-circle"></i> Congratulations! Your application has been accepted.
+                                            </p>
+                                            {% if job.employer_email %}
+                                                <p style="color: #666; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                                                    <i class="fas fa-info-circle"></i> Next steps will be communicated by the employer via email.
+                                                </p>
+                                            {% endif %}
+                                        </div>
+                                    {% elif entry.status == 'rejected' %}
+                                        <div style="margin-top: 1rem; padding: 1rem; background: linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(253, 126, 20, 0.1) 100%); border-radius: 8px; border-left: 4px solid #dc3545;">
+                                            <p style="color: #dc3545; margin: 0; font-weight: 600;">
+                                                <i class="fas fa-exclamation-circle"></i> Application Status: Not Selected
+                                            </p>
+                                            <p style="color: #666; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                                                <i class="fas fa-lightbulb"></i> Consider this feedback for future applications and continue exploring other opportunities.
+                                            </p>
+                                        </div>
+                                    {% elif entry.status == 'shortlisted' %}
+                                        <div style="margin-top: 1rem; padding: 1rem; background: linear-gradient(135deg, rgba(23, 162, 184, 0.1) 0%, rgba(0, 123, 255, 0.1) 100%); border-radius: 8px; border-left: 3px solid #17a2b8;">
+                                            <p style="color: #17a2b8; margin: 0; font-weight: 600;">
+                                                <i class="fas fa-star"></i> Great news! You've been shortlisted.
+                                            </p>
+                                            <p style="color: #666; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                                                <i class="fas fa-info-circle"></i> The employer will contact you for the next steps in the hiring process.
+                                            </p>
+                                        </div>
+                                    {% elif entry.status == 'scheduled_for_interview' %}
+                                        <div style="margin-top: 1rem; padding: 1rem; background: linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(253, 126, 20, 0.1) 100%); border-radius: 8px; border-left: 4px solid #ffc107;">
+                                            <p style="color: #ffc107; margin: 0; font-weight: 600;">
+                                                <i class="fas fa-handshake"></i> Scheduled for Interview
+                                            </p>
+                                            <p style="color: #666; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                                                <i class="fas fa-info-circle"></i> You have been scheduled for an interview. Please check the Interview Schedule section for details.
+                                            </p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="details-sidebar">
+                <div style="background: #f8f9fa; padding: 2rem; border-radius: 10px; margin-bottom: 2rem;">
+                    <h3 style="color: #333; margin-bottom: 1rem;">Job Details</h3>
+
+                    {% if job.company_name %}
+                    <div style="margin-bottom: 1rem;">
+                        <strong style="color: #666;">Company:</strong>
+                        <p style="color: #333; margin-top: 0.25rem;">{{ job.company_name }}</p>
+                    </div>
+                    {% endif %}
+
+                    <div style="margin-bottom: 1rem;">
+                        <strong style="color: #666;">Location:</strong>
+                        <p style="color: #333; margin-top: 0.25rem;">
+                            <i class="fas fa-map-marker-alt"></i> {{ job.location|default:"Location Not Specified" }}
+                        </p>
+                    </div>
+
+                    <div style="margin-bottom: 1rem;">
+                        <strong style="color: #666;">Employment Type:</strong>
+                        <p style="color: #333; margin-top: 0.25rem;">{{ job.employment_type|title }}</p>
+                    </div>
+
+                    {% if job.salary_range %}
+                        <div style="margin-bottom: 1rem;">
+                            <strong style="color: #666;">Salary Range:</strong>
+                            <p style="color: #4CAF50; font-weight: 600; margin-top: 0.25rem;">
+                                {{ job.salary_range }}
+                            </p>
+                        </div>
+                    {% endif %}
+
+                    <div style="margin-bottom: 1rem;">
+                        <strong style="color: #666;">Posted:</strong>
+                        <p style="color: #333; margin-top: 0.25rem;">
+                            {{ job.posted_at|date:"F d, Y" }}
+                        </p>
+                    </div>
+
+                    {% if job_qualifications %}
+                        <div style="margin-bottom: 1rem;">
+                            <strong style="color: #666;">Qualifications Required:</strong>
+                            <p style="color: #333; margin-top: 0.25rem;">
+                                {{ job_qualifications|length }} qualification(s) required
+                            </p>
+                        </div>
+                    {% endif %}
+
+                    {% if job.skills_required %}
+                        <div style="margin-bottom: 1rem;">
+                            <strong style="color: #666;">Skills Required:</strong>
+                            <p style="color: #333; margin-top: 0.25rem;">
+                                {{ job.skills_required|default:"Not Specified"|title }}
+                            </p>
+                        </div>
+                    {% endif %}
+
+                    <!-- Interview Summary (if interviews exist) -->
+                    {% if has_application and interviews %}
+                        <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e0e0e0;">
+                            <h4 style="color: #333; margin-bottom: 1rem;">
+                                <i class="fas fa-calendar-check"></i> Interview Summary
+                            </h4>
+                            
+                            
+                            
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
+                                {% if scheduled_interviews > 0 %}
+                                <div style="text-align: center; background: #d4edda; padding: 0.5rem; border-radius: 6px;">
+                                    <p style="font-size: 1.5rem; font-weight: bold; color: #28a745; margin: 0;">{{ scheduled_interviews }}</p>
+                                    <p style="font-size: 0.8rem; color: #155724; margin: 0;">Scheduled</p>
+                                </div>
+                                {% endif %}
+                                
+                                {% if completed_interviews > 0 %}
+                                <div style="text-align: center; background: #d1ecf1; padding: 0.5rem; border-radius: 6px;">
+                                    <p style="font-size: 1.5rem; font-weight: bold; color: #17a2b8; margin: 0;">{{ completed_interviews }}</p>
+                                    <p style="font-size: 0.8rem; color: #0c5460; margin: 0;">Completed</p>
+                                </div>
+                                {% endif %}
+                                
+                                {% if cancelled_interviews > 0 %}
+                                <div style="text-align: center; background: #f8d7da; padding: 0.5rem; border-radius: 6px;">
+                                    <p style="font-size: 1.5rem; font-weight: bold; color: #dc3545; margin: 0;">{{ cancelled_interviews }}</p>
+                                    <p style="font-size: 0.8rem; color: #721c24; margin: 0;">Cancelled</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            {% if upcoming_interview %}
+                                <div style="margin-top: 1rem; padding: 0.75rem; background: #e7f3fe; border-radius: 8px; border-left: 3px solid #2196F3;">
+                                    <p style="color: #0d47a1; font-weight: 600; margin: 0 0 0.5rem 0; font-size: 0.9rem;">
+                                        <i class="fas fa-clock"></i> Next Interview
+                                    </p>
+                                    <p style="color: #333; margin: 0 0 0.25rem 0; font-size: 0.9rem;">
+                                        {{ upcoming_interview.interview_date|date:"F d, Y" }}
+                                    </p>
+                                    <p style="color: #666; margin: 0; font-size: 0.85rem;">
+                                        {{ upcoming_interview.start_time|date:"h:i A" }} - 
+                                        {{ upcoming_interview.end_time|date:"h:i A" }}
+                                    </p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+
+                 <!-- Application Status (if applied) -->
+<!-- Application Status (if applied) -->
+{% if has_application and application_details %}
+    <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #e0e0e0;">
+        <h4 style="color: #333; margin-bottom: 1rem;">
+            <i class="fas fa-clipboard-check"></i> Your Application Status
+        </h4>
+        
+        
+        
+        <div style="text-align: center; margin-bottom: 1rem;">
+            <span style="background: {{ color }}; color: white; padding: 0.5rem 1.5rem; border-radius: 20px; font-size: 1rem; font-weight: 600;">
+                {{ status_display }}
+            </span>
+        </div>
+        
+        {% if application_details.reviewed_by_name %}
+            <p style="color: #666; text-align: center; margin-bottom: 0.5rem;">
+                <i class="fas fa-user-check"></i> Reviewed by: {{ application_details.reviewed_by_name }}
+            </p>
+        {% endif %}
+        
+        {% if application_details.match_score %}
+            <p style="color: #4CAF50; font-weight: 600; text-align: center; margin-bottom: 0.5rem;">
+                <i class="fas fa-chart-line"></i> Match Score: {{ application_details.match_score|floatformat:2 }}%
+            </p>
+        {% endif %}
+        
+        <p style="color: #666; text-align: center; font-size: 0.9rem; margin-bottom: 0.5rem;">
+            <i class="fas fa-calendar-alt"></i> Applied on: {{ application_details.applied_at|date:"F d, Y" }}
+        </p>
+        
+        {% if application_details.cover_letter %}
+            <div style="margin-top: 1rem;">
+                <a href="#" onclick="toggleCoverLetter()" style="color: #0056b3; text-decoration: none; font-size: 0.9rem;">
+                    <i class="fas fa-file-alt"></i> View Your Cover Letter
+                </a>
+                <div id="coverLetterContent" style="display: none; margin-top: 1rem; padding: 1rem; background: white; border-radius: 8px; border: 1px solid #e0e0e0;">
+                    <p style="color: #666; line-height: 1.6; white-space: pre-wrap;">{{ application_details.cover_letter }}</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
+
+                </div>
+
+                {% if has_application %}
+                    <div style="background: #d4edda; color: #155724; padding: 1.5rem; border-radius: 10px; text-align: center; border: 1px solid #c3e6cb;">
+                        <i class="fas fa-check-circle" style="font-size: 2rem; margin-bottom: 0.5rem; color: #28a745;"></i>
+                        <p style="font-weight: 600; margin-bottom: 0.5rem;">Application Submitted</p>
+                        <p style="font-size: 0.9rem; margin-bottom: 1rem;">Your application is under review by the employer.</p>
+                        
+                        {% if applicant_remarks %}
+                            <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(40, 167, 69, 0.1); border-radius: 8px; border-left: 3px solid #28a745;">
+                                <p style="color: #155724; margin: 0; font-size: 0.9rem;">
+                                    <i class="fas fa-comment"></i> You have {{ applicant_remarks|length }} feedback message(s) from the employer.
+                                </p>
+                            </div>
+                        {% endif %}
+                        
+                        {% if interviews %}
+                            <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(156, 39, 176, 0.1); border-radius: 8px; border-left: 3px solid #9C27B0;">
+                                <p style="color: #4a148c; margin: 0; font-size: 0.9rem;">
+                                    <i class="fas fa-calendar-alt"></i> You have {{ interviews|length }} scheduled interview(s).
+                                </p>
+                            </div>
+                        {% endif %}
+                        
+                        <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem;">
+                            <a href="applications.php" style="color: #155724; text-decoration: underline; font-size: 0.9rem;">
+                                <i class="fas fa-list"></i> View All Applications
+                            </a>
+                            <a href="#" onclick="window.print()" style="color: #155724; text-decoration: underline; font-size: 0.9rem;">
+                                <i class="fas fa-print"></i> Print Application Details
+                            </a>
+                        </div>
+                    </div>
+
+                {% else %}
+                    <a href="apply_job.php?id={{ job.job_id }}" style="display: block; background: linear-gradient(135deg, #0056b3 0%, #004494 100%); color: white; padding: 1rem; border-radius: 10px; text-align: center; text-decoration: none; font-weight: 600; font-size: 1.1rem;">
+                        <i class="fas fa-paper-plane"></i> Apply Now
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+function toggleCoverLetter() {
+    var content = document.getElementById('coverLetterContent');
+    if (content.style.display === 'none' || content.style.display === '') {
+        content.style.display = 'block';
+    } else {
+        content.style.display = 'none';
+    }
+    return false;
+}
+
+function addToCalendar() {
+    {% if interviews and interviews.0.status == 'scheduled' %}
+        const interview = {{ interviews.0|escapejs }};
+        
+        // Format date for calendar
+        const startDate = new Date(interview.interview_date + 'T' + interview.start_time);
+        const endDate = new Date(interview.interview_date + 'T' + interview.end_time);
+        
+        // Create Google Calendar URL
+        const title = encodeURIComponent('Interview for {{ job.title }}');
+        const details = encodeURIComponent(
+            `Job: {{ job.title }}\n` +
+            `Company: {{ job.company_name }}\n` +
+            `Type: ${interview.interview_type} interview\n` +
+            (interview.location ? `Location: ${interview.location}\n` : '') +
+            (interview.meeting_link ? `Meeting Link: ${interview.meeting_link}\n` : '') +
+            (interview.notes ? `Notes: ${interview.notes}` : '')
+        );
+        const location = encodeURIComponent(interview.location || interview.meeting_link || '');
+        
+        const startStr = startDate.toISOString().replace(/-|:|\.\d+/g, '');
+        const endStr = endDate.toISOString().replace(/-|:|\.\d+/g, '');
+        
+        const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}&location=${location}&dates=${startStr}/${endStr}`;
+        
+        // Create .ics file for download
+        const icsContent = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Job Portal//Interview Schedule//EN',
+            'BEGIN:VEVENT',
+            'UID:' + interview.id + '@jobportal',
+            'DTSTAMP:' + new Date().toISOString().replace(/-|:|\.\d+/g, ''),
+            'DTSTART:' + startStr,
+            'DTEND:' + endStr,
+            'SUMMARY:' + title,
+            'DESCRIPTION:' + details.replace(/\\n/g, '\\\\n'),
+            'LOCATION:' + location,
+            'STATUS:CONFIRMED',
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].join('\n');
+        
+        // Show options to user
+        const choice = confirm(
+            'Add interview to calendar:\n\n' +
+            '1. Open Google Calendar\n' +
+            '2. Download .ics file (for Outlook, Apple Calendar, etc.)\n\n' +
+            'Click OK for Google Calendar, Cancel for .ics download.'
+        );
+        
+        if (choice) {
+            window.open(googleCalendarUrl, '_blank');
+        } else {
+            const blob = new Blob([icsContent], { type: 'text/calendar' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'interview.ics';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    {% endif %}
+}
+</script>
+
+{% include 'includes/footer.html' %}

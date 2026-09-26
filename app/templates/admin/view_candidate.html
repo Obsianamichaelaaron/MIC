@@ -1,0 +1,317 @@
+{% include 'includes/header.html' %}
+<div class="container py-4">
+    <!-- Breadcrumb & Top Bar -->
+    <div style="background:linear-gradient(135deg,#0a3d6b 0%,#1866a3 58%,#2196f3 100%);color:#fff;padding:1.6rem 2rem;border-radius:16px;margin-bottom:1.75rem;box-shadow:0 8px 24px rgba(10,61,107,0.18);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+            <div>
+                <p style="margin:0 0 .3rem;font-size:.85rem;color:rgba(255,255,255,0.75);">
+                    <a href="/admin/dashboard.php" style="color:rgba(255,255,255,0.85);text-decoration:none;">Admin</a> / 
+                    <a href="/admin/candidates.php" style="color:rgba(255,255,255,0.85);text-decoration:none;">Candidates</a> / Application #{{ application.application_id }}
+                </p>
+                <h1 style="margin:0;font-size:1.65rem;font-weight:700;"><i class="fas fa-user-tie" style="color:#f59e0b;margin-right:.5rem;"></i> Candidate: {{ candidate_user.first_name }} {{ candidate_user.last_name }}</h1>
+                <p style="margin:.3rem 0 0;font-size:.9rem;color:rgba(255,255,255,0.85);">
+                    Applied for <strong>{{ job.title }}</strong> at <strong>{{ company_name }}</strong> &bull; Submitted {{ application.applied_at|date:"M d, Y" }}
+                </p>
+            </div>
+            <div style="display:flex;gap:.5rem;">
+                <a href="/admin/candidates.php" style="background:rgba(255,255,255,0.15);color:#fff;border:1px solid rgba(255,255,255,0.3);padding:.55rem 1.1rem;border-radius:8px;text-decoration:none;font-size:.88rem;font-weight:600;display:inline-flex;align-items:center;gap:.4rem;">
+                    <i class="fas fa-arrow-left"></i> Back to Pipeline
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if success_msg %}
+        <div style="background:#dcfce7;border:1px solid #22c55e;color:#15803d;padding:.9rem 1.25rem;border-radius:10px;margin-bottom:1.5rem;font-weight:600;display:flex;align-items:center;gap:.6rem;">
+            <i class="fas fa-check-circle" style="font-size:1.1rem;"></i> {{ success_msg }}
+        </div>
+    {% endif %}
+
+    {% if error_msg %}
+        <div style="background:#fee2e2;border:1px solid #ef4444;color:#b91c1c;padding:.9rem 1.25rem;border-radius:10px;margin-bottom:1.5rem;font-weight:600;display:flex;align-items:center;gap:.6rem;">
+            <i class="fas fa-exclamation-triangle" style="font-size:1.1rem;"></i> {{ error_msg }}
+        </div>
+    {% endif %}
+
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:1.75rem;align-items:start;">
+        <!-- Left Column: Candidate Dossier -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem;">
+            
+            <!-- 1. Profile & Contact Card -->
+            <div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:1.6rem;box-shadow:0 3px 12px rgba(0,0,0,0.04);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;padding-bottom:.75rem;border-bottom:1px solid #e2e8f0;">
+                    <h3 style="margin:0;font-size:1.15rem;color:#0a3d6b;font-weight:700;">
+                        <i class="fas fa-id-card" style="color:#1866a3;margin-right:.4rem;"></i> Personal & Contact Information
+                    </h3>
+                    <span style="padding:.35rem .9rem;border-radius:20px;font-size:.8rem;font-weight:700;
+                        {% if application.status == 'accepted' %}background:#dcfce7;color:#15803d;
+                        {% elif application.status == 'interviewed' %}background:#ddd6fe;color:#6d28d9;
+                        {% elif application.status == 'shortlisted' %}background:#e0f2fe;color:#0369a1;
+                        {% elif application.status == 'rejected' %}background:#fee2e2;color:#b91c1c;
+                        {% else %}background:#ffedd5;color:#c2410c;{% endif %}">
+                        Current Status: {{ application.status|title }}
+                    </span>
+                </div>
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;font-size:.9rem;">
+                    <div>
+                        <div style="color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase;">Full Name</div>
+                        <div style="font-weight:700;color:#0f172a;margin-top:.2rem;">{{ candidate_user.first_name }} {{ candidate_user.last_name }}</div>
+                    </div>
+                    <div>
+                        <div style="color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase;">Email Address</div>
+                        <div style="color:#0f172a;margin-top:.2rem;">{{ candidate_user.email }}</div>
+                    </div>
+                    <div>
+                        <div style="color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase;">Phone Contact</div>
+                        <div style="color:#0f172a;margin-top:.2rem;">{{ candidate_user.phone|default:"Not specified" }}</div>
+                    </div>
+                    <div>
+                        <div style="color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase;">Highest Education</div>
+                        <div style="color:#0f172a;margin-top:.2rem;">{{ applicant.education_level|default:"Not specified" }}</div>
+                    </div>
+                    <div>
+                        <div style="color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase;">Experience Years</div>
+                        <div style="color:#0f172a;margin-top:.2rem;">{{ applicant.experience_years }} year(s)</div>
+                    </div>
+                    <div>
+                        <div style="color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase;">Employability Index Score</div>
+                        <div style="font-weight:800;color:#1866a3;margin-top:.2rem;">{{ applicant.employability_score|floatformat:1 }}%</div>
+                    </div>
+                </div>
+
+                <!-- Resume Download Box -->
+                <div style="margin-top:1.5rem;padding:1rem 1.25rem;background:#f8fafc;border:1px solid #cbd5e1;border-radius:10px;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="display:flex;align-items:center;gap:.75rem;">
+                        <i class="fas fa-file-pdf" style="font-size:1.8rem;color:#ef4444;"></i>
+                        <div>
+                            <div style="font-weight:700;color:#1e293b;font-size:.9rem;">Verified Candidate Resume Document</div>
+                            <div style="font-size:.78rem;color:#64748b;">
+                                {% if application.resume_file or applicant.resume_file %}
+                                    {{ application.resume_file|default:applicant.resume_file }}
+                                {% else %}
+                                    No resume document attached
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% if application.resume_file or applicant.resume_file %}
+                        <a href="/{{ application.resume_file|default:applicant.resume_file }}" target="_blank" style="padding:.5rem 1rem;background:#0f172a;color:#fff;border-radius:8px;font-size:.82rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;">
+                            <i class="fas fa-download"></i> View / Download
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 2. Skills & Qualifications Matrix -->
+            <div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:1.6rem;box-shadow:0 3px 12px rgba(0,0,0,0.04);">
+                <h3 style="margin:0 0 1rem;font-size:1.15rem;color:#0a3d6b;font-weight:700;padding-bottom:.6rem;border-bottom:1px solid #e2e8f0;">
+                    <i class="fas fa-tools" style="color:#1866a3;margin-right:.4rem;"></i> Technical Skills & Credentials
+                </h3>
+                
+                <div style="margin-bottom:1.25rem;">
+                    <div style="color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase;margin-bottom:.5rem;">Applicant Skills Profile</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:.4rem;">
+                        {% for sk in applicant.skills|default:""|split:"," %}
+                            {% if sk|trim != '' %}
+                                <span style="background:#e0f2fe;color:#0369a1;padding:.35rem .75rem;border-radius:20px;font-size:.8rem;font-weight:600;">
+                                    <i class="fas fa-check" style="font-size:.65rem;margin-right:.2rem;"></i> {{ sk|trim }}
+                                </span>
+                            {% endif %}
+                        {% empty %}
+                            <span style="color:#94a3b8;font-size:.85rem;">No skills listed.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if applicant.qualifications %}
+                <div>
+                    <div style="color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Degree / Major Qualification</div>
+                    <div style="font-size:.88rem;color:#1e293b;padding:.75rem;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+                        {{ applicant.qualifications }}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if application.cover_letter %}
+                <div style="margin-top:1.25rem;">
+                    <div style="color:#64748b;font-size:.78rem;font-weight:700;text-transform:uppercase;margin-bottom:.3rem;">Applicant Pitch / Cover Letter</div>
+                    <div style="font-size:.88rem;color:#334155;line-height:1.5;padding:.85rem;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+                        {{ application.cover_letter }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+
+            <!-- 4. Remarks & Activity Log History -->
+            <div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:1.6rem;box-shadow:0 3px 12px rgba(0,0,0,0.04);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;padding-bottom:.6rem;border-bottom:1px solid #e2e8f0;">
+                    <h3 style="margin:0;font-size:1.15rem;color:#0a3d6b;font-weight:700;">
+                        <i class="fas fa-clock-rotate-left" style="color:#1866a3;margin-right:.4rem;"></i> Application Remarks & Review Log
+                    </h3>
+                    <span style="font-size:.78rem;font-weight:600;color:#64748b;">
+                        {{ application.remarks_history|parse_remarks|length }} Recorded Events
+                    </span>
+                </div>
+
+                {% with history=application.remarks_history|parse_remarks %}
+                    {% if history %}
+                        <div style="display:flex;flex-direction:column;gap:1rem;position:relative;padding-left:1.5rem;border-left:2px solid #e2e8f0;margin-left:.75rem;">
+                            {% for item in history %}
+                                <div style="position:relative;">
+                                    <!-- Timeline Node Circle -->
+                                    <div style="position:absolute;left:-1.95rem;top:.25rem;width:12px;height:12px;border-radius:50%;background:#0284c7;border:3px solid #fff;box-shadow:0 0 0 2px #0284c7;"></div>
+                                    
+                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.85rem 1.1rem;">
+                                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.4rem;">
+                                            <div style="display:flex;align-items:center;gap:.5rem;">
+                                                {% if item.status %}
+                                                    <span style="padding:.2rem .65rem;border-radius:999px;font-size:.72rem;font-weight:700;text-transform:capitalize;
+                                                        {% if item.status == 'accepted' or item.status == 'hired' %}background:#dcfce7;color:#15803d;
+                                                        {% elif item.status == 'interviewed' or 'interview' in item.status %}background:#ede9fe;color:#6d28d9;
+                                                        {% elif item.status == 'shortlisted' %}background:#e0f2fe;color:#0369a1;
+                                                        {% elif item.status == 'rejected' %}background:#fee2e2;color:#b91c1c;
+                                                        {% else %}background:#ffedd5;color:#c2410c;{% endif %}">
+                                                        {{ item.status|title }}
+                                                    </span>
+                                                {% endif %}
+                                                <span style="font-size:.8rem;font-weight:700;color:#334155;">
+                                                    <i class="fas fa-user-check" style="color:#94a3b8;font-size:.75rem;"></i> {{ item.reviewed_by|default:"Recruitment Team" }}
+                                                </span>
+                                            </div>
+                                            {% if item.timestamp %}
+                                                <span style="font-size:.76rem;color:#64748b;display:inline-flex;align-items:center;gap:.3rem;">
+                                                    <i class="fas fa-clock" style="color:#94a3b8;"></i> {{ item.timestamp }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+
+                                        {% if item.remarks %}
+                                            <div style="font-size:.86rem;color:#1e293b;line-height:1.5;background:#fff;padding:.6rem .85rem;border-radius:7px;border-left:3px solid #0284c7;margin-top:.35rem;">
+                                                {{ item.remarks }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p style="color:#94a3b8;font-size:.85rem;margin:0;font-style:italic;">No remarks or audit history recorded yet.</p>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+
+        <!-- Right Column: Admin Actions & Interview Scheduler -->
+        <div style="display:flex;flex-direction:column;gap:1.5rem;">
+
+            <!-- Status Update Action Form -->
+            <div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:1.6rem;box-shadow:0 3px 12px rgba(0,0,0,0.04);">
+                <h3 style="margin:0 0 1.25rem;font-size:1.15rem;color:#0a3d6b;font-weight:700;padding-bottom:.6rem;border-bottom:1px solid #e2e8f0;">
+                    <i class="fas fa-sliders-h" style="color:#1866a3;margin-right:.4rem;"></i> Update Status & Send Email
+                </h3>
+
+                <form method="POST" action="">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_status">
+
+                    <div style="margin-bottom:1.25rem;">
+                        <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">
+                            Application Status <span style="color:#ef4444;">*</span>
+                        </label>
+                        <select name="status" style="width:100%;padding:.65rem .85rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.88rem;background:#f8fafc;box-sizing:border-box;">
+                            <option value="pending" {% if application.status == 'pending' %}selected{% endif %}>Pending / Under Review</option>
+                            <option value="shortlisted" {% if application.status == 'shortlisted' %}selected{% endif %}>Shortlisted</option>
+                            <option value="interviewed" {% if application.status == 'interviewed' %}selected{% endif %}>Interviewed</option>
+                            <option value="accepted" {% if application.status == 'accepted' %}selected{% endif %}>Accepted / Approved</option>
+                            <option value="rejected" {% if application.status == 'rejected' %}selected{% endif %}>Rejected</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom:1.25rem;">
+                        <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">
+                            Remarks / Message for Candidate
+                        </label>
+                        <textarea name="remarks" rows="3" placeholder="Add specific feedback, reasons, or next instructions to include in the notification email..."
+                                  style="width:100%;padding:.65rem .85rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.85rem;background:#f8fafc;font-family:inherit;box-sizing:border-box;"></textarea>
+                        <small style="color:#64748b;font-size:.74rem;display:block;margin-top:.25rem;">
+                            <i class="fas fa-envelope"></i> This will automatically dispatch an email notification to <strong>{{ candidate_user.email }}</strong>.
+                        </small>
+                    </div>
+
+                    <button type="submit" style="width:100%;padding:.75rem;border:none;border-radius:8px;background:#1866a3;color:#fff;font-weight:700;font-size:.88rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;box-shadow:0 4px 12px rgba(24,102,163,0.3);">
+                        <i class="fas fa-paper-plane"></i> Update Status & Notify
+                    </button>
+                </form>
+            </div>
+
+            <!-- Schedule Interview Form -->
+            <div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:1.6rem;box-shadow:0 3px 12px rgba(0,0,0,0.04);">
+                <h3 style="margin:0 0 1.25rem;font-size:1.15rem;color:#7c3aed;font-weight:700;padding-bottom:.6rem;border-bottom:1px solid #e2e8f0;">
+                    <i class="fas fa-calendar-plus" style="color:#7c3aed;margin-right:.4rem;"></i> Schedule Interview
+                </h3>
+
+                <form method="POST" action="">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="schedule_interview">
+
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">Interview Date <span style="color:#ef4444;">*</span></label>
+                        <input type="date" name="interview_date" required style="width:100%;padding:.6rem .8rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.85rem;background:#f8fafc;box-sizing:border-box;">
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem;">
+                        <div>
+                            <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">Start Time <span style="color:#ef4444;">*</span></label>
+                            <input type="time" name="start_time" required style="width:100%;padding:.6rem .8rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.85rem;background:#f8fafc;box-sizing:border-box;">
+                        </div>
+                        <div>
+                            <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">End Time <span style="color:#ef4444;">*</span></label>
+                            <input type="time" name="end_time" required style="width:100%;padding:.6rem .8rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.85rem;background:#f8fafc;box-sizing:border-box;">
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">Interview Mode</label>
+                        <select name="interview_type" style="width:100%;padding:.6rem .8rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.85rem;background:#f8fafc;box-sizing:border-box;">
+                            <option value="video">Online Video Call (Google Meet / Zoom)</option>
+                            <option value="in-person">In-Person Office Interview</option>
+                            <option value="phone">Phone Screening</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">Meeting Link or Location Address</label>
+                        <input type="text" name="meeting_link" placeholder="e.g. https://meet.google.com/xyz or Office Floor 5"
+                               style="width:100%;padding:.6rem .8rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.85rem;background:#f8fafc;box-sizing:border-box;">
+                    </div>
+
+                    <div style="margin-bottom:1.25rem;">
+                        <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">Preparation Notes</label>
+                        <textarea name="notes" rows="2" placeholder="e.g. Please bring a printed copy of your portfolio or test code..."
+                                  style="width:100%;padding:.6rem .8rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.85rem;background:#f8fafc;font-family:inherit;box-sizing:border-box;"></textarea>
+                    </div>
+
+                    <button type="submit" style="width:100%;padding:.75rem;border:none;border-radius:8px;background:#7c3aed;color:#fff;font-weight:700;font-size:.88rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:.4rem;box-shadow:0 4px 12px rgba(124,58,237,0.3);">
+                        <i class="fas fa-calendar-check"></i> Schedule & Send Invitation
+                    </button>
+                </form>
+
+                {% if interviews %}
+                    <div style="margin-top:1.5rem;padding-top:1.25rem;border-top:1px solid #e2e8f0;">
+                        <h4 style="margin:0 0 .75rem;font-size:.9rem;color:#475569;font-weight:700;">Scheduled Sessions</h4>
+                        {% for iv in interviews %}
+                            <div style="padding:.75rem;background:#f8fafc;border-radius:8px;border-left:3px solid #7c3aed;font-size:.8rem;margin-bottom:.5rem;">
+                                <div style="font-weight:700;color:#0f172a;">{{ iv.interview_date|date:"l, M d, Y" }}</div>
+                                <div style="color:#64748b;">{{ iv.start_time }} - {{ iv.end_time }} &bull; {{ iv.interview_type|title }}</div>
+                                {% if iv.meeting_link %}<div style="color:#7c3aed;word-break:break-all;margin-top:.2rem;">{{ iv.meeting_link }}</div>{% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+</div>

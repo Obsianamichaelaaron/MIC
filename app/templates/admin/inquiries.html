@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Contact Inquiries - Multibiz Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="employer-hero-banner mb-4">
+        <div class="position-relative" style="z-index: 1;">
+            <h3 class="fw-extrabold text-white mb-1">
+                <i class="fa-solid fa-inbox text-warning me-2"></i>Public Contact Inquiries Inbox
+            </h3>
+            <p class="text-white-50 small mb-0">Review inquiries submitted via the homepage and corporate contact forms.</p>
+        </div>
+    </div>
+
+    <!-- Inquiries List -->
+    <div class="custom-card p-4 bg-white border-0 shadow-sm rounded-4">
+        <div class="table-responsive">
+            <table class="table align-middle table-hover mb-0">
+                <thead class="table-light small">
+                    <tr>
+                        <th>Sender Name</th>
+                        <th>Email Address</th>
+                        <th>Subject</th>
+                        <th>Message Excerpt</th>
+                        <th>Status</th>
+                        <th>Received Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for inq in inquiries %}
+                        <tr>
+                            <td class="fw-bold text-dark">{{ inq.name }}</td>
+                            <td>{{ inq.email }}</td>
+                            <td class="fw-semibold small text-primary">{{ inq.subject }}</td>
+                            <td class="small text-muted" style="max-width: 250px;">{{ inq.message|truncatewords:10 }}</td>
+                            <td>
+                                <span class="badge {% if inq.status == 'replied' %}bg-success{% elif inq.status == 'open' %}bg-info{% else %}bg-danger{% endif %} text-capitalize">
+                                    {{ inq.status }}
+                                </span>
+                            </td>
+                            <td class="text-muted small">{{ inq.created_at|date:"M d, Y H:i" }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary-custom" data-bs-toggle="modal" data-bs-target="#inquiryModal{{ inq.id }}">
+                                    <i class="fa-solid fa-reply me-1"></i> Reply / View
+                                </button>
+                            </td>
+                        </tr>
+
+                        <!-- Reply Modal -->
+                        <div class="modal fade" id="inquiryModal{{ inq.id }}" tabindex="-1">
+                            <div class="modal-dialog modal-dialog-centered modal-lg">
+                                <div class="modal-content rounded-4 border-0 shadow-lg">
+                                    <div class="modal-header border-bottom">
+                                        <h5 class="modal-title fw-bold">Inquiry Details</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body p-4">
+                                        <div class="p-3 bg-light rounded-3 mb-4">
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <div><strong>From:</strong> {{ inq.name }} (<code>{{ inq.email }}</code>)</div>
+                                                <div class="text-muted small">{{ inq.created_at }}</div>
+                                            </div>
+                                            <div class="mb-2"><strong>Subject:</strong> {{ inq.subject }}</div>
+                                            <div class="p-3 bg-white rounded border text-secondary small" style="line-height: 1.7;">
+                                                {{ inq.message }}
+                                            </div>
+                                        </div>
+
+                                        <!-- Previous Replies -->
+                                        {% if inq.replies.exists %}
+                                            <h6 class="fw-bold text-dark mb-2">Previous Replies:</h6>
+                                            <div class="d-flex flex-column gap-2 mb-4">
+                                                {% for r in inq.replies.all %}
+                                                    <div class="p-3 bg-light border-start border-4 border-success rounded">
+                                                        <div class="small text-muted mb-1">Replied by {{ r.admin.full_name }} on {{ r.sent_at }}</div>
+                                                        <div class="small text-dark">{{ r.reply_text }}</div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+
+                                        <form method="POST" action="{% url 'admin_messages' %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="reply_inquiry" value="1">
+                                            <input type="hidden" name="inquiry_id" value="{{ inq.id }}">
+                                            <div class="mb-3">
+                                                <label class="form-label fw-semibold small">Send Official Reply</label>
+                                                <textarea name="reply_text" rows="4" class="form-control" placeholder="Write message reply here..." required></textarea>
+                                            </div>
+                                            <div class="d-flex justify-content-end gap-2">
+                                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                                                <button type="submit" class="btn btn-primary-custom">
+                                                    <i class="fa-solid fa-paper-plane me-1"></i> Send & Record Reply
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    {% empty %}
+                        <tr><td colspan="7" class="text-center py-4 text-muted small">No contact inquiries received yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
