@@ -125,7 +125,7 @@
 }
 
 .status-card.active {
-    box-shadow: 0 0 0 3px;
+    box-shadow: 0 0 0 3px rgba(24, 102, 163, 0.3);
 }
 
 .ranking-grid {
@@ -375,6 +375,44 @@
     font-size: 0.9rem;
 }
 
+/* Status Border, Color & Background Classes */
+.status-border-pending { border-color: #FF9800 !important; }
+.status-border-reviewed { border-color: #2196F3 !important; }
+.status-border-shortlisted { border-color: #9C27B0 !important; }
+.status-border-interviewed { border-color: #673AB7 !important; }
+.status-border-accepted { border-color: #4CAF50 !important; }
+.status-border-rejected { border-color: #F44336 !important; }
+
+.status-color-pending { color: #FF9800 !important; }
+.status-color-reviewed { color: #2196F3 !important; }
+.status-color-shortlisted { color: #9C27B0 !important; }
+.status-color-interviewed { color: #673AB7 !important; }
+.status-color-accepted { color: #4CAF50 !important; }
+.status-color-rejected { color: #F44336 !important; }
+
+.status-bg-pending { background-color: #FF9800 !important; }
+.status-bg-reviewed { background-color: #2196F3 !important; }
+.status-bg-shortlisted { background-color: #9C27B0 !important; }
+.status-bg-interviewed { background-color: #673AB7 !important; }
+.status-bg-accepted { background-color: #4CAF50 !important; }
+.status-bg-rejected { background-color: #F44336 !important; }
+
+/* Tier Color, Border & Background Classes */
+.tier-color-excellent { color: #4CAF50 !important; }
+.tier-color-good { color: #2196F3 !important; }
+.tier-color-average { color: #FF9800 !important; }
+.tier-color-poor { color: #F44336 !important; }
+
+.tier-border-excellent { border-color: #4CAF50 !important; }
+.tier-border-good { border-color: #2196F3 !important; }
+.tier-border-average { border-color: #FF9800 !important; }
+.tier-border-poor { border-color: #F44336 !important; }
+
+.tier-bg-excellent { background-color: #4CAF50 !important; }
+.tier-bg-good { background-color: #2196F3 !important; }
+.tier-bg-average { background-color: #FF9800 !important; }
+.tier-bg-poor { background-color: #F44336 !important; }
+
 @media (max-width: 768px) {
     .kanban-board {
         grid-template-columns: 1fr;
@@ -435,7 +473,7 @@
                 </select>
                 
                 <select name="status" class="form-select">
-                    {% for value, label in STATUS_CONFIG.options %}
+                    {% for value, label in status_options %}
                         <option value="{{ value }}" 
                             {% if status_filter == value %}selected{% endif %}>
                             {{ label }}
@@ -455,42 +493,42 @@
             </form>
         </div>
         
-<!-- Status Summary -->
-<div style="margin-bottom: 1.5rem;">
-    <h3 style="margin-bottom: 0.8rem; font-size: 1rem; color: #333; display: flex; align-items: center; gap: 0.5rem;">
-        <i class="fas fa-chart-pie"></i> Application Status Summary
-        <span style="font-size: 0.8rem; color: #666; margin-left: 0.5rem;">
-            (Total: {{ status_counts.total }} candidates)
-        </span>
-    </h3>
-        <div class="status-grid">
-        {% for status, count in status_counts.items %}
-            <a href="?job_id={{ job_id }}&status={{ status }}&page=1" 
-               class="status-card {% if status_filter == status %}active{% endif %}"
-               style="border-color: {% if status == 'accepted' %}#4CAF50{% elif status == 'interviewed' %}#9C27B0{% elif status == 'shortlisted' %}#2196F3{% elif status == 'rejected' %}#F44336{% else %}#FF9800{% endif %};">
-                <div style="font-size: 1.2rem; font-weight: bold; color: {% if status == 'accepted' %}#4CAF50{% elif status == 'interviewed' %}#9C27B0{% elif status == 'shortlisted' %}#2196F3{% elif status == 'rejected' %}#F44336{% else %}#FF9800{% endif %};">
-                    {{ count }}
-                </div>
-                <div style="color: #666; font-size: 0.75rem; text-transform: capitalize;">
-                    {{ status }}
-                </div>
-            </a>
-        {% endfor %}
-    </div>
-</div>
+        <!-- Status Summary -->
+        <div style="margin-bottom: 1.5rem;">
+            <h3 style="margin-bottom: 0.8rem; font-size: 1rem; color: #333; display: flex; align-items: center; gap: 0.5rem;">
+                <i class="fas fa-chart-pie"></i> Application Status Summary
+                <span style="font-size: 0.8rem; color: #666; margin-left: 0.5rem;">
+                    (Total: {{ status_total }} candidates)
+                </span>
+            </h3>
+            <div class="status-grid">
+                {% for item in status_counts_list %}
+                    <a href="?job_id={{ job_id }}&status={{ item.status }}&page=1" 
+                       class="status-card status-border-{{ item.status }} {% if status_filter == item.status %}active{% endif %}">
+                        <div class="status-color-{{ item.status }}" style="font-size: 1.2rem; font-weight: bold;">
+                            {{ item.count }}
+                        </div>
+                        <div style="color: #666; font-size: 0.75rem; text-transform: capitalize;">
+                            {{ item.status }}
+                        </div>
+                    </a>
+                {% endfor %}
+            </div>
+        </div>
+
         <!-- AI Ranking Summary -->
         <div style="margin-bottom: 1.5rem;">
             <h3 style="margin-bottom: 0.8rem; font-size: 1rem; color: #333; display: flex; align-items: center; gap: 0.5rem;">
                 <i class="fas fa-brain"></i> AI Ranking Summary
             </h3>
             <div class="ranking-grid">
-                {% for category, count in ranking_counts %}
-                    <div class="ranking-card" style="border-color: #0056b3;">
-                        <div style="font-size: 1.5rem; font-weight: bold; color: #0056b3;">
-                            {{ count }}
+                {% for item in ranking_counts %}
+                    <div class="ranking-card tier-border-{{ item.category }}">
+                        <div class="tier-color-{{ item.category }}" style="font-size: 1.5rem; font-weight: bold;">
+                            {{ item.count }}
                         </div>
                         <div style="color: #666; font-size: 0.8rem;">
-                            {{ category|title }}
+                            {{ item.label }}
                         </div>
                     </div>
                 {% endfor %}
@@ -500,25 +538,24 @@
         {% if candidates %}
             <!-- Kanban Board -->
             <div class="kanban-board">
-                {% for cat, config in ranking_config.items %}
+                {% for col in kanban_columns %}
                     <div class="kanban-column">
-                        <div class="kanban-header" style="background: {{ config.color }};">
+                        <div class="kanban-header tier-bg-{{ col.category }}">
                             <h3 style="margin: 0; font-size: 1rem; font-weight: 600;">
-                                <i class="fas {{ config.icon }}"></i> 
-                                {{ config.label }}
-                                <span style="font-size: 0.8rem;">({{ cat_candidates|length }})</span>
+                                <i class="fas {{ col.icon }}"></i> 
+                                {{ col.label }}
+                                <span style="font-size: 0.8rem;">({{ col.count }})</span>
                             </h3>
                         </div>
                         <div class="candidate-list">
-                            {% for candidate in cat_candidates %}
-                                <div class="candidate-card" style="border-color: {{ config.color }};">
-                                    <div class="rank-badge" style="background: {{ config.color }};">
+                            {% for candidate in col.candidates %}
+                                <div class="candidate-card tier-border-{{ col.category }}">
+                                    <div class="rank-badge tier-bg-{{ col.category }}">
                                         #{{ forloop.counter }}
                                     </div>
                                     
                                     <!-- Status Badge -->
-                                    <div class="status-badge" 
-                                         style="background: {% if candidate.status == 'accepted' %}#4CAF50{% elif candidate.status == 'interviewed' %}#9C27B0{% elif candidate.status == 'shortlisted' %}#2196F3{% elif candidate.status == 'rejected' %}#F44336{% else %}#FF9800{% endif %};">
+                                    <div class="status-badge status-bg-{{ candidate.status }}">
                                         {{ candidate.status|truncatechars:3 }}
                                     </div>
                                     
@@ -530,14 +567,13 @@
                                             <i class="fas fa-briefcase"></i> 
                                             {{ candidate.job_title }}
                                         </p>
-                                        <p style="color: {% if candidate.status == 'accepted' %}#4CAF50{% elif candidate.status == 'interviewed' %}#9C27B0{% elif candidate.status == 'shortlisted' %}#2196F3{% elif candidate.status == 'rejected' %}#F44336{% else %}#FF9800{% endif %}; 
-                                           margin: 0; font-size: 0.7rem; font-weight: 600;">
+                                        <p class="status-color-{{ candidate.status }}" style="margin: 0; font-size: 0.7rem; font-weight: 600;">
                                             <i class="fas fa-flag"></i> 
                                             {{ candidate.status|title }}
                                         </p>
                                     </div>
                                     
-                                    <div class="score-display" style="background: {{ config.color }};">
+                                    <div class="score-display tier-bg-{{ col.category }}">
                                         <p style="font-size: 1rem; font-weight: bold; color: white; margin: 0; text-align: center;">
                                             {{ candidate.ml_ranking_score|floatformat:1 }}%
                                         </p>
@@ -570,10 +606,10 @@
                                 </div>
                             {% endfor %}
                             
-                            {% if not cat_candidates %}
+                            {% if not col.candidates %}
                                 <div style="text-align: center; color: #999; padding: 1.5rem; font-style: italic; 
                                      background: white; border-radius: 4px; border: 2px dashed #e0e0e0;">
-                                    <p style="margin: 0; font-size: 0.8rem;">No {{ status|lower }} candidates</p>
+                                    <p style="margin: 0; font-size: 0.8rem;">No {{ col.label|lower }} candidates</p>
                                 </div>
                             {% endif %}
                         </div>
@@ -581,29 +617,17 @@
                 {% endfor %}
             </div>
             
-            <!-- Pagination -->
-            {% if total_pages > 1 %}
-                <div class="pagination">
-                    
-                        <a href="?job_id={{ job_id }}&status={{ status_filter }}&page={{ i }}"
-                           class="page-link {% if i == page %}active{% endif %}">
-                            {{ i }}
-                        </a>
-                    
-                </div>
-            {% endif %}
-            
             <!-- Status Legend -->
             <div class="legend">
                 <h4 style="margin: 0 0 0.5rem 0; font-size: 0.9rem; color: #333;">
                     <i class="fas fa-key"></i> Status Legend
                 </h4>
                 <div class="legend-items">
-                    {% for status, color in STATUS_CONFIG.colors %}
+                    {% for item in legend_items %}
                         <div class="legend-item">
-                            <div class="legend-color" style="background: {{ color }};"></div>
+                            <div class="legend-color status-bg-{{ item.status }}"></div>
                             <span style="font-size: 0.8rem; color: #666; text-transform: capitalize;">
-                                {{ status }}
+                                {{ item.label }}
                             </span>
                         </div>
                     {% endfor %}
@@ -629,7 +653,7 @@
             <span class="message-badge">{% if unread_count > 9 %}9+{% else %}{{ unread_count }}{% endif %}</span>
         {% endif %}
         <span class="message-tooltip">
-            {% if unread_count > 0 %}You have $unread_count unread message(s){% else %}Go to Chat{% endif %}
+            {% if unread_count > 0 %}You have {{ unread_count }} unread message(s){% else %}Go to Chat{% endif %}
         </span>
     </a>
 </div>
@@ -672,7 +696,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Update UI
                     const statusBadge = this.closest('.candidate-card').querySelector('.status-badge');
                     statusBadge.textContent = newStatus.substring(0, 3).toUpperCase();
-                    statusBadge.style.background = getStatusColor(newStatus);
+                    statusBadge.className = `status-badge status-bg-${newStatus}`;
                     
                     // Show success message
                     showToast('Status updated successfully');
@@ -680,17 +704,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
-    
-    function getStatusColor(status) {
-        const colors = {
-            'pending': '#FF9800',
-            'shortlisted': '#2196F3',
-            'interviewed': '#9C27B0',
-            'accepted': '#4CAF50',
-            'rejected': '#F44336'
-        };
-        return colors[status] || '#666';
-    }
     
     function showToast(message) {
         // Simple toast notification

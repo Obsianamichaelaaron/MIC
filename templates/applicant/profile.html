@@ -159,6 +159,7 @@
     background: linear-gradient(90deg, #0a3d6b, #2196f3);
     border-radius: 99px;
     transition: width .6s ease;
+    width: var(--pr-completion, 0%);
 }
 
 /* Stats row (Matches Dashboard) */
@@ -967,7 +968,7 @@
 .profile-meter { padding: .8rem; margin-top: 1rem; border: 1px solid #e5eaf1; border-radius: 9px; background: #f8fafc; text-align: left; }
 .profile-meter-head { display: flex; justify-content: space-between; margin-bottom: .35rem; color: #334155; font-size: .72rem; font-weight: 700; }
 .profile-track { height: 7px; overflow: hidden; border-radius: 99px; background: #e5eaf1; }
-.profile-fill { width: {{ completion_pct }}%; height: 100%; background: #28a745; }
+.profile-fill { width: var(--profile-fill, 0%); height: 100%; background: #28a745; }
 .profile-checklist { padding: 0; margin: .8rem 0 0; list-style: none; }
 .profile-checklist li { display: flex; justify-content: space-between; padding: .35rem 0; border-bottom: 1px solid #edf0f4; color: #687386; font-size: .72rem; }
 .profile-checklist li:last-child { border-bottom: 0; }
@@ -1005,7 +1006,7 @@
         {% if error_msg %}<div class="profile-alert" style="background:#fff5f5;color:#c62828">{{ error_msg }}</div>{% endif %}
         <div class="profile-layout">
             <aside>
-                <section class="profile-card profile-identity"><div class="profile-avatar"><div class="profile-avatar-inner">{% if applicant.profile_pic %}<img src="../{{ applicant.profile_pic }}" alt="Profile">{% else %}{{ applicant.user.first_name|slice:":1"|upper }}{{ applicant.user.last_name|slice:":1"|upper }}{% endif %}</div></div><h2>{{ applicant.user.first_name }} {{ applicant.user.last_name }}</h2><p><i class="fas fa-envelope"></i> {{ applicant.user.email }}</p><span class="profile-verified"><i class="fas fa-circle-check"></i> Verified Candidate Account</span><div class="profile-meter"><div class="profile-meter-head"><span>Profile Completeness</span><strong>{{ completion_pct }}%</strong></div><div class="profile-track"><div class="profile-fill"></div></div><ul class="profile-checklist"><li>Personal Information {% if applicant.user.first_name and applicant.user.phone %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Resume Document {% if applicant.resume_file %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Educational Level {% if applicant.education_level %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Skills and Competencies {% if applicant.skills %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li></ul></div></section>
+                <section class="profile-card profile-identity"><div class="profile-avatar"><div class="profile-avatar-inner">{% if applicant.profile_pic %}<img src="../{{ applicant.profile_pic }}" alt="Profile">{% else %}{{ applicant.user.first_name|slice:":1"|upper }}{{ applicant.user.last_name|slice:":1"|upper }}{% endif %}</div></div><h2>{{ applicant.user.first_name }} {{ applicant.user.last_name }}</h2><p><i class="fas fa-envelope"></i> {{ applicant.user.email }}</p><span class="profile-verified"><i class="fas fa-circle-check"></i> Verified Candidate Account</span><div class="profile-meter"><div class="profile-meter-head"><span>Profile Completeness</span><strong>{{ completion_pct }}%</strong></div><div class="profile-track"><div class="profile-fill" style="--profile-fill: {{ completion_pct }}%;"></div></div><ul class="profile-checklist"><li>Personal Information {% if applicant.user.first_name and applicant.user.phone %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Resume Document {% if applicant.resume_file %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Educational Level {% if applicant.education_level %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Skills and Competencies {% if applicant.skills %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li></ul></div></section>
                 <section class="profile-card">
                     <div class="profile-section-head">
                         <div class="profile-section-num"><i class="fas fa-file-pdf"></i></div>
@@ -1091,7 +1092,7 @@
                     <span>{{ completion }}%</span>
                 </div>
                 <div class="pr-bar-track">
-                    <div class="pr-bar-fill" style="width:{{ completion }}%"></div>
+                    <div class="pr-bar-fill" style="--pr-completion: {{ completion }}%;"></div>
                 </div>
 
                 <div class="pr-id-stats">
@@ -1323,7 +1324,7 @@
                         </select>
                     </div>
 
-                    <div id="otherWrap" style="display:{% if is_other_qualification %}block{% else %}none{% endif %};">
+                    <div id="otherWrap" {% if is_other_qualification %}style="display: block;"{% else %}style="display: none;"{% endif %}>
                         <div class="pr-field">
                             <label class="pr-label">Please specify</label>
                             <input type="text" name="qualification_other" id="qualOther" class="pr-input"
