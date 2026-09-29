@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>{{ page_title|default:"Contact Us - MULTIBIZ INTERNATIONAL CORPORATION" }}</title>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta name="description" content="Contact MULTIBIZ INTERNATIONAL CORPORATION - Get in touch with our enterprise solutions, support, and career teams.">
+    <link rel="shortcut icon" href="2024/favicon.png" type="image/x-icon">
+    <link rel="apple-touch-icon" href="2024/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* ============================================================
+           DESIGN SYSTEM — LUXURY CORPORATE (synced with about/services)
+        ============================================================ */
+        :root {
+            --navy:        #0a1628;
+            --navy-mid:    #0f2040;
+            --blue:        #1a4fa0;
+            --blue-light:  #2563c8;
+            --gold:        #b8973a;
+            --gold-light:  #d4af55;
+            --cream:       #f7f5f0;
+            --warm-white:  #fafaf8;
+            --gray-100:    #f0eff0;
+            --gray-200:    #e4e2e8;
+            --gray-300:    #cbd5e1;
+            --gray-500:    #8a8691;
+            --gray-700:    #4a4752;
+            --dark:        #18151f;
+
+            --font-display: 'Playfair Display', Georgia, serif;
+            --font-body:    'DM Sans', -apple-system, sans-serif;
+
+            --shadow-sm: 0 2px 12px rgba(10,22,40,0.07);
+            --shadow-md: 0 8px 32px rgba(10,22,40,0.11);
+            --shadow-lg: 0 20px 56px rgba(10,22,40,0.16);
+            --shadow-xl: 0 32px 80px rgba(10,22,40,0.22);
+            --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+            --radius-sm: 6px; --radius-md: 12px; --radius-lg: 20px;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; overflow-x: hidden; }
+        body {
+            font-family: var(--font-body); color: var(--dark);
+            background: var(--warm-white); overflow-x: hidden;
+            line-height: 1.6; -webkit-font-smoothing: antialiased;
+        }
+
+        /* ── HEADER ── */
+        header { position: fixed; top: 0; left: 0; width: 100%; z-index: 1000; }
+        header.scrolled .header-container { box-shadow: var(--shadow-lg); }
+        .header-container {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 clamp(1rem,5%,4rem); height: 76px;
+            background: rgba(10,22,40,0.97);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            transition: all 0.3s ease;
+        }
+        .logo a { display: block; }
+        .logo img { height: 42px; width: auto; object-fit: contain; }
+        .nav-menu { display: flex; align-items: center; }
+        .nav-list { display: flex; list-style: none; gap: 0.25rem; align-items: center; }
+        .nav-item { position: relative; }
+        .nav-link {
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            padding: 0.5rem 0.9rem; color: rgba(255,255,255,0.82);
+            text-decoration: none; font-size: 0.88rem; font-weight: 500;
+            border-radius: var(--radius-sm); transition: all 0.25s ease;
+        }
+        .nav-link:hover, .nav-link.active {
+            color: #fff; background: rgba(255,255,255,0.08);
+        }
+        .nav-link.active { color: var(--gold-light); font-weight: 600; }
+        .nav-link.contact-button {
+            color: var(--gold-light);
+            border: 1px solid rgba(212,175,85,0.4);
+        }
+        .nav-link.contact-button:hover {
+            background: rgba(212,175,85,0.15);
+            border-color: var(--gold-light);
+        }
+        .login-register-btn {
+            background: linear-gradient(135deg, var(--gold), var(--gold-light));
+            color: var(--navy) !important; font-weight: 600 !important;
+            padding: 0.5rem 1.25rem !important; border-radius: 100px !important;
+            margin-left: 0.5rem;
+        }
+        .login-register-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(184,151,58,0.4);
+        }
+
+        /* ── DROPDOWN ── */
+        .dropdown {
+            position: absolute; top: calc(100% + 8px); left: 0;
+            min-width: 240px; background: rgba(10,22,40,0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--radius-md); padding: 0.5rem;
+            box-shadow: var(--shadow-xl); opacity: 0; visibility: hidden;
+            transform: translateY(10px); transition: all 0.25s var(--ease-out);
+        }
+        .nav-item:hover .dropdown { opacity: 1; visibility: visible; transform: translateY(0); }
+        .dropdown-item { margin-bottom: 2px; }
+        .dropdown-link {
+            display: block; padding: 0.55rem 0.85rem; color: rgba(255,255,255,0.75);
+            text-decoration: none; font-size: 0.83rem; border-radius: var(--radius-sm);
+            transition: all 0.2s ease;
+        }
+        .dropdown-link:hover { color: #fff; background: rgba(255,255,255,0.08); padding-left: 1.1rem; }
+
+        .nav-toggle {
+            display: none; background: none; border: none;
+            color: white; font-size: 1.4rem; cursor: pointer; padding: 0.5rem;
+        }
+
+        /* ── HERO BANNER ── */
+        .contact-hero {
+            position: relative; padding: 140px clamp(1.25rem,5%,4rem) 70px;
+            background: linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 50%, #123060 100%);
+            color: white; text-align: center; overflow: hidden;
+        }
+        .contact-hero::before {
+            content: ''; position: absolute; inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+        .contact-hero-content { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; }
+        .contact-hero-eyebrow {
+            display: inline-flex; align-items: center; gap: 0.5rem;
+            font-size: 0.72rem; font-weight: 700; letter-spacing: 0.2em;
+            text-transform: uppercase; color: var(--gold-light); margin-bottom: 1rem;
+        }
+        .contact-hero-eyebrow::before, .contact-hero-eyebrow::after {
+            content: ''; width: 24px; height: 1px; background: var(--gold-light); opacity: 0.7;
+        }
+        .contact-hero-title {
+            font-family: var(--font-display); font-size: clamp(2.2rem,5vw,3.6rem);
+            font-weight: 700; line-height: 1.15; margin-bottom: 1rem; color: #fff;
+        }
+        .contact-hero-title em { font-style: italic; color: var(--gold-light); }
+        .contact-hero-subtitle {
+            font-size: clamp(0.95rem,2.5vw,1.15rem); color: rgba(255,255,255,0.78);
+            line-height: 1.7; max-width: 650px; margin: 0 auto;
+        }
+
+        /* ── SUB-NAV TABS ── */
+        .contact-nav {
+            background: #fff; border-bottom: 1px solid var(--gray-200);
+            position: sticky; top: 76px; z-index: 900;
+            box-shadow: var(--shadow-sm);
+        }
+        .contact-nav-container {
+            display: flex; justify-content: center; gap: 0.5rem;
+            padding: 0.6rem 1rem; overflow-x: auto;
+        }
+        .contact-nav-link {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.55rem 1.1rem; border-radius: 100px;
+            color: var(--gray-700); text-decoration: none; font-size: 0.85rem;
+            font-weight: 600; white-space: nowrap; transition: all 0.2s ease;
+        }
+        .contact-nav-link:hover, .contact-nav-link.active {
+            background: var(--navy); color: #fff;
+        }
+
+        /* ── MAIN SECTION ── */
+        .contact-main {
+            padding: clamp(3rem,6vw,5.5rem) clamp(1rem,5%,4rem);
+            max-width: 1240px; margin: 0 auto;
+        }
+
+        /* ── CARDS GRID (TOP INFO) ── */
+        .info-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1.5rem; margin-bottom: 3.5rem;
+        }
+        .info-card {
+            background: #fff; border: 1px solid var(--gray-200);
+            border-radius: var(--radius-md); padding: 2rem 1.6rem;
+            text-align: center; transition: all 0.3s var(--ease-out);
+            position: relative; overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        .info-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0;
+            height: 4px; background: linear-gradient(90deg, var(--gold), var(--blue));
+            opacity: 0; transition: opacity 0.3s ease;
+        }
+        .info-card:hover {
+            transform: translateY(-6px); box-shadow: var(--shadow-md);
+            border-color: var(--blue-light);
+        }
+        .info-card:hover::before { opacity: 1; }
+        .info-icon {
+            width: 58px; height: 58px; border-radius: 50%;
+            background: linear-gradient(135deg, rgba(26,79,160,0.1), rgba(184,151,58,0.15));
+            color: var(--blue); font-size: 1.4rem; display: grid; place-items: center;
+            margin: 0 auto 1.25rem; transition: transform 0.3s ease;
+        }
+        .info-card:hover .info-icon { transform: scale(1.1); background: var(--navy); color: var(--gold-light); }
+        .info-card h3 {
+            font-family: var(--font-display); font-size: 1.15rem; font-weight: 600;
+            color: var(--navy); margin-bottom: 0.5rem;
+        }
+        .info-card p {
+            color: var(--gray-500); font-size: 0.85rem; margin-bottom: 0.85rem; line-height: 1.5;
+        }
+        .info-card a {
+            color: var(--blue); text-decoration: none; font-weight: 600; font-size: 0.9rem;
+            transition: color 0.2s ease; word-break: break-word;
+        }
+        .info-card a:hover { color: var(--gold); }
+
+        /* ── INQUIRY & CONTACT FORM SECTION ── */
+        .inquiry-wrapper {
+            display: grid; grid-template-columns: 1fr 1.35fr;
+            gap: clamp(2rem,5vw,4rem); align-items: start;
+            background: #fff; border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg); padding: clamp(1.75rem,4vw,3.5rem);
+            box-shadow: var(--shadow-md); margin-bottom: 4rem;
+        }
+        .inquiry-intro h2 {
+            font-family: var(--font-display); font-size: clamp(1.6rem,4vw,2.2rem);
+            color: var(--navy); font-weight: 700; margin-bottom: 1rem; line-height: 1.25;
+        }
+        .inquiry-intro p {
+            color: var(--gray-700); font-size: 0.95rem; line-height: 1.7; margin-bottom: 1.75rem;
+        }
+        .feature-bullets { list-style: none; display: flex; flex-direction: column; gap: 1rem; }
+        .feature-bullet {
+            display: flex; align-items: flex-start; gap: 0.75rem; font-size: 0.9rem; color: var(--navy);
+        }
+        .feature-bullet i {
+            color: var(--gold); font-size: 1.1rem; margin-top: 0.15rem; flex-shrink: 0;
+        }
+        .live-chat-box {
+            margin-top: 2rem; padding: 1.25rem; border-radius: var(--radius-md);
+            background: linear-gradient(135deg, rgba(10,22,40,0.04), rgba(26,79,160,0.06));
+            border: 1px dashed var(--gray-300); display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+        }
+        .live-chat-box h4 { font-size: 0.92rem; color: var(--navy); margin-bottom: 0.2rem; }
+        .live-chat-box p { font-size: 0.8rem; color: var(--gray-500); margin: 0; }
+        .live-chat-btn {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.5rem 1rem; border-radius: 100px; background: var(--blue);
+            color: #fff; font-size: 0.78rem; font-weight: 600; text-decoration: none;
+            white-space: nowrap; transition: all 0.2s ease;
+        }
+        .live-chat-btn:hover { background: var(--navy); color: var(--gold-light); }
+
+        /* ── FORM ELEMENTS ── */
+        .contact-form-box { position: relative; }
+        .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-label {
+            display: block; font-size: 0.82rem; font-weight: 600;
+            color: var(--navy); margin-bottom: 0.4rem;
+        }
+        .form-control {
+            width: 100%; padding: 0.8rem 1rem; border: 1.5px solid var(--gray-200);
+            border-radius: var(--radius-sm); font-family: inherit; font-size: 0.9rem;
+            color: var(--dark); background: #fafafc; transition: all 0.25s ease;
+        }
+        .form-control:focus {
+            outline: none; border-color: var(--blue); background: #fff;
+            box-shadow: 0 0 0 4px rgba(26,79,160,0.1);
+        }
+        textarea.form-control { min-height: 120px; resize: vertical; }
+        .form-submit-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+            width: 100%; padding: 0.95rem 2rem; border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+            color: white; border: none; font-weight: 600; font-size: 0.95rem;
+            cursor: pointer; transition: all 0.3s var(--ease-out); box-shadow: 0 6px 20px rgba(10,22,40,0.2);
+        }
+        .form-submit-btn:hover {
+            transform: translateY(-2px); box-shadow: 0 10px 28px rgba(10,22,40,0.3);
+            background: linear-gradient(135deg, #071120 0%, #15428a 100%);
+        }
+        .form-submit-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        .form-message-box {
+            display: none; padding: 1rem; border-radius: var(--radius-sm);
+            margin-bottom: 1.25rem; font-size: 0.88rem; line-height: 1.5;
+        }
+
+        /* ── DIRECTORY SECTION ── */
+        .directory-section {
+            padding: 3rem 0; border-top: 1px solid var(--gray-200);
+        }
+        .section-header-center {
+            text-align: center; max-width: 650px; margin: 0 auto 3rem;
+        }
+        .section-tag {
+            display: inline-block; font-size: 0.72rem; font-weight: 700;
+            letter-spacing: 0.15em; text-transform: uppercase; color: var(--gold);
+            margin-bottom: 0.5rem;
+        }
+        .section-title {
+            font-family: var(--font-display); font-size: clamp(1.8rem,4vw,2.4rem);
+            color: var(--navy); font-weight: 700;
+        }
+        .directory-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        .directory-card {
+            background: #fff; border: 1px solid var(--gray-200);
+            border-radius: var(--radius-md); padding: 1.75rem;
+            transition: all 0.25s ease; box-shadow: var(--shadow-sm);
+        }
+        .directory-card:hover {
+            border-color: var(--blue-light); box-shadow: var(--shadow-md); transform: translateY(-4px);
+        }
+        .dept-title {
+            font-family: var(--font-display); font-size: 1.1rem; font-weight: 700;
+            color: var(--navy); margin-bottom: 0.4rem;
+        }
+        .dept-desc {
+            font-size: 0.83rem; color: var(--gray-500); margin-bottom: 1.25rem; line-height: 1.5;
+        }
+        .dept-items { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; }
+        .dept-item {
+            display: flex; align-items: center; gap: 0.6rem; font-size: 0.84rem; color: var(--gray-700);
+        }
+        .dept-item i { color: var(--blue); font-size: 0.9rem; width: 16px; text-align: center; }
+        .dept-item a { color: inherit; text-decoration: none; font-weight: 500; transition: color 0.2s ease; }
+        .dept-item a:hover { color: var(--blue); }
+
+        /* ── MAP & LOCATIONS ── */
+        .location-section {
+            background: #f4f6fa; border: 1px solid var(--gray-200);
+            border-radius: var(--radius-lg); padding: clamp(2rem,4vw,3.5rem);
+            margin-top: 3rem; margin-bottom: 3.5rem;
+        }
+        .locations-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center;
+        }
+        .location-info h3 {
+            font-family: var(--font-display); font-size: 1.5rem; color: var(--navy);
+            margin-bottom: 0.75rem;
+        }
+        .location-info p {
+            color: var(--gray-700); font-size: 0.9rem; line-height: 1.7; margin-bottom: 1.5rem;
+        }
+        .branch-list {
+            list-style: none; display: flex; flex-direction: column; gap: 0.85rem; margin-bottom: 1.5rem;
+        }
+        .branch-item {
+            display: flex; align-items: flex-start; gap: 0.75rem; font-size: 0.88rem; color: var(--navy);
+        }
+        .branch-item i { color: var(--gold); font-size: 1.1rem; margin-top: 0.2rem; }
+        .map-placeholder {
+            border-radius: var(--radius-md); overflow: hidden;
+            background: #e2e8f0; height: 320px; position: relative;
+            box-shadow: var(--shadow-sm); border: 1px solid var(--gray-300);
+        }
+        .map-placeholder iframe {
+            width: 100%; height: 100%; border: 0;
+        }
+
+        /* ── FOOTER ── */
+        footer {
+            background: var(--dark); color: white;
+            padding: clamp(3rem,8vw,5.5rem) clamp(1.25rem,5%,4rem) 0;
+        }
+        .footer-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px,100%),1fr));
+            gap: clamp(1.5rem,4vw,3rem); max-width: 1200px; margin: 0 auto clamp(2rem,5vw,3.5rem);
+        }
+        .footer-col h4 {
+            font-family: var(--font-display); font-size: 1.1rem; font-weight: 600;
+            color: white; margin-bottom: 1.25rem; position: relative; padding-bottom: 0.6rem;
+        }
+        .footer-col h4::after {
+            content: ''; position: absolute; bottom: 0; left: 0; width: 28px; height: 2px;
+            background: var(--gold);
+        }
+        .footer-links { list-style: none; }
+        .footer-links li { margin-bottom: 0.65rem; }
+        .footer-links a {
+            color: rgba(255,255,255,0.65); text-decoration: none; font-size: 0.88rem;
+            transition: all 0.25s ease;
+        }
+        .footer-links a:hover { color: var(--gold-light); padding-left: 0.4rem; }
+        .footer-brand p {
+            color: rgba(255,255,255,0.6); font-size: 0.88rem; line-height: 1.7; margin-bottom: 1.25rem;
+        }
+        .footer-bottom {
+            border-top: 1px solid rgba(255,255,255,0.08); padding: 1.5rem 0;
+            text-align: center; color: rgba(255,255,255,0.45); font-size: 0.82rem;
+            max-width: 1200px; margin: 0 auto;
+        }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 900px) {
+            .nav-toggle { display: block; }
+            .nav-menu {
+                position: fixed; top: 76px; left: -100%;
+                width: 100%; height: calc(100vh - 76px);
+                background: var(--navy); flex-direction: column;
+                align-items: stretch; padding: 1.5rem;
+                transition: left 0.4s var(--ease-out); overflow-y: auto;
+            }
+            .nav-menu.active { left: 0; }
+            .nav-list { flex-direction: column; width: 100%; gap: 0; }
+            .nav-item { width: 100%; margin-bottom: 0.4rem; }
+            .nav-link { padding: 0.75rem 1rem; font-size: 1rem; }
+            .dropdown { position: static; opacity: 1; visibility: visible; transform: none; box-shadow: none; border: none; background: rgba(255,255,255,0.05); border-radius: var(--radius-sm); margin-top: 0.25rem; display: none; }
+            .nav-item.open .dropdown { display: block; }
+            .nav-item.open .nav-link i { transform: rotate(180deg) !important; }
+
+            .inquiry-wrapper { grid-template-columns: 1fr; }
+            .locations-grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 600px) {
+            .form-row-2 { grid-template-columns: 1fr; }
+            .info-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ─── HEADER ─── -->
+<header id="mainHeader">
+    <div class="header-container">
+        <div class="logo">
+            <a href="index.php"><img src="images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION"></a>
+        </div>
+        <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+            <i class="fas fa-bars"></i>
+        </button>
+        <nav class="nav-menu" id="navMenu">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="about.php" class="nav-link">About <i class="fas fa-chevron-down"></i></a>
+                    <div class="dropdown">
+                        <div class="dropdown-item"><a href="about.php" class="dropdown-link">Who We Are</a></div>
+                        <div class="dropdown-item"><a href="about.php#vision" class="dropdown-link">Vision, Mission, Values</a></div>
+                        <div class="dropdown-item"><a href="about.php#whereweare" class="dropdown-link">Where We Are</a></div>
+                        <div class="dropdown-item"><a href="about.php#industries" class="dropdown-link">Industries We Serve</a></div>
+                        <div class="dropdown-item"><a href="about.php#certifications" class="dropdown-link">Certifications</a></div>
+                        <div class="dropdown-item"><a href="about.php#awards" class="dropdown-link">Awards</a></div>
+                        <div class="dropdown-item"><a href="about.php#history" class="dropdown-link">History</a></div>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a href="services.php" class="nav-link">Services <i class="fas fa-chevron-down"></i></a>
+                    <div class="dropdown">
+                        <div class="dropdown-item"><a href="services.php" class="dropdown-link">Managed Print Services (MPS)</a></div>
+                        <div class="dropdown-item"><a href="services.php#managedit" class="dropdown-link">Document Management System</a></div>
+                        <div class="dropdown-item"><a href="services.php#managedpc" class="dropdown-link">Document Scanner Leasing</a></div>
+                        <div class="dropdown-item"><a href="services.php#managedhris" class="dropdown-link">System Integration</a></div>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a href="solutions.php" class="nav-link">Solutions</a>
+                </li>
+                <li class="nav-item">
+                    <a href="careers.php" class="nav-link">Careers</a>
+                </li>
+                <li class="nav-item">
+                    <a href="contactus.php" class="nav-link active contact-button">Contact Us <i class="fas fa-chevron-down"></i></a>
+                    <div class="dropdown">
+                        <div class="dropdown-item"><a href="contactus.php#sendaninquiry" class="dropdown-link">Send an Inquiry</a></div>
+                        <div class="dropdown-item"><a href="contactus.php#directory" class="dropdown-link">Delsan Directory</a></div>
+                        <div class="dropdown-item"><a href="contactus.php#locations" class="dropdown-link">Office Locations</a></div>
+                        <div class="dropdown-item"><a href="tel:+6328967688" class="dropdown-link">Call Direct Line</a></div>
+                    </div>
+                </li>
+                <li class="nav-item">
+                    <a href="loginregister.php" class="nav-link login-register-btn">Login</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+</header>
+
+<!-- ─── HERO BANNER ─── -->
+<div class="contact-hero">
+    <div class="contact-hero-content">
+        <span class="contact-hero-eyebrow">Connect With Multibiz</span>
+        <h1 class="contact-hero-title">Let's Start a <em>Conversation</em></h1>
+        <p class="contact-hero-subtitle">Whether you're exploring enterprise managed services, seeking careers, or requesting technical support, our team is ready to assist you.</p>
+    </div>
+</div>
+
+<!-- ─── SUB-NAV BAR ─── -->
+<nav class="contact-nav">
+    <div class="contact-nav-container">
+        <a href="#overview" class="contact-nav-link active"><i class="fas fa-info-circle"></i> Overview</a>
+        <a href="#sendaninquiry" class="contact-nav-link"><i class="fas fa-paper-plane"></i> Send an Inquiry</a>
+        <a href="#directory" class="contact-nav-link"><i class="fas fa-address-book"></i> Directory</a>
+        <a href="#locations" class="contact-nav-link"><i class="fas fa-map-location-dot"></i> Office Locations</a>
+    </div>
+</nav>
+
+<!-- ─── MAIN CONTENT ─── -->
+<main class="contact-main" id="overview">
+
+    <!-- ── TOP 4 CONTACT HIGHLIGHTS ── -->
+    <div class="info-grid">
+        <div class="info-card">
+            <div class="info-icon"><i class="fas fa-phone-volume"></i></div>
+            <h3>Direct Hotline</h3>
+            <p>Speak directly with our client representatives during office hours.</p>
+            <a href="tel:{{ contact_info.phone|default:'+639175441674' }}">{{ contact_info.phone|default:"+63 917 544 1674" }}</a>
+        </div>
+
+        <div class="info-card">
+            <div class="info-icon"><i class="fas fa-envelope-open-text"></i></div>
+            <h3>Official Inquiries</h3>
+            <p>Send your corporate inquiries and project RFPs to our central desk.</p>
+            <a href="mailto:{{ contact_info.email|default:'inquiry@multibiz.global' }}">{{ contact_info.email|default:"inquiry@multibiz.global" }}</a>
+        </div>
+
+        <div class="info-card">
+            <div class="info-icon"><i class="fas fa-building-circle-check"></i></div>
+            <h3>Headquarters</h3>
+            <p>Main Corporate Hub, Metro Manila, Philippines.</p>
+            <a href="#locations">View Map & Directions</a>
+        </div>
+
+        <div class="info-card">
+            <div class="info-icon"><i class="fas fa-headset"></i></div>
+            <h3>Technical Helpdesk</h3>
+            <p>24/7 dedicated support & service ticketing for enterprise clients.</p>
+            <a href="tel:+63288967688">(02) 8896-7688</a>
+        </div>
+    </div>
+
+    <!-- ── SEND AN INQUIRY / CONTACT FORM (id="sendaninquiry" and id="contact") ── -->
+    <section class="inquiry-wrapper" id="sendaninquiry">
+        <div class="inquiry-intro">
+            <span class="section-tag">Reach Our Team</span>
+            <h2>Send an Inquiry</h2>
+            <p>Fill out the form with your project requirements or general inquiry. A dedicated Multibiz solutions specialist will review your note and respond within 24 business hours.</p>
+
+            <ul class="feature-bullets">
+                <li class="feature-bullet">
+                    <i class="fas fa-circle-check"></i>
+                    <span><strong>Rapid Response:</strong> Guaranteed 24-hour turnaround on business inquiries.</span>
+                </li>
+                <li class="feature-bullet">
+                    <i class="fas fa-circle-check"></i>
+                    <span><strong>Tailored Consultation:</strong> Direct connection to relevant service engineers and account directors.</span>
+                </li>
+                <li class="feature-bullet">
+                    <i class="fas fa-circle-check"></i>
+                    <span><strong>Confidential Handling:</strong> Your organizational data is guarded with enterprise-grade privacy protocols.</span>
+                </li>
+            </ul>
+
+            <div class="live-chat-box">
+                <div>
+                    <h4>Need Instant Assistance?</h4>
+                    <p>Connect with our live support agents right away.</p>
+                </div>
+                <a href="tel:{{ contact_info.phone|default:'+639175441674' }}" class="live-chat-btn">
+                    <i class="fas fa-phone"></i> Call Now
+                </a>
+            </div>
+        </div>
+
+        <div class="contact-form-box">
+            <div class="form-message-box" id="contactFormMessage"></div>
+
+            <form id="contactForm" novalidate>
+                {% csrf_token %}
+                <div class="form-row-2">
+                    <div class="form-group">
+                        <label for="name" class="form-label">Full Name *</label>
+                        <input type="text" id="name" name="name" class="form-control" required placeholder="e.g. Maria Santos" maxlength="150">
+                    </div>
+                    <div class="form-group">
+                        <label for="email" class="form-label">Email Address *</label>
+                        <input type="email" id="email" name="email" class="form-control" required placeholder="name@company.com">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="subject" class="form-label">Subject / Purpose of Inquiry *</label>
+                    <input type="text" id="subject" name="subject" class="form-control" placeholder="e.g. Managed Print Services Inquiry" maxlength="255">
+                </div>
+
+                <div class="form-group">
+                    <label for="message" class="form-label">Your Message *</label>
+                    <textarea id="message" name="message" class="form-control" required placeholder="Please describe your company needs, questions, or specifications..." minlength="10"></textarea>
+                </div>
+
+                <button type="submit" class="form-submit-btn" id="contactSubmitBtn">
+                    <span>Send Message</span>
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- ── DELSAN & MULTIBIZ DIRECTORY (id="directory") ── -->
+    <section class="directory-section" id="directory">
+        <div class="section-header-center">
+            <span class="section-tag">Department Contacts</span>
+            <h2 class="section-title">Delsan & Multibiz Directory</h2>
+            <p style="color:var(--gray-500);font-size:0.9rem;margin-top:0.5rem;">Reach specific divisions directly for accelerated service and specialized solutions.</p>
+        </div>
+
+        <div class="directory-grid">
+            {% for item in directory %}
+            <div class="directory-card">
+                <div class="dept-title">{{ item.department }}</div>
+                <p class="dept-desc">{{ item.description }}</p>
+                <ul class="dept-items">
+                    <li class="dept-item">
+                        <i class="fas fa-envelope"></i>
+                        <a href="mailto:{{ item.email }}">{{ item.email }}</a>
+                    </li>
+                    <li class="dept-item">
+                        <i class="fas fa-phone"></i>
+                        <a href="tel:{{ item.phone }}">{{ item.phone }}</a>
+                    </li>
+                    <li class="dept-item">
+                        <i class="fas fa-clock"></i>
+                        <span>{{ item.hours }}</span>
+                    </li>
+                </ul>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- ── OFFICE LOCATIONS & MAP (id="locations") ── -->
+    <section class="location-section" id="locations">
+        <div class="locations-grid">
+            <div class="location-info">
+                <span class="section-tag">Nationwide Reach</span>
+                <h3>Corporate Headquarters & Service Centers</h3>
+                <p>Strategically positioned to deliver high-availability managed print, IT, and software support across Luzon, Visayas, and Mindanao.</p>
+
+                <ul class="branch-list">
+                    <li class="branch-item">
+                        <i class="fas fa-location-dot"></i>
+                        <div>
+                            <strong>Metro Manila Main Office:</strong><br>
+                            Delsan Building, Makati City / Pasig City, Metro Manila, Philippines
+                        </div>
+                    </li>
+                    <li class="branch-item">
+                        <i class="fas fa-location-dot"></i>
+                        <div>
+                            <strong>Laguna & Calabarzon Regional Hub:</strong><br>
+                            Serving industrial corridors across Santa Rosa, San Pedro, and Batangas
+                        </div>
+                    </li>
+                    <li class="branch-item">
+                        <i class="fas fa-location-dot"></i>
+                        <div>
+                            <strong>Visayas & Mindanao Support Centers:</strong><br>
+                            Cebu City & Davao City Regional Service Branches
+                        </div>
+                    </li>
+                </ul>
+
+                <a href="#sendaninquiry" class="form-submit-btn" style="width: auto; text-decoration: none;">
+                    <i class="fas fa-comments"></i> Inquire About Regional Coverage
+                </a>
+            </div>
+
+            <div class="map-placeholder">
+                <iframe src="https://maps.google.com/maps?q=Makati%20City%20Metro%20Manila&t=&z=13&ie=UTF8&iwloc=&output=embed" loading="lazy"></iframe>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+    <div class="footer-grid">
+        <div class="footer-col footer-brand">
+            <div class="logo" style="margin-bottom: 1.25rem;">
+                <img src="images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION" style="height: 40px; filter: brightness(0) invert(1);">
+            </div>
+            <p>{{ cms.footer.description|default:"Your trusted career matching platform and managed services partner. Connecting talented professionals with leading employers across the Philippines." }}</p>
+        </div>
+
+        <div class="footer-col">
+            <h4>Quick Links</h4>
+            <ul class="footer-links">
+                <li><a href="about.php">About Us</a></li>
+                <li><a href="services.php">Managed Services</a></li>
+                <li><a href="solutions.php">Solutions</a></li>
+                <li><a href="careers.php">Careers & Jobs</a></li>
+                <li><a href="contactus.php">Contact Us</a></li>
+            </ul>
+        </div>
+
+        <div class="footer-col">
+            <h4>Solutions</h4>
+            <ul class="footer-links">
+                <li><a href="services.php">Managed Print Services</a></li>
+                <li><a href="services.php#managedit">Document Management</a></li>
+                <li><a href="services.php#managedpc">Scanner Leasing</a></li>
+                <li><a href="services.php#managedhris">System Integration</a></li>
+            </ul>
+        </div>
+
+        <div class="footer-col">
+            <h4>Get In Touch</h4>
+            <ul class="footer-links">
+                <li><a href="tel:{{ contact_info.phone|default:'+639175441674' }}"><i class="fas fa-phone" style="margin-right:.4rem; color:var(--gold);"></i> {{ contact_info.phone|default:"+63 917 544 1674" }}</a></li>
+                <li><a href="mailto:{{ contact_info.email|default:'inquiry@multibiz.global' }}"><i class="fas fa-envelope" style="margin-right:.4rem; color:var(--gold);"></i> {{ contact_info.email|default:"inquiry@multibiz.global" }}</a></li>
+                <li><a href="contactus.php#locations"><i class="fas fa-location-dot" style="margin-right:.4rem; color:var(--gold);"></i> Metro Manila, Philippines</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="footer-bottom">
+        <p>&copy; {% now "Y" %} MULTIBIZ INTERNATIONAL CORPORATION. All Rights Reserved.</p>
+    </div>
+</footer>
+
+<!-- ─── SCRIPTS ─── -->
+<script>
+    // Header Scroll Effect & Mobile Menu
+    const header = document.getElementById('mainHeader');
+    window.addEventListener('scroll', () => {
+        if (window.scrollY > 40) header.classList.add('scrolled');
+        else header.classList.remove('scrolled');
+    });
+
+    const navToggle = document.getElementById('navToggle');
+    const navMenu   = document.getElementById('navMenu');
+    if (navToggle && navMenu) {
+        navToggle.addEventListener('click', () => {
+            navMenu.classList.toggle('active');
+            const icon = navToggle.querySelector('i');
+            if (navMenu.classList.contains('active')) {
+                icon.classList.remove('fa-bars');
+                icon.classList.add('fa-times');
+            } else {
+                icon.classList.remove('fa-times');
+                icon.classList.add('fa-bars');
+            }
+        });
+    }
+
+    // Dropdown toggles on mobile
+    document.querySelectorAll('.nav-item').forEach(item => {
+        const link = item.querySelector('.nav-link');
+        const dropdown = item.querySelector('.dropdown');
+        if (dropdown && link && window.innerWidth <= 900) {
+            link.addEventListener('click', (e) => {
+                if (link.getAttribute('href') === 'about.php' || link.getAttribute('href') === 'services.php' || link.getAttribute('href') === 'contactus.php') {
+                    // allow toggle on mobile
+                }
+            });
+        }
+    });
+
+    // Contact Form AJAX Handler
+    const contactForm = document.getElementById('contactForm');
+    const formMsg     = document.getElementById('contactFormMessage');
+    const submitBtn   = document.getElementById('contactSubmitBtn');
+
+    if (contactForm) {
+        contactForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const name    = document.getElementById('name').value.trim();
+            const email   = document.getElementById('email').value.trim();
+            const subject = document.getElementById('subject').value.trim();
+            const message = document.getElementById('message').value.trim();
+
+            const errors = [];
+            const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            if (!name) errors.push('Please enter your full name.');
+            if (!email) errors.push('Please enter your email address.');
+            else if (!emailRx.test(email)) errors.push('Please enter a valid email address.');
+            if (!message) errors.push('Please enter your message.');
+            else if (message.length < 10) errors.push('Message must be at least 10 characters.');
+
+            if (errors.length) {
+                formMsg.style.display    = 'block';
+                formMsg.style.background = '#fef2f2';
+                formMsg.style.color      = '#991b1b';
+                formMsg.style.border     = '1px solid #fca5a5';
+                formMsg.innerHTML        = errors.map(err => `<div>• ${err}</div>`).join('');
+                formMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+
+            submitBtn.disabled  = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Sending Message…</span>';
+            formMsg.style.display = 'none';
+
+            try {
+                const formData = new FormData();
+                formData.append('name', name);
+                formData.append('email', email);
+                formData.append('subject', subject || 'General Inquiry');
+                formData.append('message', message);
+
+                // Fetch handler
+                const response = await fetch('contact_handler.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    formMsg.style.display    = 'block';
+                    formMsg.style.background = '#ecfdf5';
+                    formMsg.style.color      = '#065f46';
+                    formMsg.style.border     = '1px solid #6ee7b7';
+                    formMsg.innerHTML        = `<i class="fas fa-circle-check" style="margin-right:.4rem;"></i> ${data.message || 'Thank you! Your inquiry has been sent successfully.'}`;
+                    contactForm.reset();
+                    formMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    setTimeout(() => { formMsg.style.display = 'none'; }, 8000);
+                } else {
+                    const errList = Array.isArray(data.errors) ? data.errors : ['Something went wrong. Please try again.'];
+                    formMsg.style.display    = 'block';
+                    formMsg.style.background = '#fef2f2';
+                    formMsg.style.color      = '#991b1b';
+                    formMsg.style.border     = '1px solid #fca5a5';
+                    formMsg.innerHTML        = errList.map(err => `<div>• ${err}</div>`).join('');
+                    formMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            } catch (err) {
+                formMsg.style.display    = 'block';
+                formMsg.style.background = '#fef2f2';
+                formMsg.style.color      = '#991b1b';
+                formMsg.style.border     = '1px solid #fca5a5';
+                formMsg.innerHTML        = 'Network error. Please check your connection and try again.';
+                formMsg.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            } finally {
+                submitBtn.disabled  = false;
+                submitBtn.innerHTML = '<span>Send Message</span> <i class="fas fa-arrow-right"></i>';
+            }
+        });
+    }
+</script>
+</body>
+</html>

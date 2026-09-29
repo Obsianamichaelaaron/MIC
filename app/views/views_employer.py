@@ -363,6 +363,7 @@ def candidates_view(request):
     employer, _ = Employer.objects.get_or_create(user_id=user_id)
 
     job_id = request.GET.get('job_id', '0')
+    status_filter = request.GET.get('status', 'all')
     
     # Query applications for employer's jobs
     apps_qs = Application.objects.filter(
@@ -372,7 +373,7 @@ def candidates_view(request):
     if job_id and job_id.isdigit() and int(job_id) > 0:
         apps_qs = apps_qs.filter(job_id=int(job_id))
 
-    candidates = []
+    all_raw_candidates = []
     for app in apps_qs:
         applicant = app.applicant
         user_obj = applicant.user
@@ -399,15 +400,90 @@ def candidates_view(request):
         score_info = calculate_candidate_ml_score(cand_dict)
         cand_dict['ml_ranking_score'] = score_info['ml_ranking_score']
         cand_dict['ranking_category'] = score_info['ranking_category']
-        candidates.append(cand_dict)
+        all_raw_candidates.append(cand_dict)
 
     # Sort descending by ML score
-    candidates.sort(key=lambda x: x['ml_ranking_score'], reverse=True)
+    all_raw_candidates.sort(key=lambda x: x['ml_ranking_score'], reverse=True)
+
+    # Calculate status counts across all queried applications
+    status_allowed = ['pending', 'reviewed', 'shortlisted', 'interviewed', 'accepted', 'rejected']
+    status_counts_list = []
+    for s_key in status_allowed:
+        s_cnt = sum(1 for c in all_raw_candidates if c['status'] == s_key)
+        status_counts_list.append({
+            'status': s_key,
+            'count': s_cnt,
+        })
+    status_total = len(all_raw_candidates)
+
+    # Apply status filter to candidates list if specific status is selected
+    if status_filter and status_filter in status_allowed:
+        candidates = [c for c in all_raw_candidates if c['status'] == status_filter]
+    else:
+        status_filter = 'all'
+        candidates = all_raw_candidates
 
     excellent_candidates = [c for c in candidates if c['ranking_category'] == 'excellent']
     good_candidates = [c for c in candidates if c['ranking_category'] == 'good']
     average_candidates = [c for c in candidates if c['ranking_category'] == 'average']
     poor_candidates = [c for c in candidates if c['ranking_category'] == 'poor']
+
+    ranking_counts = [
+        {'category': 'excellent', 'label': 'Excellent', 'count': len(excellent_candidates)},
+        {'category': 'good', 'label': 'Good', 'count': len(good_candidates)},
+        {'category': 'average', 'label': 'Average', 'count': len(average_candidates)},
+        {'category': 'poor', 'label': 'Poor', 'count': len(poor_candidates)},
+    ]
+
+    kanban_columns = [
+        {
+            'category': 'excellent',
+            'label': 'Excellent',
+            'icon': 'fa-crown',
+            'candidates': excellent_candidates,
+            'count': len(excellent_candidates),
+        },
+        {
+            'category': 'good',
+            'label': 'Good',
+            'icon': 'fa-thumbs-up',
+            'candidates': good_candidates,
+            'count': len(good_candidates),
+        },
+        {
+            'category': 'average',
+            'label': 'Average',
+            'icon': 'fa-chart-line',
+            'candidates': average_candidates,
+            'count': len(average_candidates),
+        },
+        {
+            'category': 'poor',
+            'label': 'Poor',
+            'icon': 'fa-exclamation-triangle',
+            'candidates': poor_candidates,
+            'count': len(poor_candidates),
+        },
+    ]
+
+    status_options = [
+        ('all', 'All Statuses'),
+        ('pending', 'Pending'),
+        ('reviewed', 'Reviewed'),
+        ('shortlisted', 'Shortlisted'),
+        ('interviewed', 'Interviewed'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+    ]
+
+    legend_items = [
+        {'status': 'pending', 'label': 'Pending'},
+        {'status': 'reviewed', 'label': 'Reviewed'},
+        {'status': 'shortlisted', 'label': 'Shortlisted'},
+        {'status': 'interviewed', 'label': 'Interviewed'},
+        {'status': 'accepted', 'label': 'Accepted'},
+        {'status': 'rejected', 'label': 'Rejected'},
+    ]
 
     jobs_for_filter = JobPosting.objects.filter(employer=employer).order_by('-posted_at')
 
@@ -419,8 +495,16 @@ def candidates_view(request):
         'good_candidates': good_candidates,
         'average_candidates': average_candidates,
         'poor_candidates': poor_candidates,
+        'ranking_counts': ranking_counts,
+        'kanban_columns': kanban_columns,
+        'status_counts_list': status_counts_list,
+        'status_total': status_total,
+        'status_options': status_options,
+        'legend_items': legend_items,
+        'status_filter': status_filter,
         'jobs': jobs_for_filter,
-        'selected_job_id': int(job_id) if job_id.isdigit() else 0,
+        'job_id': int(job_id) if (job_id and job_id.isdigit()) else 0,
+        'selected_job_id': int(job_id) if (job_id and job_id.isdigit()) else 0,
     }
     return render(request, 'employer/candidates.html', context)
 

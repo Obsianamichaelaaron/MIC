@@ -7,7 +7,7 @@
 .filter-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.25rem; }
 .filter-tab { padding:.45rem 1rem; border:1px solid #e2e8f0; border-radius:20px; background:white; font-size:.82rem; font-weight:600; cursor:pointer; transition:all .2s; color:#475569; display:inline-flex; align-items:center; gap:.4rem; }
 .filter-tab.active, .filter-tab:hover { background:linear-gradient(135deg,#0a3d6b 0%,#1866a3 100%); color:white; border-color:#0a3d6b; box-shadow:0 3px 8px rgba(24,102,163,0.25); }
-.msg-layout { display:grid; grid-template-columns:380px 1fr; gap:1.5rem; align-items:start; }
+.msg-layout { display:grid; grid-template-columns:390px 1fr; gap:1.5rem; align-items:start; }
 @media(max-width:960px){ .msg-layout{ grid-template-columns:1fr; } }
 .inquiry-list { background:white; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden; box-shadow:0 4px 15px rgba(0,0,0,0.03); }
 .inquiry-list-header { display:flex; align-items:center; justify-content:space-between; padding:.9rem 1.25rem; background:#f8fafc; border-bottom:1px solid #e2e8f0; font-weight:700; font-size:.9rem; color:#0a3d6b; }
@@ -17,7 +17,7 @@
 .inquiry-item.active { background:#eff6ff; border-left:4px solid #1866a3; }
 .inquiry-item.unread { background:#f0f7ff; }
 .unread-dot { width:8px; height:8px; border-radius:50%; background:#1866a3; display:inline-block; margin-right:6px; }
-.inquiry-name { font-weight:700; font-size:.88rem; color:#0f172a; display:flex; align-items:center; }
+.inquiry-name { font-weight:700; font-size:.88rem; color:#0f172a; display:flex; align-items:center; gap:.4rem; }
 .inquiry-sub  { font-size:.8rem; color:#475569; margin:3px 0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .inquiry-time { font-size:.72rem; color:#94a3b8; font-weight:500; }
 .inquiry-status-badge { position:absolute; top:.95rem; right:1rem; }
@@ -56,7 +56,16 @@
 .badge-open    { background:#fef3c7; color:#92400e; }
 .badge-replied { background:#d1fae5; color:#065f46; }
 .badge-closed  { background:#f1f5f9; color:#475569; }
-.badge-talent  { background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; }
+.badge-talent, .badge-company  { background:#ede9fe; color:#6d28d9; border:1px solid #ddd6fe; }
+.badge-applicant { background:#d1fae5; color:#065f46; border:1px solid #a7f3d0; }
+.badge-general   { background:#e0f2fe; color:#0369a1; border:1px solid #bae6fd; }
+
+.tab-pill { display:inline-block; font-size:.68rem; font-weight:700; padding:.12rem .48rem; border-radius:99px; margin-left:.35rem; background:#f1f5f9; color:#475569; }
+.filter-tab.active .tab-pill { background:rgba(255,255,255,0.25); color:#fff; }
+.pill-purple { background:#ede9fe; color:#6d28d9; }
+.pill-green  { background:#d1fae5; color:#065f46; }
+.pill-blue   { background:#e0f2fe; color:#0369a1; }
+.pill-amber  { background:#fef3c7; color:#92400e; }
 
 /* Job Specs Card inside Message View */
 .job-spec-card { background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:1.1rem; margin-top:.75rem; margin-bottom:.5rem; }
@@ -64,6 +73,10 @@
 @media(max-width:600px){ .job-spec-grid { grid-template-columns:1fr; } }
 .job-spec-label { color:#64748b; font-size:.72rem; font-weight:700; text-transform:uppercase; }
 .job-spec-val { color:#0f172a; font-weight:600; margin-top:2px; }
+
+/* Applicant Details Card */
+.applicant-card-box { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:1.1rem; margin-top:.75rem; margin-bottom:.5rem; }
+.general-inquiry-box { background:#f0f9ff; border:1px solid #bae6fd; border-radius:10px; padding:.9rem 1.1rem; margin-top:.75rem; margin-bottom:.5rem; }
 
 /* Modal Styles */
 .modal-backdrop { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,23,42,0.6); z-index:9999; display:none; align-items:center; justify-content:center; padding:1rem; }
@@ -84,17 +97,18 @@
 </style>
 
 <div class="msg-page-header">
-    <h1><i class="fas fa-inbox"></i> Inquiries &amp; Talent Requests</h1>
-    <p>Review employer job requirements, general messages, and approve postings directly to the careers board</p>
+    <h1><i class="fas fa-inbox"></i> Inquiries &amp; Talent Requests Inbox</h1>
+    <p>Categorized dashboard for company hiring requests, applicant inquiries, and general corporate communications</p>
 </div>
 
 <div class="msg-container">
     <div class="filter-tabs">
-        <button class="filter-tab active" data-filter="all"><i class="fas fa-list"></i> All Messages</button>
-        <button class="filter-tab" data-filter="staffing"><i class="fas fa-briefcase" style="color:#8b5cf6;"></i> Staffing Requests <span id="staffingBadge" style="display:none;" class="badge badge-talent"></span></button>
-        <button class="filter-tab" data-filter="new"><i class="fas fa-sparkles" style="color:#eab308;"></i> New <span id="newBadge" style="display:none;" class="badge badge-new"></span></button>
-        <button class="filter-tab" data-filter="unread"><i class="fas fa-envelope"></i> Unread</button>
-        <button class="filter-tab" data-filter="replied"><i class="fas fa-check-double"></i> Replied</button>
+        <button class="filter-tab active" data-filter="all"><i class="fas fa-list"></i> All Messages <span id="badgeAll" class="tab-pill">0</span></button>
+        <button class="filter-tab" data-filter="company"><i class="fas fa-building" style="color:#8b5cf6;"></i> Company Requests <span id="badgeCompany" class="tab-pill pill-purple">0</span></button>
+        <button class="filter-tab" data-filter="applicant"><i class="fas fa-user-graduate" style="color:#10b981;"></i> Applicant Inquiries <span id="badgeApplicant" class="tab-pill pill-green">0</span></button>
+        <button class="filter-tab" data-filter="general"><i class="fas fa-globe" style="color:#0284c7;"></i> Public Inquiries <span id="badgeGeneral" class="tab-pill pill-blue">0</span></button>
+        <button class="filter-tab" data-filter="unread"><i class="fas fa-envelope" style="color:#eab308;"></i> Unread <span id="badgeUnread" class="tab-pill pill-amber">0</span></button>
+        <button class="filter-tab" data-filter="replied"><i class="fas fa-check-double" style="color:#059669;"></i> Replied</button>
     </div>
 
     <div class="msg-layout">
@@ -279,6 +293,13 @@ async function apiGet(params) {
     return res.json();
 }
 
+function setTabPill(id, count) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.textContent = count !== undefined ? count : '0';
+    }
+}
+
 async function loadList(filter = currentFilter, page = 1) {
     currentFilter = filter;
     currentPage   = page;
@@ -303,10 +324,18 @@ async function loadList(filter = currentFilter, page = 1) {
     document.querySelectorAll('.filter-tab').forEach(t =>
         t.classList.toggle('active', t.dataset.filter === filter));
 
+    if (data.counts) {
+        setTabPill('badgeAll', data.counts.all);
+        setTabPill('badgeCompany', data.counts.company);
+        setTabPill('badgeApplicant', data.counts.applicant);
+        setTabPill('badgeGeneral', data.counts.general);
+        setTabPill('badgeUnread', data.counts.unread);
+    }
+
     const rows = data.rows;
     if (!rows.length) {
         document.getElementById('inquiryListBody').innerHTML =
-            '<div class="empty-list"><i class="fas fa-inbox fa-2x" style="margin-bottom:.5rem;opacity:.4;"></i><br>No inquiries found.</div>';
+            '<div class="empty-list"><i class="fas fa-inbox fa-2x" style="margin-bottom:.5rem;opacity:.4;"></i><br>No messages in this category.</div>';
         document.getElementById('paginationBar').style.display = 'none';
         return;
     }
@@ -316,8 +345,10 @@ async function loadList(filter = currentFilter, page = 1) {
              data-id="${r.id}" onclick="openInquiry(${r.id})">
             <div class="inquiry-name">
                 ${r.is_read==0?'<span class="unread-dot"></span>':''}
-                ${escHtml(r.name)}
-                ${r.is_staffing_request ? '<span class="badge badge-talent" style="margin-left:auto;font-size:.65rem;"><i class="fas fa-briefcase"></i> Job Request</span>' : ''}
+                <span>${escHtml(r.name)}</span>
+                <span class="badge ${r.badge_class}" style="margin-left:auto;font-size:.65rem;">
+                    <i class="${r.badge_icon}"></i> ${r.sender_label}
+                </span>
             </div>
             <div class="inquiry-sub" title="${escHtml(r.subject)}"><strong>${escHtml(r.subject)}</strong></div>
             <div class="inquiry-sub" style="color:#64748b;">${escHtml(r.excerpt)}</div>
@@ -353,17 +384,18 @@ async function openInquiry(id) {
     if (!data.success) { toast('Failed to load inquiry','error'); return; }
 
     currentInquiryData = data;
-    const inq     = data.inquiry;
-    const replies = data.replies;
-    const specs   = data.job_specs;
+    const inq         = data.inquiry;
+    const replies     = data.replies;
+    const specs       = data.job_specs;
+    const sender_meta = data.sender_meta || {};
 
-    let jobSpecsCardHtml = '';
-    if (specs && (specs.is_staffing_request || specs.title)) {
-        jobSpecsCardHtml = `
+    let infoCardHtml = '';
+    if (sender_meta.type === 'company' && specs && (specs.is_staffing_request || specs.title)) {
+        infoCardHtml = `
         <div class="job-spec-card">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;padding-bottom:.5rem;border-bottom:1px solid #cbd5e1;">
                 <div style="font-weight:700;color:#0a3d6b;font-size:.95rem;">
-                    <i class="fas fa-briefcase" style="color:#8b5cf6;margin-right:4px;"></i> Company Talent Requirement
+                    <i class="fas fa-building" style="color:#8b5cf6;margin-right:4px;"></i> Company Staffing &amp; Talent Requirement
                 </div>
                 <button class="btn btn-sm btn-primary" onclick="openJobReviewModal()">
                     <i class="fas fa-rocket"></i> Review &amp; Post Job
@@ -375,8 +407,8 @@ async function openInquiry(id) {
                     <div class="job-spec-val" style="color:#0a3d6b;font-size:.95rem;">${escHtml(specs.title || inq.subject)}</div>
                 </div>
                 <div>
-                    <div class="job-spec-label">Company</div>
-                    <div class="job-spec-val">${escHtml(specs.company_name || inq.name)}</div>
+                    <div class="job-spec-label">Company Name</div>
+                    <div class="job-spec-val">${escHtml(specs.company_name || sender_meta.company_name || inq.name)}</div>
                 </div>
                 <div>
                     <div class="job-spec-label">Employment Type</div>
@@ -402,20 +434,73 @@ async function openInquiry(id) {
                 </div>
             ` : ''}
         </div>`;
+    } else if (sender_meta.type === 'applicant') {
+        infoCardHtml = `
+        <div class="applicant-card-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;padding-bottom:.4rem;border-bottom:1px solid #bbf7d0;">
+                <div style="font-weight:700;color:#065f46;font-size:.9rem;">
+                    <i class="fas fa-user-graduate" style="color:#10b981;margin-right:4px;"></i> Applicant Candidate Profile
+                </div>
+                ${sender_meta.applicant_id ? `
+                    <a href="/admin/candidates.php?search=${encodeURIComponent(inq.email)}" target="_blank" class="btn btn-sm btn-outline" style="border-color:#10b981;color:#065f46;background:#fff;">
+                        <i class="fas fa-id-card"></i> View Candidate Profile
+                    </a>
+                ` : ''}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:.82rem;">
+                <div><strong>Candidate Name:</strong> ${escHtml(sender_meta.applicant_name || inq.name)}</div>
+                <div><strong>Experience:</strong> ${sender_meta.experience_years || 0} Year(s)</div>
+                ${sender_meta.skills ? `<div style="grid-column:1/-1;"><strong>Skills:</strong> ${escHtml(sender_meta.skills)}</div>` : ''}
+                ${sender_meta.qualifications ? `<div style="grid-column:1/-1;"><strong>Qualifications:</strong> ${escHtml(sender_meta.qualifications)}</div>` : ''}
+            </div>
+        </div>`;
     }
 
     function cleanDisplayMessage(rawMsg) {
         if (!rawMsg) return '';
-        let clean = rawMsg.replace(/<!--\s*JSON:[\s\S]*?-->/gi, '').trim();
-        return clean;
+        const jsonCommentRegex = new RegExp('<' + '!--\\s*JSON:[\\s\\S]*?--' + '>', 'gi');
+        return rawMsg.replace(jsonCommentRegex, '').trim();
+    }
+
+    let cleanMsg = cleanDisplayMessage(inq.message);
+    let msgBodyHtml = '';
+    if (sender_meta.type === 'company') {
+        msgBodyHtml = `
+            ${infoCardHtml}
+            ${cleanMsg ? `
+                <div style="margin-top:.75rem;padding:.85rem;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;">
+                    <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">
+                        <i class="fas fa-file-alt" style="margin-right:4px;"></i> Original Request Specifications &amp; Notes
+                    </div>
+                    <div style="color:#1e293b;line-height:1.6;font-size:.85rem;">${escHtml(cleanMsg).replace(/\n/g,'<br>')}</div>
+                </div>
+            ` : ''}
+        `;
+    } else if (sender_meta.type === 'applicant') {
+        msgBodyHtml = `
+            ${infoCardHtml}
+            <div style="margin-top:.75rem;padding:.85rem;background:#ffffff;border-radius:8px;border:1px solid #e2e8f0;">
+                <div style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:4px;">
+                    <i class="fas fa-comment-dots" style="margin-right:4px;"></i> Candidate Inquiry / Message
+                </div>
+                <div style="color:#1e293b;line-height:1.6;font-size:.88rem;">${escHtml(cleanMsg).replace(/\n/g,'<br>')}</div>
+            </div>
+        `;
+    } else {
+        msgBodyHtml = `
+            <div style="color:#1e293b;line-height:1.6;font-size:.88rem;background:#ffffff;padding:.85rem;border-radius:8px;border:1px solid #e2e8f0;">
+                ${escHtml(cleanMsg).replace(/\n/g,'<br>')}
+            </div>
+        `;
     }
 
     let bubbles = `
-        <div class="msg-bubble user">
-            <div class="bubble-label">${escHtml(inq.name)} &bull; ${specs && (specs.is_staffing_request || specs.title) ? 'Company Hiring Request' : 'Visitor Message'}</div>
-            ${jobSpecsCardHtml ? '' : escHtml(cleanDisplayMessage(inq.message)).replace(/\n/g,'<br>')}
-            ${jobSpecsCardHtml}
-            <div class="bubble-meta">${fullDate(inq.created_at)}</div>
+        <div class="msg-bubble user" style="width:100%;max-width:92%;">
+            <div class="bubble-label" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <span><strong>${escHtml(inq.name)}</strong> &bull; <span class="badge ${sender_meta.badge_class||'badge-general'}">${sender_meta.label || 'Visitor Message'}</span></span>
+                <span style="font-size:.72rem;font-weight:500;color:#64748b;">${fullDate(inq.created_at)}</span>
+            </div>
+            ${msgBodyHtml}
         </div>`;
 
     replies.forEach(rep => {
@@ -435,7 +520,12 @@ async function openInquiry(id) {
     cc.innerHTML = `
         <div class="conv-header">
             <div class="conv-header-info">
-                <h3>${escHtml(inq.subject)}</h3>
+                <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:2px;">
+                    <span class="badge ${sender_meta.badge_class || 'badge-general'}">
+                        <i class="${sender_meta.icon || 'fas fa-envelope'}"></i> ${sender_meta.label || 'Inquiry'}
+                    </span>
+                    <h3 style="margin:0;">${escHtml(inq.subject)}</h3>
+                </div>
                 <p>
                     <i class="fas fa-user" style="color:#1866a3;margin-right:4px;"></i>${escHtml(inq.name)} &nbsp;&bull;&nbsp;
                     <a href="mailto:${escHtml(inq.email)}" style="color:#1866a3;text-decoration:none;font-weight:600;">${escHtml(inq.email)}</a> &nbsp;
@@ -443,9 +533,16 @@ async function openInquiry(id) {
                 </p>
             </div>
             <div class="conv-header-actions">
-                <button class="btn btn-sm btn-primary" onclick="openJobReviewModal()">
-                    <i class="fas fa-rocket"></i> Review &amp; Post Job
-                </button>
+                ${sender_meta.type === 'company' ? `
+                    <button class="btn btn-sm btn-primary" onclick="openJobReviewModal()">
+                        <i class="fas fa-rocket"></i> Review &amp; Post Job
+                    </button>
+                ` : ''}
+                ${sender_meta.type === 'applicant' && sender_meta.applicant_id ? `
+                    <a href="/admin/candidates.php?search=${encodeURIComponent(inq.email)}" target="_blank" class="btn btn-sm btn-outline">
+                        <i class="fas fa-id-card"></i> Candidate Dossier
+                    </a>
+                ` : ''}
                 ${inq.is_read==1
                     ? `<button class="btn btn-sm btn-outline" onclick="markUnread(${inq.id})"><i class="fas fa-envelope"></i> Unread</button>`
                     : `<button class="btn btn-sm btn-outline" onclick="markRead(${inq.id})"><i class="fas fa-envelope-open"></i> Read</button>`}
@@ -614,13 +711,11 @@ async function refreshUnreadCount() {
     try {
         const data = await apiGet({ action:'get_unread_count' });
         if (data.success) {
-            const nb = document.getElementById('newBadge');
-            if (data.count > 0) { nb.textContent=data.count; nb.style.display='inline-block'; }
-            else { nb.style.display='none'; }
-
-            const sb = document.getElementById('staffingBadge');
-            if (data.staffing_count > 0) { sb.textContent=data.staffing_count; sb.style.display='inline-block'; }
-            else { sb.style.display='none'; }
+            setTabPill('badgeAll', data.total_count);
+            setTabPill('badgeCompany', data.company_count);
+            setTabPill('badgeApplicant', data.applicant_count);
+            setTabPill('badgeGeneral', data.general_count);
+            setTabPill('badgeUnread', data.count);
         }
     } catch(e) {}
 }

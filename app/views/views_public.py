@@ -165,6 +165,95 @@ def solutions_view(request):
     return render(request, 'public/solutions.html', context)
 
 
+def printmanagement_view(request):
+    """Handles printmanagement.php / printmanagement/ route."""
+    return redirect('/services.php#managedprint')
+
+
+def computingproducts_view(request):
+    """Handles computingproducts.php / computingproducts/ route."""
+    return redirect('/services.php#managedpc')
+
+
+def retailsolutions_view(request):
+    """Handles retailsolutions.php / retailsolutions/ route."""
+    return redirect('/solutions.php#retailsolutions')
+
+
+def audiovisual_view(request):
+    """Handles audiovisual.php / audiovisual/ route."""
+    return redirect('/solutions.php#audiovisual')
+
+
+def informationmanagement_view(request):
+    """Handles informationmanagement.php / informationmanagement/ route."""
+    return redirect('/services.php#managedit')
+
+
+def businessautomation_view(request):
+    """Handles businessautomation.php / businessautomation/ route."""
+    return redirect('/services.php#managedhris')
+
+
+def cybersecurity_view(request):
+    """Handles cybersecurity.php / cybersecurity/ route."""
+    return redirect('/solutions.php#cybersecurity')
+
+
+def hp_view(request):
+    """Handles hp.php / hp/ route."""
+    return redirect('/services.php#managedprint')
+
+
+def contactus_view(request):
+    """
+    Contact Us page controller matching contactus.php / contact.php.
+    """
+    cms = get_cms_content_dict()
+    contact_info = cms.get('contact', {})
+
+    directory = [
+        {
+            'department': 'General Inquiries & Customer Care',
+            'email': contact_info.get('email', 'inquiry@multibiz.global'),
+            'phone': contact_info.get('phone', '+63 917 544 1674'),
+            'hours': 'Mon – Fri: 8:00 AM – 5:30 PM (PHT)',
+            'description': 'For general questions, corporate partnerships, and service inquiries.'
+        },
+        {
+            'department': 'Technical Support & Helpdesk',
+            'email': 'support@multibiz.global',
+            'phone': '(02) 8896-7688 / +63 917 800 4357',
+            'hours': '24/7 Priority Support for Enterprise Clients',
+            'description': 'For system maintenance, hardware support, and service ticketing.'
+        },
+        {
+            'department': 'Enterprise Solutions & Sales',
+            'email': 'sales@multibiz.global',
+            'phone': '+63 917 544 1674',
+            'hours': 'Mon – Fri: 8:30 AM – 5:00 PM (PHT)',
+            'description': 'Consult with our specialists on Managed Print Services, DMS, and IT integration.'
+        },
+        {
+            'department': 'Talent Acquisition & Careers',
+            'email': 'careers@multibiz.global',
+            'phone': '(02) 8896-7688 loc. 104',
+            'hours': 'Mon – Fri: 9:00 AM – 5:00 PM (PHT)',
+            'description': 'For applicant inquiries, recruitment status, and HR partnerships.'
+        },
+    ]
+
+    context = {
+        'page_title': 'Contact Us - MULTIBIZ INTERNATIONAL CORPORATION',
+        'current_page': 'contactus.php',
+        'cms': cms,
+        'contact_info': contact_info,
+        'directory': directory,
+    }
+    return render(request, 'public/contactus.html', context)
+
+
+
 def news_view(request):
     """Public news listing matching news.php."""
     news_articles = CmsNews.objects.filter(is_active=True).order_by('-news_date', '-id')

@@ -115,6 +115,30 @@
     box-shadow: 0 6px 18px rgba(245, 158, 11, 0.45);
 }
 
+.cand-btn-export {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.88rem;
+    padding: 0.7rem 1.35rem;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
+}
+
+.cand-btn-export:hover {
+    background: linear-gradient(135deg, #059669 0%, #047857 100%);
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+}
+
 /* KPI Overview Grid */
 .cand-kpi-grid {
     display: grid;
@@ -679,6 +703,9 @@
                 </p>
             </div>
             <div class="cand-hero-actions">
+                <button type="button" onclick="openExportModal()" class="cand-btn-export">
+                    <i class="fas fa-file-excel"></i> Export (.xlsx / Drive)
+                </button>
                 <a href="/admin/post_job.php" class="cand-btn-primary">
                     <i class="fas fa-plus-circle"></i> Post New Job
                 </a>
@@ -862,3 +889,215 @@
 
     </div>
 </div>
+
+<!-- ==========================================
+     GOOGLE DRIVE & EXCEL EXPORT MODAL
+     ========================================== -->
+<div id="exportModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.65);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#ffffff;border-radius:18px;max-width:580px;width:100%;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;animation:modalScale .25s ease-out;font-family:'DM Sans', sans-serif;">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg, #0a3d6b 0%, #1866a3 100%);padding:1.35rem 1.75rem;color:#fff;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:.75rem;">
+                <div style="width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,0.18);display:grid;place-items:center;font-size:1.3rem;">
+                    <i class="fas fa-file-excel" style="color:#86efac;"></i>
+                </div>
+                <div>
+                    <h4 style="margin:0;font-size:1.18rem;font-weight:800;letter-spacing:-0.3px;">Export Candidates to Excel &amp; Google Drive</h4>
+                    <p style="margin:2px 0 0;font-size:.78rem;opacity:.9;">Download full evaluation matrix with both Qualified &amp; Not Qualified applicants</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeExportModal()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;opacity:.8;padding:4px;" title="Close">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:1.5rem 1.75rem;">
+            <!-- Target Job -->
+            <div style="margin-bottom:1.15rem;">
+                <label style="display:block;font-size:.8rem;font-weight:700;color:#334155;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:0.04em;">
+                    <i class="fas fa-briefcase" style="color:#1866a3;margin-right:4px;"></i> Select Job Opening
+                </label>
+                <select id="exportJobSelect" style="width:100%;padding:.65rem .85rem;border:1.5px solid #cbd5e1;border-radius:9px;font-size:.88rem;color:#1e293b;background:#f8fafc;font-family:inherit;">
+                    <option value="0">All Job Vacancies (All Candidate Submissions)</option>
+                    {% for j in jobs %}
+                        <option value="{{ j.job_id }}" {% if selected_job_id == j.job_id %}selected{% endif %}>
+                            {{ j.title }} ({{ j.employer.company_name|default:"Partner" }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Qualification Pool Scope -->
+            <div style="margin-bottom:1.25rem;">
+                <label style="display:block;font-size:.8rem;font-weight:700;color:#334155;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:0.04em;">
+                    <i class="fas fa-filter" style="color:#1866a3;margin-right:4px;"></i> Applicant Qualification Scope
+                </label>
+                <div style="display:grid;grid-template-columns:1fr;gap:.5rem;background:#f8fafc;padding:.85rem;border-radius:10px;border:1px solid #e2e8f0;">
+                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.86rem;color:#1e293b;cursor:pointer;font-weight:600;">
+                        <input type="radio" name="exportQualScope" value="all" checked style="accent-color:#1866a3;">
+                        <span><strong>All Applicants Included</strong> (Qualified + Under-Qualified + Not Qualified)</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#15803d;cursor:pointer;">
+                        <input type="radio" name="exportQualScope" value="qualified" style="accent-color:#16a34a;">
+                        <span>Qualified Candidates Only (Match Score &ge; 70%)</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#b91c1c;cursor:pointer;">
+                        <input type="radio" name="exportQualScope" value="not_qualified" style="accent-color:#dc2626;">
+                        <span>Not Qualified Candidates Only (Match Score &lt; 50%)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Google Drive Banner -->
+            <div style="background:#f0fdf4;border:1.5px dashed #86efac;border-radius:12px;padding:1rem 1.15rem;margin-bottom:1.25rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                    <div style="display:flex;align-items:center;gap:.5rem;font-size:.86rem;font-weight:700;color:#15803d;">
+                        <i class="fab fa-google-drive" style="font-size:1.15rem;color:#059669;"></i> Google Drive &amp; Sheets Direct Integration
+                    </div>
+                    <span style="font-size:.72rem;background:#dcfce7;color:#166534;padding:2px 8px;border-radius:999px;font-weight:700;">Live Ready</span>
+                </div>
+                <div style="font-size:.78rem;color:#334155;line-height:1.45;margin-bottom:.5rem;">
+                    Clicking <strong>Open via Google Drive</strong> downloads your pre-styled <code>.xlsx</code> file and instantly launches Google Drive / Sheets so you can drag and drop to edit in the cloud.
+                </div>
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                    <button type="button" onclick="copyGoogleSheetsFormula()" style="background:#fff;border:1px solid #86efac;color:#15803d;padding:.3rem .6rem;border-radius:6px;font-size:.74rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                        <i class="fas fa-copy"></i> Copy Google Sheets =IMPORTDATA Formula
+                    </button>
+                    <span id="copyConfirmNote" style="font-size:.74rem;color:#16a34a;font-weight:600;display:none;">Copied!</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#f8fafc;padding:1rem 1.75rem;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;">
+            <button type="button" onclick="closeExportModal()" style="padding:.6rem 1rem;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font-size:.85rem;font-weight:600;color:#64748b;cursor:pointer;">
+                Cancel
+            </button>
+            <div style="display:flex;gap:.6rem;">
+                <button type="button" onclick="executeGoogleDriveExport()" style="padding:.65rem 1.15rem;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);color:#fff;border:none;border-radius:9px;font-size:.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.45rem;box-shadow:0 3px 10px rgba(2,132,199,0.3);">
+                    <i class="fab fa-google-drive"></i> Open via Google Drive
+                </button>
+                <button type="button" onclick="executeDirectExcelExport()" style="padding:.65rem 1.25rem;background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);color:#fff;border:none;border-radius:9px;font-size:.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.45rem;box-shadow:0 3px 10px rgba(22,163,74,0.3);">
+                    <i class="fas fa-file-excel"></i> Download Excel (.xlsx)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openExportModal(presetJobId = null) {
+    const modal = document.getElementById('exportModal');
+    if (presetJobId !== null) {
+        const select = document.getElementById('exportJobSelect');
+        if (select) select.value = String(presetJobId);
+    }
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeExportModal() {
+    const modal = document.getElementById('exportModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function getExportUrl() {
+    const select = document.getElementById('exportJobSelect');
+    const jobId = select ? select.value : '0';
+    const qualScope = document.querySelector('input[name="exportQualScope"]:checked')?.value || 'all';
+    
+    let url = '/admin/export_candidates_excel.php?';
+    const params = new URLSearchParams();
+    if (jobId && jobId !== '0') {
+        params.append('job_id', jobId);
+    }
+    if (qualScope && qualScope !== 'all') {
+        params.append('qual', qualScope);
+    }
+    return url + params.toString();
+}
+
+function executeDirectExcelExport() {
+    const exportUrl = getExportUrl();
+    window.location.href = exportUrl;
+    setTimeout(() => {
+        closeExportModal();
+    }, 800);
+}
+
+function executeGoogleDriveExport(btnElement) {
+    const btn = btnElement || document.querySelector('button[onclick*="executeGoogleDriveExport"]');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting to Drive...';
+    }
+
+    const select = document.getElementById('exportJobSelect');
+    const jobId = select ? select.value : '0';
+    const qualScope = document.querySelector('input[name="qualScope"]:checked')?.value || 'all';
+
+    const params = new URLSearchParams();
+    if (jobId && jobId !== '0') params.append('job_id', jobId);
+    if (qualScope && qualScope !== 'all') params.append('qual', qualScope);
+
+    fetch('/admin/upload_candidates_google_drive/?' + params.toString())
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Successfully exported directly to Google Drive!\n\nFile: ' + data.file_name);
+                window.open(data.folder_url, '_blank');
+                closeExportModal();
+            } else if (data.error === 'no_credentials') {
+                window.open(data.folder_url || 'https://drive.google.com/drive/folders/1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K?usp=sharing', '_blank');
+                alert('ℹ️ Google Drive opened!\n\nTo enable 100% automated direct server upload without any manual step, place your service_account.json in the project root or configure GOOGLE_DRIVE_WEBHOOK_URL.');
+                closeExportModal();
+            } else {
+                alert('⚠️ Google Drive notice: ' + (data.message || data.error));
+                window.open('https://drive.google.com/drive/folders/1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K?usp=sharing', '_blank');
+                closeExportModal();
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            window.open('https://drive.google.com/drive/folders/1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K?usp=sharing', '_blank');
+            closeExportModal();
+        })
+        .finally(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        });
+}
+
+function copyGoogleSheetsFormula() {
+    const select = document.getElementById('exportJobSelect');
+    const jobId = select ? select.value : '0';
+    const baseUrl = window.location.origin;
+    let csvUrl = `${baseUrl}/admin/export_candidates_csv.php`;
+    if (jobId && jobId !== '0') {
+        csvUrl += `?job_id=${jobId}`;
+    }
+    const formula = `=IMPORTDATA("${csvUrl}")`;
+    navigator.clipboard.writeText(formula).then(() => {
+        const note = document.getElementById('copyConfirmNote');
+        if (note) {
+            note.style.display = 'inline';
+            setTimeout(() => { note.style.display = 'none'; }, 3000);
+        }
+    });
+}
+
+// Close on Escape key or outside click
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeExportModal();
+});
+document.getElementById('exportModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'exportModal') closeExportModal();
+});
+</script>

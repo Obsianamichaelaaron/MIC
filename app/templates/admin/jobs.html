@@ -1,4 +1,16 @@
 {% include 'includes/header.html' %}
+<style>
+.job-status-pill {
+    display: inline-block;
+    padding: .25rem .65rem;
+    border-radius: 12px;
+    font-size: .75rem;
+    font-weight: 700;
+}
+.job-status-pill.status-active { background: #dcfce7; color: #15803d; }
+.job-status-pill.status-draft { background: #fef3c7; color: #b45309; }
+.job-status-pill.status-closed, .job-status-pill.status-inactive { background: #f1f5f9; color: #64748b; }
+</style>
 <div class="container py-4">
     <!-- Header Banner -->
     <div style="background:linear-gradient(135deg,#0a3d6b 0%,#1866a3 58%,#2196f3 100%);color:#fff;padding:1.6rem 2rem;border-radius:16px;margin-bottom:1.75rem;box-shadow:0 8px 24px rgba(10,61,107,0.18);">
@@ -10,7 +22,10 @@
                 <h1 style="margin:0;font-size:1.65rem;font-weight:700;"><i class="fas fa-briefcase" style="color:#f59e0b;margin-right:.5rem;"></i> Job Vacancies & Postings</h1>
                 <p style="margin:.3rem 0 0;font-size:.9rem;color:rgba(255,255,255,0.85);">Manage client company job listings, requirements, statuses, and candidate pools.</p>
             </div>
-            <div style="display:flex;gap:.5rem;">
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+                <button type="button" onclick="openJobTableExportModal(0)" style="background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.3);backdrop-filter:blur(8px);padding:.6rem 1.15rem;border-radius:8px;font-size:.88rem;font-weight:700;display:inline-flex;align-items:center;gap:.45rem;cursor:pointer;">
+                    <i class="fab fa-google-drive" style="color:#86efac;"></i> Export Candidates (.xlsx / Drive)
+                </button>
                 <a href="/admin/post_job.php" style="background:#f59e0b;color:#1e293b;border:none;padding:.6rem 1.25rem;border-radius:8px;text-decoration:none;font-size:.88rem;font-weight:700;display:inline-flex;align-items:center;gap:.4rem;box-shadow:0 4px 12px rgba(0,0,0,0.15);">
                     <i class="fas fa-plus-circle"></i> Post New Vacancy
                 </a>
@@ -85,15 +100,14 @@
                                 <div style="font-size:.78rem;color:#64748b;"><i class="fas fa-map-marker-alt"></i> {{ job.location }}</div>
                             </td>
                             <td style="padding:1.1rem 1.25rem;">
-                                <a href="/admin/candidates.php?job_id={{ job.job_id }}" style="background:#e0f2fe;color:#0369a1;padding:.35rem .75rem;border-radius:20px;text-decoration:none;font-weight:700;font-size:.78rem;display:inline-flex;align-items:center;gap:.35rem;">
-                                    <i class="fas fa-users-viewfinder"></i> {{ job.applicant_count|default:job.applications.count }} Candidates
-                                </a>
+                                <div style="display:flex;align-items:center;gap:.4rem;">
+                                    <a href="/admin/candidates.php?job_id={{ job.job_id }}" style="background:#e0f2fe;color:#0369a1;padding:.35rem .75rem;border-radius:20px;text-decoration:none;font-weight:700;font-size:.78rem;display:inline-flex;align-items:center;gap:.35rem;">
+                                        <i class="fas fa-users-viewfinder"></i> {{ job.applicant_count|default:job.applications.count }} Candidates
+                                    </a>
+                                </div>
                             </td>
                             <td style="padding:1.1rem 1.25rem;">
-                                <span style="display:inline-block;padding:.25rem .65rem;border-radius:12px;font-size:.75rem;font-weight:700;
-                                    {% if job.status == 'active' %}background:#dcfce7;color:#15803d;
-                                    {% elif job.status == 'draft' %}background:#fef3c7;color:#b45309;
-                                    {% else %}background:#f1f5f9;color:#64748b;{% endif %}">
+                                <span class="job-status-pill status-{{ job.status|lower|default:'closed' }}">
                                     {{ job.status|title }}
                                 </span>
                             </td>
@@ -102,6 +116,11 @@
                             </td>
                             <td style="padding:1.1rem 1.25rem;text-align:right;">
                                 <div style="display:inline-flex;gap:.4rem;align-items:center;">
+                                    <!-- Export Button for Job -->
+                                    <button type="button" data-job-id="{{ job.job_id }}" onclick="openJobTableExportModal(this.getAttribute('data-job-id'))" style="padding:.4rem .65rem;border:1px solid #86efac;background:#f0fdf4;border-radius:6px;color:#166534;font-size:.8rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:.3rem;" title="Export Qualified &amp; Not Qualified Applicants (.xlsx / Drive)">
+                                        <i class="fas fa-file-excel" style="color:#16a34a;"></i> Export
+                                    </button>
+
                                     <a href="/admin/edit_job.php?id={{ job.job_id }}" style="padding:.4rem .7rem;border:1px solid #cbd5e1;background:#fff;border-radius:6px;color:#334155;text-decoration:none;font-size:.8rem;font-weight:600;" title="Edit Job">
                                         <i class="fas fa-edit"></i> Edit
                                     </a>
@@ -137,3 +156,213 @@
         </div>
     </div>
 </div>
+
+<!-- ==========================================
+     GOOGLE DRIVE & EXCEL EXPORT MODAL (JOBS PAGE)
+     ========================================== -->
+<div id="jobsPageExportModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.65);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
+    <div style="background:#ffffff;border-radius:18px;max-width:580px;width:100%;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;animation:modalScale .25s ease-out;font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg, #0a3d6b 0%, #1866a3 100%);padding:1.35rem 1.75rem;color:#fff;display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:.75rem;">
+                <div style="width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,0.18);display:grid;place-items:center;font-size:1.3rem;">
+                    <i class="fas fa-file-excel" style="color:#86efac;"></i>
+                </div>
+                <div>
+                    <h4 style="margin:0;font-size:1.18rem;font-weight:800;letter-spacing:-0.3px;">Export Candidates to Excel &amp; Google Drive</h4>
+                    <p style="margin:2px 0 0;font-size:.78rem;opacity:.9;">Download full evaluation matrix with Qualified &amp; Not Qualified applicants</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeJobTableExportModal()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;opacity:.8;padding:4px;" title="Close">
+                <i class="fas fa-xmark"></i>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:1.5rem 1.75rem;">
+            <!-- Target Job -->
+            <div style="margin-bottom:1.15rem;">
+                <label style="display:block;font-size:.8rem;font-weight:700;color:#334155;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:0.04em;">
+                    <i class="fas fa-briefcase" style="color:#1866a3;margin-right:4px;"></i> Select Job Opening
+                </label>
+                <select id="jobsModalJobSelect" style="width:100%;padding:.65rem .85rem;border:1.5px solid #cbd5e1;border-radius:9px;font-size:.88rem;color:#1e293b;background:#f8fafc;font-family:inherit;">
+                    <option value="0">All Job Vacancies (All Candidate Submissions)</option>
+                    {% for j in jobs %}
+                        <option value="{{ j.job_id }}">{{ j.title }} ({{ j.employer.company_name|default:"Partner" }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Qualification Pool Scope -->
+            <div style="margin-bottom:1.25rem;">
+                <label style="display:block;font-size:.8rem;font-weight:700;color:#334155;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:0.04em;">
+                    <i class="fas fa-filter" style="color:#1866a3;margin-right:4px;"></i> Applicant Qualification Scope
+                </label>
+                <div style="display:grid;grid-template-columns:1fr;gap:.5rem;background:#f8fafc;padding:.85rem;border-radius:10px;border:1px solid #e2e8f0;">
+                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.86rem;color:#1e293b;cursor:pointer;font-weight:600;">
+                        <input type="radio" name="jobsPageQualScope" value="all" checked style="accent-color:#1866a3;">
+                        <span><strong>All Applicants Included</strong> (Qualified + Under-Qualified + Not Qualified)</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#15803d;cursor:pointer;">
+                        <input type="radio" name="jobsPageQualScope" value="qualified" style="accent-color:#16a34a;">
+                        <span>Qualified Candidates Only (Match Score &ge; 70%)</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#b91c1c;cursor:pointer;">
+                        <input type="radio" name="jobsPageQualScope" value="not_qualified" style="accent-color:#dc2626;">
+                        <span>Not Qualified Candidates Only (Match Score &lt; 50%)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Google Drive Banner -->
+            <div style="background:#f0fdf4;border:1.5px dashed #86efac;border-radius:12px;padding:1rem 1.15rem;margin-bottom:1.25rem;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                    <div style="display:flex;align-items:center;gap:.5rem;font-size:.86rem;font-weight:700;color:#15803d;">
+                        <i class="fab fa-google-drive" style="font-size:1.15rem;color:#059669;"></i> Google Drive &amp; Sheets Direct Integration
+                    </div>
+                    <span style="font-size:.72rem;background:#dcfce7;color:#166534;padding:2px 8px;border-radius:999px;font-weight:700;">Live Ready</span>
+                </div>
+                <div style="font-size:.78rem;color:#334155;line-height:1.45;margin-bottom:.5rem;">
+                    Clicking <strong>Open via Google Drive</strong> downloads your pre-styled <code>.xlsx</code> file and instantly launches Google Drive / Sheets in a new tab so you can edit in the cloud.
+                </div>
+                <div style="display:flex;align-items:center;gap:.5rem;">
+                    <button type="button" onclick="copyJobsPageGoogleSheetsFormula()" style="background:#fff;border:1px solid #86efac;color:#15803d;padding:.3rem .6rem;border-radius:6px;font-size:.74rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
+                        <i class="fas fa-copy"></i> Copy Google Sheets =IMPORTDATA Formula
+                    </button>
+                    <span id="jobsCopyConfirmNote" style="font-size:.74rem;color:#16a34a;font-weight:600;display:none;">Copied!</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#f8fafc;padding:1rem 1.75rem;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;">
+            <button type="button" onclick="closeJobTableExportModal()" style="padding:.6rem 1rem;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font-size:.85rem;font-weight:600;color:#64748b;cursor:pointer;">
+                Cancel
+            </button>
+            <div style="display:flex;gap:.6rem;">
+                <button type="button" onclick="executeJobsPageGoogleDriveExport()" style="padding:.65rem 1.15rem;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);color:#fff;border:none;border-radius:9px;font-size:.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.45rem;box-shadow:0 3px 10px rgba(2,132,199,0.3);">
+                    <i class="fab fa-google-drive"></i> Open via Google Drive
+                </button>
+                <button type="button" onclick="executeJobsPageDirectExcelExport()" style="padding:.65rem 1.25rem;background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);color:#fff;border:none;border-radius:9px;font-size:.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.45rem;box-shadow:0 3px 10px rgba(22,163,74,0.3);">
+                    <i class="fas fa-file-excel"></i> Download Excel (.xlsx)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openJobTableExportModal(jobId = 0) {
+    const modal = document.getElementById('jobsPageExportModal');
+    const select = document.getElementById('jobsModalJobSelect');
+    if (select && jobId) {
+        select.value = String(jobId);
+    }
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeJobTableExportModal() {
+    const modal = document.getElementById('jobsPageExportModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function getJobsPageExportUrl() {
+    const select = document.getElementById('jobsModalJobSelect');
+    const jobId = select ? select.value : '0';
+    const qualScope = document.querySelector('input[name="jobsPageQualScope"]:checked')?.value || 'all';
+    
+    let url = '/admin/export_candidates_excel.php?';
+    const params = new URLSearchParams();
+    if (jobId && jobId !== '0') {
+        params.append('job_id', jobId);
+    }
+    if (qualScope && qualScope !== 'all') {
+        params.append('qual', qualScope);
+    }
+    return url + params.toString();
+}
+
+function executeJobsPageDirectExcelExport() {
+    const exportUrl = getJobsPageExportUrl();
+    window.location.href = exportUrl;
+    setTimeout(() => {
+        closeJobTableExportModal();
+    }, 800);
+}
+
+function executeJobsPageGoogleDriveExport(btnElement) {
+    const btn = btnElement || document.querySelector('button[onclick*="executeJobsPageGoogleDriveExport"]');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting to Drive...';
+    }
+
+    const select = document.getElementById('jobsModalJobSelect');
+    const jobId = select ? select.value : '0';
+    const qualScope = document.querySelector('input[name="jobsPageQualScope"]:checked')?.value || 'all';
+
+    const params = new URLSearchParams();
+    if (jobId && jobId !== '0') params.append('job_id', jobId);
+    if (qualScope && qualScope !== 'all') params.append('qual', qualScope);
+
+    fetch('/admin/upload_candidates_google_drive/?' + params.toString())
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert('✅ Successfully exported directly to Google Drive!\n\nFile: ' + data.file_name);
+                window.open(data.folder_url, '_blank');
+                closeJobTableExportModal();
+            } else if (data.error === 'no_credentials') {
+                window.open(data.folder_url || 'https://drive.google.com/drive/folders/1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K?usp=sharing', '_blank');
+                alert('ℹ️ Google Drive opened!\n\nTo enable 100% automated direct server upload without downloading, place your service_account.json in the project root or configure GOOGLE_DRIVE_WEBHOOK_URL.');
+                closeJobTableExportModal();
+            } else {
+                alert('⚠️ Google Drive notice: ' + (data.message || data.error));
+                window.open('https://drive.google.com/drive/folders/1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K?usp=sharing', '_blank');
+                closeJobTableExportModal();
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            window.open('https://drive.google.com/drive/folders/1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K?usp=sharing', '_blank');
+            closeJobTableExportModal();
+        })
+        .finally(() => {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origHtml;
+            }
+        });
+}
+
+function copyJobsPageGoogleSheetsFormula() {
+    const select = document.getElementById('jobsModalJobSelect');
+    const jobId = select ? select.value : '0';
+    const baseUrl = window.location.origin;
+    let csvUrl = `${baseUrl}/admin/export_candidates_csv.php`;
+    if (jobId && jobId !== '0') {
+        csvUrl += `?job_id=${jobId}`;
+    }
+    const formula = `=IMPORTDATA("${csvUrl}")`;
+    navigator.clipboard.writeText(formula).then(() => {
+        const note = document.getElementById('jobsCopyConfirmNote');
+        if (note) {
+            note.style.display = 'inline';
+            setTimeout(() => { note.style.display = 'none'; }, 3000);
+        }
+    });
+}
+
+// Close on Escape key or outside click
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeJobTableExportModal();
+});
+document.getElementById('jobsPageExportModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'jobsPageExportModal') closeJobTableExportModal();
+});
+</script>

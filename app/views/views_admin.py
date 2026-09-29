@@ -1,10 +1,12 @@
 import os
 import time
 import json
+import io
+import csv
 from decimal import Decimal
 from datetime import date, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q, Count, Avg
 from django.conf import settings
@@ -871,10 +873,639 @@ def update_status_api(request):
     return JsonResponse({'success': False, 'message': 'Invalid status'})
 
 
+def generate_candidates_excel_workbook(job=None, applications=None):
+    """
+    Generates an executive-styled, professional Excel (.xlsx) workbook
+    containing ALL qualified and not-qualified applicants for a job.
+    """
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Applicant Dossier"
+    ws.views.sheetView[0].showGridLines = True
+
+    # MultiBiz Brand Colors
+    PRIMARY_NAVY = "0A3D6B"
+    PRIMARY_BLUE = "1866A3"
+    LIGHT_SLATE  = "F8FAFC"
+    CARD_BG      = "F1F5F9"
+    BORDER_CLR   = "CBD5E1"
+
+    font_title     = Font(name="Calibri", size=14, bold=True, color="FFFFFF")
+    font_meta_lbl  = Font(name="Calibri", size=9, bold=True, color="0A3D6B")
+    font_meta_val  = Font(name="Calibri", size=9, color="334155")
+    font_kpi_text  = Font(name="Calibri", size=10, bold=True, color="0A3D6B")
+    font_tbl_head  = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+    font_cell_main = Font(name="Calibri", size=9.5, color="1E293B")
+    font_cell_bold = Font(name="Calibri", size=9.5, bold=True, color="0A3D6B")
+
+    # Qualification Status Styling
+    font_qual_ok    = Font(name="Calibri", size=9, bold=True, color="15803D")
+    fill_qual_ok    = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid") # Green
+
+    font_qual_under = Font(name="Calibri", size=9, bold=True, color="B45309")
+    fill_qual_under = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid") # Amber
+
+    font_qual_not   = Font(name="Calibri", size=9, bold=True, color="B91C1C")
+    fill_qual_not   = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid") # Red
+
+    # Application Status Styling
+    font_status_acc = Font(name="Calibri", size=9, bold=True, color="15803D")
+    font_status_rej = Font(name="Calibri", size=9, bold=True, color="B91C1C")
+    font_status_pen = Font(name="Calibri", size=9, bold=True, color="C2410C")
+    font_status_shl = Font(name="Calibri", size=9, bold=True, color="0369A1")
+
+    fill_title   = PatternFill(start_color=PRIMARY_NAVY, end_color=PRIMARY_NAVY, fill_type="solid")
+    fill_header  = PatternFill(start_color=PRIMARY_BLUE, end_color=PRIMARY_BLUE, fill_type="solid")
+    fill_card    = PatternFill(start_color=CARD_BG, end_color=CARD_BG, fill_type="solid")
+    fill_zebra_w = PatternFill(start_color="FFFFFF", end_color="FFFFFF", fill_type="solid")
+    fill_zebra_g = PatternFill(start_color=LIGHT_SLATE, end_color=LIGHT_SLATE, fill_type="solid")
+
+    thin_border = Border(
+        left=Side(style="thin", color=BORDER_CLR),
+        right=Side(style="thin", color=BORDER_CLR),
+        top=Side(style="thin", color=BORDER_CLR),
+        bottom=Side(style="thin", color=BORDER_CLR)
+    )
+
+    # 1. Main Header Title
+    ws.merge_cells("A1:Q1")
+    ws.row_dimensions[1].height = 34
+    cell_a1 = ws["A1"]
+    cell_a1.value = "MULTIBIZ INTERNATIONAL CORPORATION — APPLICANT EVALUATION MATRIX"
+    cell_a1.font = font_title
+    cell_a1.fill = fill_title
+    cell_a1.alignment = Alignment(horizontal="center", vertical="center")
+
+    # 2. Metadata Block
+    job_title_str   = job.title if job else "All Job Vacancies"
+    company_name_str = (job.employer.company_name if (job and job.employer) else "") or "MultiBiz International Partners"
+    location_str    = f"{job.location} • {job.employment_type.title()}" if job else "Platform-Wide"
+    export_time_str = timezone.now().strftime("%Y-%m-%d %H:%M:%S (PHT)")
+
+    ws.row_dimensions[2].height = 6
+    ws.row_dimensions[3].height = 20
+    ws.row_dimensions[4].height = 22
+
+    ws["A3"] = "Target Job:"
+    ws["A3"].font = font_meta_lbl
+    ws["B3"] = job_title_str
+    ws["B3"].font = font_meta_val
+
+    ws["C3"] = "Employer / Partner:"
+    ws["C3"].font = font_meta_lbl
+    ws["D3"] = company_name_str
+    ws["D3"].font = font_meta_val
+
+    ws["E3"] = "Work Location:"
+    ws["E3"].font = font_meta_lbl
+    ws["F3"] = location_str
+    ws["F3"].font = font_meta_val
+
+    ws["G3"] = "Export Generated:"
+    ws["G3"].font = font_meta_lbl
+    ws["H3"] = export_time_str
+    ws["H3"].font = font_meta_val
+
+    # 3. KPI Statistics Row
+    total_cand = len(applications) if applications else 0
+    qual_count = sum(1 for a in (applications or []) if a.get('qualification_status') == 'qualified')
+    under_count = sum(1 for a in (applications or []) if a.get('qualification_status') == 'under_qualified')
+    not_count  = sum(1 for a in (applications or []) if a.get('qualification_status') == 'not_qualified')
+
+    ws.merge_cells("A4:Q4")
+    kpi_cell = ws["A4"]
+    kpi_cell.value = f"TOTAL APPLICANTS: {total_cand}   |   QUALIFIED (TOP MATCH): {qual_count}   |   UNDER-QUALIFIED: {under_count}   |   NOT QUALIFIED: {not_count}   |   ALL APPLICANT STATUSES INCLUDED"
+    kpi_cell.font = font_kpi_text
+    kpi_cell.fill = fill_card
+    kpi_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    ws.row_dimensions[5].height = 6
+
+    # 4. Table Headers (Row 6)
+    headers = [
+        ("No.", 5, "center"),
+        ("App ID", 9, "center"),
+        ("Applicant Full Name", 24, "left"),
+        ("Email Address", 26, "left"),
+        ("Contact Number", 16, "center"),
+        ("Job Title Applied For", 24, "left"),
+        ("Employer / Company", 22, "left"),
+        ("Experience (Yrs)", 15, "center"),
+        ("Highest Education", 18, "left"),
+        ("Key Skills & Competencies", 30, "left"),
+        ("Declared Qualifications", 28, "left"),
+        ("AI Match Score", 15, "center"),
+        ("Qualification Tier", 19, "center"),
+        ("Application Status", 18, "center"),
+        ("Applied Date", 16, "center"),
+        ("Resume File", 20, "left"),
+        ("Admin Remarks / History", 32, "left"),
+    ]
+
+    header_row = 6
+    ws.row_dimensions[header_row].height = 26
+
+    for col_idx, (head_text, width, align) in enumerate(headers, start=1):
+        cell = ws.cell(row=header_row, column=col_idx)
+        cell.value = head_text
+        cell.font = font_tbl_head
+        cell.fill = fill_header
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = thin_border
+        col_letter = get_column_letter(col_idx)
+        ws.column_dimensions[col_letter].width = max(width, len(head_text) + 2)
+
+    # 5. Data Rows (Row 7+)
+    start_row = 7
+    for idx, cand in enumerate(applications or [], start=1):
+        curr_row = start_row + idx - 1
+        ws.row_dimensions[curr_row].height = 22
+        zebra_fill = fill_zebra_g if (idx % 2 == 0) else fill_zebra_w
+
+        q_status = cand.get('qualification_status', 'not_qualified')
+        if q_status == 'qualified':
+            tier_label = "QUALIFIED"
+            tier_font = font_qual_ok
+            tier_fill = fill_qual_ok
+        elif q_status == 'under_qualified':
+            tier_label = "UNDER-QUALIFIED"
+            tier_font = font_qual_under
+            tier_fill = fill_qual_under
+        else:
+            tier_label = "NOT QUALIFIED"
+            tier_font = font_qual_not
+            tier_fill = fill_qual_not
+
+        app_status_raw = cand.get('status', 'pending').lower()
+        if app_status_raw in ['accepted', 'hired']:
+            status_font = font_status_acc
+        elif app_status_raw in ['rejected', 'archived']:
+            status_font = font_status_rej
+        elif app_status_raw in ['shortlisted', 'interviewed']:
+            status_font = font_status_shl
+        else:
+            status_font = font_status_pen
+
+        row_data = [
+            (idx, "center", font_cell_main, zebra_fill),
+            (f"#{cand.get('application_id', '')}", "center", font_cell_bold, zebra_fill),
+            (cand.get('full_name', ''), "left", font_cell_bold, zebra_fill),
+            (cand.get('email', ''), "left", font_cell_main, zebra_fill),
+            (cand.get('phone', '') or "N/A", "center", font_cell_main, zebra_fill),
+            (cand.get('job_title', ''), "left", font_cell_main, zebra_fill),
+            (cand.get('company_name', ''), "left", font_cell_main, zebra_fill),
+            (cand.get('experience_years', 0), "center", font_cell_main, zebra_fill),
+            (cand.get('education_level', 'Not specified'), "left", font_cell_main, zebra_fill),
+            (cand.get('skills', 'None recorded'), "left", font_cell_main, zebra_fill),
+            (cand.get('qualifications', 'None recorded'), "left", font_cell_main, zebra_fill),
+            (f"{float(cand.get('match_score', 0)):.1f}%", "center", font_cell_bold, zebra_fill),
+            (tier_label, "center", tier_font, tier_fill),
+            (cand.get('status', 'pending').title(), "center", status_font, zebra_fill),
+            (cand.get('applied_at_formatted', ''), "center", font_cell_main, zebra_fill),
+            (cand.get('resume_file', '') or "No resume file", "left", font_cell_main, zebra_fill),
+            (cand.get('remarks', '') or "No remarks recorded", "left", font_cell_main, zebra_fill),
+        ]
+
+        for col_idx, (val, align, f_style, p_fill) in enumerate(row_data, start=1):
+            cell = ws.cell(row=curr_row, column=col_idx)
+            cell.value = val
+            cell.font = f_style
+            cell.fill = p_fill
+            cell.alignment = Alignment(horizontal=align, vertical="center", wrap_text=(col_idx in [10, 11, 17]))
+            cell.border = thin_border
+
+    ws.freeze_panes = "A7"
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+@require_role('admin')
+def export_candidates_excel_view(request, job_id=None):
+    """
+    Exports all qualified and not-qualified applicants for a given job (or all jobs)
+    into a styled Excel (.xlsx) spreadsheet.
+    Supports direct Excel download and Google Drive/Sheets import workflow.
+    """
+    admin_id = getCurrentUserId(request)
+    j_id = job_id or request.GET.get('job_id') or request.GET.get('id')
+    
+    job_obj = None
+    if j_id and str(j_id).isdigit() and int(j_id) > 0:
+        job_obj = JobPosting.objects.filter(pk=int(j_id)).select_related('employer').first()
+
+    apps_qs = Application.objects.select_related(
+        'applicant', 'applicant__user', 'job', 'job__employer'
+    ).order_by('-applied_at')
+
+    if job_obj:
+        apps_qs = apps_qs.filter(job=job_obj)
+
+    # Specific selections if filtered
+    selected_raw = request.GET.get('selected_candidates') or request.GET.getlist('selected_candidates')
+    if selected_raw:
+        if isinstance(selected_raw, list):
+            s_ids = [int(x) for x in selected_raw if str(x).isdigit()]
+        else:
+            s_ids = [int(x) for x in str(selected_raw).split(',') if str(x).strip().isdigit()]
+        if s_ids:
+            apps_qs = apps_qs.filter(application_id__in=s_ids)
+
+    qual_filter = request.GET.get('qual', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    search_q = request.GET.get('q', '').strip() or request.GET.get('search', '').strip()
+
+    if status_filter:
+        apps_qs = apps_qs.filter(status=status_filter)
+
+    if search_q:
+        apps_qs = apps_qs.filter(
+            Q(applicant__user__first_name__icontains=search_q) |
+            Q(applicant__user__last_name__icontains=search_q) |
+            Q(applicant__user__email__icontains=search_q) |
+            Q(job__title__icontains=search_q)
+        )
+
+    candidates_list = []
+    for app in apps_qs:
+        applicant = app.applicant
+        user_obj = applicant.user if applicant else None
+        if not user_obj:
+            continue
+
+        match_score = float(app.match_score or 0.0)
+        
+        # Determine qualification tier
+        if match_score >= 70.0:
+            q_status = 'qualified'
+        elif match_score >= 50.0:
+            q_status = 'under_qualified'
+        else:
+            q_status = 'not_qualified'
+
+        # Filter by qualification tier if explicitly requested
+        if qual_filter and qual_filter != 'all' and q_status != qual_filter:
+            continue
+
+        candidates_list.append({
+            'application_id': app.application_id,
+            'full_name': f"{user_obj.first_name} {user_obj.last_name}".strip() or user_obj.email,
+            'email': user_obj.email,
+            'phone': user_obj.phone or '',
+            'job_title': app.job.title if app.job else 'N/A',
+            'company_name': (app.job.employer.company_name if (app.job and app.job.employer) else '') or 'MultiBiz Partner',
+            'experience_years': applicant.experience_years or 0,
+            'education_level': applicant.education_level or 'Not specified',
+            'skills': applicant.skills or 'None recorded',
+            'qualifications': applicant.qualifications or 'None recorded',
+            'match_score': match_score,
+            'qualification_status': q_status,
+            'status': app.status,
+            'applied_at_formatted': app.applied_at.strftime('%Y-%m-%d %H:%M') if app.applied_at else '',
+            'resume_file': app.resume_file or applicant.resume_file or '',
+            'remarks': app.remarks_history or '',
+        })
+
+    # Sort descending by match score
+    candidates_list.sort(key=lambda x: x['match_score'], reverse=True)
+
+    excel_file = generate_candidates_excel_workbook(job=job_obj, applications=candidates_list)
+    
+    clean_job_name = "".join(c if c.isalnum() else "_" for c in (job_obj.title if job_obj else "All_Jobs")).strip("_")
+    filename = f"MultiBiz_Applicants_{clean_job_name}_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+
+    log_audit_trail(request, admin_id, 'export_applicants_excel', f"Exported {len(candidates_list)} applicants to Excel for job: {job_obj.title if job_obj else 'All Jobs'}")
+
+    response = HttpResponse(
+        excel_file.getvalue(),
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+@require_role('admin')
+def upload_candidates_google_drive_api(request, job_id=None):
+    """
+    Directly uploads the generated Excel candidates workbook into the Google Drive folder
+    without forcing a local browser download.
+    """
+    from django.http import JsonResponse
+    from app.services.google_drive_service import upload_excel_to_google_drive, TARGET_DRIVE_FOLDER_URL
+
+    admin_id = getCurrentUserId(request)
+    j_id = job_id or request.GET.get('job_id') or request.POST.get('job_id') or request.GET.get('id')
+    
+    job_obj = None
+    if j_id and str(j_id).isdigit() and int(j_id) > 0:
+        job_obj = JobPosting.objects.filter(pk=int(j_id)).select_related('employer').first()
+
+    apps_qs = Application.objects.select_related(
+        'applicant', 'applicant__user', 'job', 'job__employer'
+    ).order_by('-applied_at')
+
+    if job_obj:
+        apps_qs = apps_qs.filter(job=job_obj)
+
+    # Specific selections if filtered
+    selected_raw = request.GET.get('selected_candidates') or request.POST.get('selected_candidates') or request.GET.getlist('selected_candidates')
+    if selected_raw:
+        if isinstance(selected_raw, list):
+            s_ids = [int(x) for x in selected_raw if str(x).isdigit()]
+        else:
+            s_ids = [int(x) for x in str(selected_raw).split(',') if str(x).strip().isdigit()]
+        if s_ids:
+            apps_qs = apps_qs.filter(application_id__in=s_ids)
+
+    qual_filter = (request.GET.get('qual') or request.POST.get('qual') or '').strip()
+    status_filter = (request.GET.get('status') or request.POST.get('status') or '').strip()
+    search_q = (request.GET.get('q') or request.GET.get('search') or '').strip()
+
+    if status_filter:
+        apps_qs = apps_qs.filter(status=status_filter)
+
+    if search_q:
+        apps_qs = apps_qs.filter(
+            Q(applicant__user__first_name__icontains=search_q) |
+            Q(applicant__user__last_name__icontains=search_q) |
+            Q(applicant__user__email__icontains=search_q) |
+            Q(job__title__icontains=search_q)
+        )
+
+    candidates_list = []
+    for app in apps_qs:
+        applicant = app.applicant
+        user_obj = applicant.user if applicant else None
+        if not user_obj:
+            continue
+
+        match_score = float(app.match_score or 0.0)
+        if match_score >= 70.0:
+            q_status = 'qualified'
+        elif match_score >= 50.0:
+            q_status = 'under_qualified'
+        else:
+            q_status = 'not_qualified'
+
+        if qual_filter and qual_filter != 'all' and q_status != qual_filter:
+            continue
+
+        candidates_list.append({
+            'application_id': app.application_id,
+            'full_name': f"{user_obj.first_name} {user_obj.last_name}".strip() or user_obj.email,
+            'email': user_obj.email,
+            'phone': user_obj.phone or '',
+            'job_title': app.job.title if app.job else 'N/A',
+            'company_name': (app.job.employer.company_name if (app.job and app.job.employer) else '') or 'MultiBiz Partner',
+            'experience_years': applicant.experience_years or 0,
+            'education_level': applicant.education_level or 'Not specified',
+            'skills': applicant.skills or 'None recorded',
+            'qualifications': applicant.qualifications or 'None recorded',
+            'match_score': match_score,
+            'qualification_status': q_status,
+            'status': app.status,
+            'applied_at_formatted': app.applied_at.strftime('%Y-%m-%d %H:%M') if app.applied_at else '',
+            'resume_file': app.resume_file or applicant.resume_file or '',
+            'remarks': app.remarks_history or '',
+        })
+
+    candidates_list.sort(key=lambda x: x['match_score'], reverse=True)
+    excel_file = generate_candidates_excel_workbook(job=job_obj, applications=candidates_list)
+    clean_job_name = "".join(c if c.isalnum() else "_" for c in (job_obj.title if job_obj else "All_Jobs")).strip("_")
+    filename = f"MultiBiz_Applicants_{clean_job_name}_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
+
+    upload_res = upload_excel_to_google_drive(excel_file.getvalue(), filename)
+
+    if upload_res.get('success'):
+        log_audit_trail(request, admin_id, 'export_applicants_gdrive', f"Uploaded {filename} with {len(candidates_list)} records directly to Google Drive")
+        return JsonResponse({
+            'success': True,
+            'message': upload_res.get('message', f'Exported {filename} directly to Google Drive!'),
+            'file_name': filename,
+            'folder_url': upload_res.get('folder_url', TARGET_DRIVE_FOLDER_URL),
+            'file_url': upload_res.get('file_url', TARGET_DRIVE_FOLDER_URL),
+        })
+    else:
+        return JsonResponse({
+            'success': False,
+            'error': upload_res.get('error'),
+            'message': upload_res.get('message', 'Google Drive upload requires authorization.'),
+            'folder_url': upload_res.get('folder_url', TARGET_DRIVE_FOLDER_URL),
+        }, status=400 if upload_res.get('error') != 'no_credentials' else 200)
+
+
+@require_role('admin')
+def export_candidates_csv_view(request, job_id=None):
+    """
+    Exports candidates in UTF-8 CSV format suitable for live Google Sheets import (=IMPORTDATA)
+    or standard spreadsheet processing.
+    """
+    j_id = job_id or request.GET.get('job_id') or request.GET.get('id')
+    job_obj = None
+    if j_id and str(j_id).isdigit() and int(j_id) > 0:
+        job_obj = JobPosting.objects.filter(pk=int(j_id)).select_related('employer').first()
+
+    apps_qs = Application.objects.select_related(
+        'applicant', 'applicant__user', 'job', 'job__employer'
+    ).order_by('-applied_at')
+
+    if job_obj:
+        apps_qs = apps_qs.filter(job=job_obj)
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    clean_job_name = "".join(c if c.isalnum() else "_" for c in (job_obj.title if job_obj else "All_Jobs")).strip("_")
+    response['Content-Disposition'] = f'attachment; filename="MultiBiz_Applicants_{clean_job_name}.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow([
+        'No.', 'App ID', 'Applicant Name', 'Email', 'Phone',
+        'Job Title', 'Company', 'Experience (Yrs)', 'Education Level',
+        'Skills', 'Qualifications', 'AI Match Score (%)',
+        'Qualification Tier', 'Application Status', 'Applied Date',
+        'Resume File', 'Admin Remarks'
+    ])
+
+    for idx, app in enumerate(apps_qs, start=1):
+        applicant = app.applicant
+        user_obj = applicant.user if applicant else None
+        if not user_obj:
+            continue
+
+        match_score = float(app.match_score or 0.0)
+        if match_score >= 70.0:
+            q_status = 'QUALIFIED'
+        elif match_score >= 50.0:
+            q_status = 'UNDER-QUALIFIED'
+        else:
+            q_status = 'NOT QUALIFIED'
+
+        writer.writerow([
+            idx,
+            app.application_id,
+            f"{user_obj.first_name} {user_obj.last_name}".strip() or user_obj.email,
+            user_obj.email,
+            user_obj.phone or '',
+            app.job.title if app.job else 'N/A',
+            (app.job.employer.company_name if (app.job and app.job.employer) else '') or 'MultiBiz Partner',
+            applicant.experience_years or 0,
+            applicant.education_level or 'Not specified',
+            applicant.skills or '',
+            applicant.qualifications or '',
+            f"{match_score:.1f}%",
+            q_status,
+            app.status.title(),
+            app.applied_at.strftime('%Y-%m-%d %H:%M') if app.applied_at else '',
+            app.resume_file or applicant.resume_file or '',
+            app.remarks_history or '',
+        ])
+
+    return response
+
+
 @require_role('admin')
 def job_candidates_view(request, job_id):
-    """Show applicants for one job from the admin jobs listing."""
-    return redirect(f'/admin/candidates.php?job_id={job_id}')
+    """
+    Renders the dedicated Candidate Management dossier for a specific job posting,
+    including AI match scores, qualification segmentation (Qualified, Under-Qualified, Not Qualified),
+    and direct Excel & Google Drive export capabilities.
+    """
+    job = get_object_or_404(JobPosting.objects.select_related('employer'), pk=job_id)
+    # Ensure template compat properties
+    job.id = job.job_id
+    job.company_name = job.employer.company_name if job.employer else 'MultiBiz Partner'
+
+    selected_qual   = request.GET.get('qual', '').strip()
+    selected_status = request.GET.get('status', '').strip()
+    query           = request.GET.get('q', '').strip()
+    selected_sort   = request.GET.get('sort', 'score').strip()
+
+    apps_qs = Application.objects.filter(job=job).select_related(
+        'applicant', 'applicant__user'
+    ).order_by('-applied_at')
+
+    all_candidates = []
+    for app in apps_qs:
+        applicant = app.applicant
+        user_obj = applicant.user if applicant else None
+        if not user_obj:
+            continue
+
+        match_score = float(app.match_score or 0.0)
+        if match_score >= 70.0:
+            q_status = 'qualified'
+        elif match_score >= 50.0:
+            q_status = 'under_qualified'
+        else:
+            q_status = 'not_qualified'
+
+        cand_info = {
+            'application': app,
+            'applicant': applicant,
+            'user': user_obj,
+            'match_score': match_score,
+            'qualification_status': q_status,
+            'is_top_match': False,
+            'notice_sent': bool(app.status in ['reviewed', 'shortlisted', 'accepted', 'interviewed']),
+        }
+        all_candidates.append(cand_info)
+
+    # Sort candidates
+    if selected_sort == 'score':
+        all_candidates.sort(key=lambda x: x['match_score'], reverse=True)
+    elif selected_sort == 'experience':
+        all_candidates.sort(key=lambda x: x['applicant'].experience_years or 0, reverse=True)
+    elif selected_sort == 'date':
+        all_candidates.sort(key=lambda x: x['application'].applied_at, reverse=True)
+
+    # Flag top 3 qualified matches
+    qual_count = 0
+    for c in all_candidates:
+        if c['qualification_status'] == 'qualified':
+            qual_count += 1
+            if qual_count <= 3:
+                c['is_top_match'] = True
+
+    # Compute KPI overview counters
+    counts = {
+        'all': len(all_candidates),
+        'qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'qualified'),
+        'under_qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'under_qualified'),
+        'not_qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'not_qualified'),
+        'under_review': sum(1 for c in all_candidates if c['application'].status in ['pending', 'reviewed']),
+        'shortlisted': sum(1 for c in all_candidates if c['application'].status == 'shortlisted'),
+    }
+
+    # Filter for display
+    displayed = all_candidates
+    if selected_qual:
+        displayed = [c for c in displayed if c['qualification_status'] == selected_qual]
+    if selected_status:
+        displayed = [c for c in displayed if c['application'].status == selected_status]
+    if query:
+        q_low = query.lower()
+        displayed = [
+            c for c in displayed
+            if q_low in f"{c['user'].first_name} {c['user'].last_name}".lower()
+            or q_low in c['user'].email.lower()
+            or q_low in (c['applicant'].skills or '').lower()
+        ]
+
+    context = {
+        'job': job,
+        'candidates': displayed,
+        'counts': counts,
+        'selected_qual': selected_qual,
+        'selected_status': selected_status,
+        'query': query,
+        'selected_sort': selected_sort,
+        'current_page': 'candidates.php',
+    }
+    return render(request, 'admin/job_candidates.html', context)
+
+
+@require_role('admin')
+def notify_qualified_applicants_view(request, job_id):
+    """Dispatches review notifications to all qualified applicants for a job."""
+    admin_id = getCurrentUserId(request)
+    job = get_object_or_404(JobPosting, pk=job_id)
+    apps = Application.objects.filter(job=job, match_score__gte=70.0).select_related('applicant__user')
+    count = 0
+    for app in apps:
+        if app.status == 'pending':
+            app.status = 'reviewed'
+            app.save()
+            count += 1
+            Notification.objects.create(
+                user=app.applicant.user,
+                title=f"Application Under Review: {job.title}",
+                message=f"Good news! Your application for {job.title} meets the required qualifications and is now under active review.",
+                type='application'
+            )
+    log_audit_trail(request, admin_id, 'notify_qualified_applicants', f"Notified {count} qualified applicants for job #{job_id}")
+    return redirect(f'/admin/jobs/{job_id}/candidates/?notified=success')
+
+
+@require_role('admin')
+def notify_single_applicant_view(request, application_id):
+    """Dispatches a single candidate review notification."""
+    admin_id = getCurrentUserId(request)
+    app = get_object_or_404(Application.objects.select_related('applicant__user', 'job'), pk=application_id)
+    if app.status == 'pending':
+        app.status = 'reviewed'
+        app.save()
+    Notification.objects.create(
+        user=app.applicant.user,
+        title=f"Application Update: {app.job.title}",
+        message=f"Your profile and qualifications for {app.job.title} have been reviewed by the recruitment team.",
+        type='application'
+    )
+    log_audit_trail(request, admin_id, 'notify_single_applicant', f"Notified applicant {app.applicant.user.email} for application #{application_id}")
+    return redirect(f'/admin/jobs/{app.job.job_id}/candidates/?notified=single')
 
 
 @require_role('admin')
@@ -1275,6 +1906,79 @@ def contact_api_view(request):
 
         return specs
 
+    def classify_inquiry(inq):
+        """
+        Classifies a ContactInquiry into:
+        - 'company': Company staffing / talent hiring request from employers
+        - 'applicant': Job seeker / applicant questions and application inquiries
+        - 'general': Public website general inquiry
+        """
+        sub = (inq.subject or '').lower()
+        msg = (inq.message or '').lower()
+        email = (inq.email or '').lower().strip()
+
+        # 1. Company Request check
+        if '[staffing request]' in sub or 'position needed:' in msg or 'talent request' in msg or 'company talent' in sub:
+            emp = Employer.objects.filter(Q(user__email__iexact=email) | Q(company_name__icontains=inq.name)).first()
+            return {
+                'type': 'company',
+                'label': 'Company Request',
+                'badge_class': 'badge-talent',
+                'icon': 'fas fa-building',
+                'employer_id': emp.employer_id if emp else None,
+                'company_name': emp.company_name if emp else inq.name,
+            }
+
+        emp = Employer.objects.filter(user__email__iexact=email).first()
+        if emp:
+            return {
+                'type': 'company',
+                'label': 'Company Request',
+                'badge_class': 'badge-talent',
+                'icon': 'fas fa-building',
+                'employer_id': emp.employer_id,
+                'company_name': emp.company_name,
+            }
+
+        # 2. Applicant Inquiry check
+        app = Applicant.objects.filter(user__email__iexact=email).select_related('user').first()
+        if app:
+            full_app_name = f"{app.user.first_name} {app.user.last_name}".strip() if app.user else inq.name
+            return {
+                'type': 'applicant',
+                'label': 'Applicant Inquiry',
+                'badge_class': 'badge-applicant',
+                'icon': 'fas fa-user-graduate',
+                'applicant_id': app.applicant_id,
+                'applicant_name': full_app_name or inq.name,
+                'skills': app.skills or '',
+                'experience_years': app.experience_years or 0,
+                'resume_file': app.resume_file or '',
+                'qualifications': app.qualifications or '',
+            }
+
+        if any(k in sub or k in msg for k in ['application', 'resume', 'cv', 'job seeker', 'applicant', 'applied for', 'interview', 'job vacancy']):
+            return {
+                'type': 'applicant',
+                'label': 'Applicant Inquiry',
+                'badge_class': 'badge-applicant',
+                'icon': 'fas fa-user-graduate',
+                'applicant_id': None,
+                'applicant_name': inq.name,
+                'skills': '',
+                'experience_years': 0,
+                'resume_file': '',
+                'qualifications': '',
+            }
+
+        # 3. General Public Inquiry
+        return {
+            'type': 'general',
+            'label': 'Public Inquiry',
+            'badge_class': 'badge-general',
+            'icon': 'fas fa-globe',
+        }
+
     # 1. LIST INQUIRIES
     if action == 'list_inquiries':
         filter_type = request.GET.get('filter', 'all')
@@ -1284,34 +1988,55 @@ def contact_api_view(request):
             page = 1
         limit = 15
 
-        inqs_qs = ContactInquiry.objects.all().order_by('-created_at')
+        all_inqs = list(ContactInquiry.objects.all().order_by('-created_at'))
 
-        if filter_type == 'new':
-            inqs_qs = inqs_qs.filter(status='new')
+        # Pre-classify and calculate counts
+        classified_list = []
+        count_all = len(all_inqs)
+        count_company = 0
+        count_applicant = 0
+        count_general = 0
+        count_unread = 0
+
+        for inq in all_inqs:
+            meta = classify_inquiry(inq)
+            if not inq.is_read:
+                count_unread += 1
+            if meta['type'] == 'company':
+                count_company += 1
+            elif meta['type'] == 'applicant':
+                count_applicant += 1
+            else:
+                count_general += 1
+            classified_list.append((inq, meta))
+
+        # Filter according to selected tab
+        if filter_type in ('company', 'staffing'):
+            filtered = [item for item in classified_list if item[1]['type'] == 'company']
+        elif filter_type == 'applicant':
+            filtered = [item for item in classified_list if item[1]['type'] == 'applicant']
+        elif filter_type == 'general':
+            filtered = [item for item in classified_list if item[1]['type'] == 'general']
+        elif filter_type == 'new':
+            filtered = [item for item in classified_list if item[0].status == 'new']
         elif filter_type == 'unread':
-            inqs_qs = inqs_qs.filter(is_read=False)
+            filtered = [item for item in classified_list if not item[0].is_read]
         elif filter_type == 'replied':
-            inqs_qs = inqs_qs.filter(status='replied')
-        elif filter_type == 'staffing':
-            inqs_qs = inqs_qs.filter(
-                Q(subject__icontains='[Staffing Request]') |
-                Q(subject__icontains='Talent') |
-                Q(message__icontains='Position Needed') |
-                Q(message__icontains='TALENT REQUEST')
-            )
+            filtered = [item for item in classified_list if item[0].status == 'replied']
+        else:
+            filtered = classified_list
 
-        total = inqs_qs.count()
+        total = len(filtered)
         start = (page - 1) * limit
         rows_data = []
 
-        for inq in inqs_qs[start:start + limit]:
-            is_staffing = '[Staffing Request]' in inq.subject or 'Position Needed:' in inq.message or 'TALENT REQUEST' in inq.message
-            if is_staffing:
+        for inq, meta in filtered[start:start + limit]:
+            if meta['type'] == 'company':
                 sp = parse_job_specs(inq.message, inq.subject)
                 clean_excerpt = f"Role: {sp['title'] or inq.subject} • {sp['employment_type'].title()} • {sp['location']}"
             else:
-                clean_excerpt = inq.message[:75]
-                if len(inq.message) > 75:
+                clean_excerpt = inq.message[:80]
+                if len(inq.message) > 80:
                     clean_excerpt += '…'
 
             rows_data.append({
@@ -1323,10 +2048,26 @@ def contact_api_view(request):
                 'created_at': inq.created_at.strftime('%Y-%m-%d %H:%M:%S'),
                 'is_read': 1 if inq.is_read else 0,
                 'status': inq.status,
-                'is_staffing_request': is_staffing,
+                'is_staffing_request': (meta['type'] == 'company'),
+                'sender_type': meta['type'],
+                'sender_label': meta['label'],
+                'badge_class': meta['badge_class'],
+                'badge_icon': meta['icon'],
             })
 
-        return JsonResponse({'success': True, 'rows': rows_data, 'total': total, 'limit': limit})
+        return JsonResponse({
+            'success': True,
+            'rows': rows_data,
+            'total': total,
+            'limit': limit,
+            'counts': {
+                'all': count_all,
+                'company': count_company,
+                'applicant': count_applicant,
+                'general': count_general,
+                'unread': count_unread,
+            }
+        })
 
     # 2. GET SINGLE INQUIRY CONVERSATION
     elif action == 'get_inquiry':
@@ -1348,7 +2089,8 @@ def contact_api_view(request):
             })
 
         job_specs = parse_job_specs(inquiry.message, inquiry.subject)
-        
+        sender_meta = classify_inquiry(inquiry)
+
         # Match potential employer account by email or company name
         matched_employer_id = None
         matched_emp = Employer.objects.filter(Q(user__email__iexact=inquiry.email) | Q(company_name__iexact=job_specs.get('company_name', ''))).first()
@@ -1371,6 +2113,7 @@ def contact_api_view(request):
                 'status': inquiry.status,
                 'created_at': inquiry.created_at.strftime('%Y-%m-%d %H:%M:%S'),
             },
+            'sender_meta': sender_meta,
             'job_specs': job_specs,
             'matched_employer_id': matched_employer_id,
             'replies': replies_list,
@@ -1434,9 +2177,30 @@ def contact_api_view(request):
 
     # 6. GET UNREAD COUNT
     elif action == 'get_unread_count':
-        unread_count = ContactInquiry.objects.filter(is_read=False).count()
-        staffing_count = ContactInquiry.objects.filter(status='new', subject__icontains='[Staffing Request]').count()
-        return JsonResponse({'success': True, 'count': unread_count, 'staffing_count': staffing_count})
+        all_inqs = list(ContactInquiry.objects.all())
+        unread_count = 0
+        company_count = 0
+        applicant_count = 0
+        general_count = 0
+        for inq in all_inqs:
+            if not inq.is_read:
+                unread_count += 1
+            meta = classify_inquiry(inq)
+            if meta['type'] == 'company':
+                company_count += 1
+            elif meta['type'] == 'applicant':
+                applicant_count += 1
+            else:
+                general_count += 1
+
+        return JsonResponse({
+            'success': True,
+            'count': unread_count,
+            'company_count': company_count,
+            'applicant_count': applicant_count,
+            'general_count': general_count,
+            'total_count': len(all_inqs)
+        })
 
     # 7. APPROVE AND POST JOB FROM INQUIRY
     elif action == 'approve_and_post_job':
