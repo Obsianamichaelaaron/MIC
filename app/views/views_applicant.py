@@ -30,6 +30,12 @@ def dashboard_view(request):
     # Application counts
     app_count = Application.objects.filter(applicant=applicant).count()
     pending_count = Application.objects.filter(applicant=applicant, status='pending').count()
+    shortlisted_count = Application.objects.filter(applicant=applicant, status='shortlisted').count()
+    accepted_count = Application.objects.filter(applicant=applicant, status='accepted').count()
+
+    # Chatbot completion check
+    chatbot_answers = list(ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number'))
+    chatbot_completed = bool(chatbot_answers)
 
     # Sub-scores for Employability Breakdown
     candidate_skills = [s.strip() for s in (applicant.skills or '').split(',') if s.strip()]
@@ -43,30 +49,33 @@ def dashboard_view(request):
             applicant.resume_file,
             applicant.education_level or applicant.profile_pic,
         ]
-        completion_pct = round(sum(bool(value) for value in profile_fields) / len(profile_fields) * 100)
-    skills_score = min(100, max(20 if candidate_skills else 0, len(candidate_skills) * 12))
-    exp_score = min(100, max(25 if (applicant.experience_years and applicant.experience_years > 0) else 10, int(applicant.experience_years or 0) * 20))
-    resume_score = 100 if applicant.resume_file else (60 if applicant.skills else 20)
+        completion_pct = round(sum(bool(value) for value in profile_fields) / len(profile_fields) * 100) if profile_fields else 0
 
-    # Chatbot completion check
-    chatbot_answers = list(ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number'))
-    chatbot_completed = bool(chatbot_answers)
+    skills_score = min(100, len(candidate_skills) * 12) if candidate_skills else 0
+    exp_score = min(100, int(applicant.experience_years or 0) * 20) if applicant.experience_years else 0
+    resume_score = 100 if applicant.resume_file else (40 if candidate_skills else 0)
 
-    # Live AI Employability Index
+    # Employability score calculation matching PHP dashboard.php
+    latest_score = 0.0
+    score_source = 'Not assessed'
+
     if applicant.employability_score and float(applicant.employability_score) > 0:
         base_score = float(applicant.employability_score)
+        skill_bonus = len(candidate_skills) * 3
+        latest_score = min(100.0, base_score + skill_bonus)
         score_source = 'AI Assessment Verified'
     elif chatbot_completed:
         total_val = sum(a.score_value or 0 for a in chatbot_answers)
-        base_score = min(100.0, max(40.0, (total_val / max(1, len(chatbot_answers) * 40)) * 100.0))
+        base_score = (total_val / max(1, len(chatbot_answers) * 40)) * 100.0
+        skill_bonus = len(candidate_skills) * 3
+        latest_score = min(100.0, max(10.0, base_score + skill_bonus))
         score_source = 'Chatbot Quiz'
     else:
-        # Dynamic composite score based on profile strength
-        base_score = (skills_score * 0.35) + (exp_score * 0.25) + (resume_score * 0.20) + (completion_pct * 0.20)
-        score_source = 'Profile Strength'
+        latest_score = 0.0
+        score_source = 'Not assessed'
 
-    latest_score = min(100.0, max(15.0 if candidate_skills else 0.0, round(base_score, 1)))
-    display_score = f"{latest_score:.1f}"
+    latest_score = round(latest_score, 2)
+    display_score = f"{latest_score:.2f}" if latest_score > 0 else "0.00"
 
     if latest_score >= 80:
         score_color = '#28a745'
@@ -77,23 +86,23 @@ def dashboard_view(request):
     elif latest_score >= 60:
         score_color = '#ff9800'
         score_description = "Good"
-    elif latest_score >= 45:
+    elif latest_score >= 50:
         score_color = '#fd7e14'
         score_description = "Average"
     elif latest_score > 0:
         score_color = '#dc3545'
         score_description = "Needs Improvement"
     else:
-        score_color = '#687386'
+        score_color = '#6c757d'
         score_description = "Not assessed"
 
-    # Recommendations calculation (Higher match >= 40%)
+    # Recommendations calculation - ONLY SHOW 50%+ MATCH SCORE WHEN ASSESSMENT COMPLETED
     recommendations = []
-    if applicant:
+    if applicant and chatbot_completed:
         all_jobs = JobPosting.objects.filter(status='active').select_related('employer').order_by('-posted_at')
         for job in all_jobs:
             score = compute_job_match_score(applicant, job, chatbot_answers)
-            if score >= 40:
+            if score >= 50.0:
                 recommendations.append({
                     'job': job,
                     'job_id': job.job_id,
@@ -125,6 +134,7 @@ def dashboard_view(request):
             })
     except Exception:
         pass
+
     # Unread messages count
     unread_count = 0
     try:
@@ -144,12 +154,6 @@ def dashboard_view(request):
         status__in=['scheduled', 'rescheduled']
     ).select_related('employer', 'application', 'application__job').order_by('interview_date', 'start_time')
 
-    shortlisted_count = Application.objects.filter(
-        applicant=applicant, status='shortlisted'
-    ).count()
-    accepted_count = Application.objects.filter(
-        applicant=applicant, status='accepted'
-    ).count()
     recommended_jobs = []
     for recommendation in recommendations:
         recommended_job = JobPosting.objects.filter(
@@ -170,6 +174,8 @@ def dashboard_view(request):
         'applicant': applicant,
         'app_count': app_count,
         'pending_count': pending_count,
+        'shortlisted_count': shortlisted_count,
+        'accepted_count': accepted_count,
         'latest_score': latest_score,
         'display_score': display_score,
         'score_color': score_color,
@@ -184,11 +190,8 @@ def dashboard_view(request):
         'interviews': interviews,
         'saved_count': SavedJob.objects.filter(applicant=applicant).count(),
         'applied_count': app_count,
-        # Display aliases used by the newer Applicant dashboard design.
         'profile': applicant,
         'total_apps': app_count,
-        'shortlisted_count': shortlisted_count,
-        'accepted_count': accepted_count,
         'upcoming_interviews': interviews,
         'recent_applications': applications,
         'recommended_jobs': recommended_jobs,
@@ -199,7 +202,7 @@ def dashboard_view(request):
         'exp_score': exp_score,
         'resume_score': resume_score,
         'ai_tip': 'Keep your profile updated to improve job matches.',
-        'ai_tip_url': 'profile.php',
+        'ai_tip_url': '/applicant/profile.php',
         'ai_tip_badge': 'Improve Profile',
     }
     return render(request, 'applicant/dashboard.html', context)
