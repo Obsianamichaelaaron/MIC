@@ -776,7 +776,7 @@
                     </div>
                 </div>
                 <div class="profile-health"><div class="profile-health-label"><span>Profile Health</span><strong>{{ completion_pct }}% Complete</strong></div><div class="profile-health-track"><div class="profile-health-fill" style="--health-fill: {{ completion_pct }}%;"></div></div></div>
-                <div class="portal-actions"><a class="portal-actions-primary" href="jobs.php"><i class="fas fa-wand-magic-sparkles"></i> Explore Matched Jobs</a><a class="portal-actions-secondary" href="profile.php"><i class="fas fa-file-pdf"></i> Manage Resume and Skills</a></div>
+                <div class="portal-actions"><a class="portal-actions-primary" href="/applicant/jobs.php"><i class="fas fa-wand-magic-sparkles"></i> Explore Matched Jobs</a><a class="portal-actions-secondary" href="/applicant/profile.php"><i class="fas fa-file-pdf"></i> Manage Resume and Skills</a></div>
             </div>
         </section>
 
@@ -789,13 +789,13 @@
 
         <div class="portal-main-grid">
             <main>
-                <section class="portal-card"><div class="portal-card-heading"><h2><i class="fas fa-microchip" style="color:#0056b3"></i> AI Matched Job Opportunities</h2><a href="jobs.php">View All ({{ recommended_jobs|length }}) <i class="fas fa-arrow-right"></i></a></div><div class="portal-jobs">
-                    {% for item in recommended_jobs %}<article class="portal-job"><div><div class="portal-job-top"><div><h3>{{ item.job.title }}</h3><p><i class="fas fa-building"></i> {{ item.job.employer.company_name|default:"Multibiz Partner" }}</p><p><i class="fas fa-location-dot"></i> {{ item.job.location }}</p></div><span class="portal-match">{{ item.match_score }}% Match</span></div><div class="portal-job-tags"><span class="portal-job-tag">{{ item.job.employment_type|title }}</span><span class="portal-job-tag">{{ item.job.salary_range|default:"Negotiable" }}</span></div></div><div class="portal-job-actions"><a href="job_details.php?id={{ item.job.job_id }}">Details</a><a href="apply_job.php?id={{ item.job.job_id }}">Quick Apply</a></div></article>{% empty %}<div class="portal-empty">No job recommendations yet.<br><a href="profile.php">Add Tech Skills</a></div>{% endfor %}
+                <section class="portal-card"><div class="portal-card-heading"><h2><i class="fas fa-microchip" style="color:#0056b3"></i> AI Matched Job Opportunities</h2><a href="/applicant/jobs.php">View All ({{ recommended_jobs|length }}) <i class="fas fa-arrow-right"></i></a></div><div class="portal-jobs">
+                    {% for item in recommended_jobs %}<article class="portal-job"><div><div class="portal-job-top"><div><h3>{{ item.job.title }}</h3><p><i class="fas fa-building"></i> {{ item.job.employer.company_name|default:"Multibiz Partner" }}</p><p><i class="fas fa-location-dot"></i> {{ item.job.location }}</p></div><span class="portal-match">{{ item.match_score }}% Match</span></div><div class="portal-job-tags"><span class="portal-job-tag">{{ item.job.employment_type|title }}</span><span class="portal-job-tag">{{ item.job.salary_range|default:"Negotiable" }}</span></div></div><div class="portal-job-actions"><a href="/applicant/job_details.php?id={{ item.job.job_id }}">Details</a><a href="/applicant/apply_job.php?id={{ item.job.job_id }}">Quick Apply</a></div></article>{% empty %}<div class="portal-empty">No job recommendations yet.<br><a href="/applicant/profile.php">Add Tech Skills</a></div>{% endfor %}
                 </div></section>
-                <section class="portal-card"><div class="portal-card-heading"><h2><i class="fas fa-bars-progress" style="color:#0056b3"></i> Live Application Pipeline</h2><a href="applications.php">Full Tracker ({{ total_apps }})</a></div><div class="portal-table-wrap"><table class="portal-table"><thead><tr><th>Role and Company</th><th>Match</th><th>Stage</th><th>Submitted</th></tr></thead><tbody>{% for app in recent_applications %}<tr><td><strong>{{ app.job.title }}</strong><br><small>{{ app.job.employer.company_name|default:"Multibiz Partner" }}</small></td><td>{{ app.match_score }}%</td><td><span class="portal-status">{{ app.status|title }}</span></td><td>{{ app.applied_at|date:"M d, Y" }}</td></tr>{% empty %}<tr><td colspan="4" class="portal-empty">No active job applications found.</td></tr>{% endfor %}</tbody></table></div></section>
+                <section class="portal-card"><div class="portal-card-heading"><h2><i class="fas fa-bars-progress" style="color:#0056b3"></i> Live Application Pipeline</h2><a href="/applicant/applications.php">Full Tracker ({{ total_apps }})</a></div><div class="portal-table-wrap"><table class="portal-table"><thead><tr><th>Role and Company</th><th>Match</th><th>Stage</th><th>Submitted</th></tr></thead><tbody>{% for app in recent_applications %}<tr><td><strong>{{ app.job.title }}</strong><br><small>{{ app.job.employer.company_name|default:"Multibiz Partner" }}</small></td><td>{{ app.match_score }}%</td><td><span class="portal-status">{{ app.status|title }}</span></td><td>{{ app.applied_at|date:"M d, Y" }}</td></tr>{% empty %}<tr><td colspan="4" class="portal-empty">No active job applications found.</td></tr>{% endfor %}</tbody></table></div></section>
             </main>
             <aside>
-                <section class="portal-card"><div class="portal-card-heading"><h2><i class="fas fa-gauge-high" style="color:#0056b3"></i> AI Employability Index</h2><span class="portal-status" style="--score-color: {{ score_color }}; color: var(--score-color); border: 1px solid var(--score-color);">{{ score_description|default:"Live Rating" }}</span></div><div class="portal-gauge" style="--score-color: {{ score_color }}; --score-pct: {{ employability_score|floatformat:0 }}%;"><div class="portal-gauge-center"><span class="portal-gauge-value">{{ employability_score|floatformat:0 }}%</span><span class="portal-gauge-label">Affinity</span></div></div><div class="portal-progress-row"><div class="portal-progress-label"><span><i class="fas fa-code" style="color:#0056b3"></i> Tech Skills Coverage</span><strong>{{ skills_score }}%</strong></div><div class="portal-progress-track"><div class="portal-progress-value" style="--bar-color: #0056b3; --progress-w: {{ skills_score }}%;"></div></div></div><div class="portal-progress-row"><div class="portal-progress-label"><span><i class="fas fa-briefcase" style="color:#17a2b8"></i> Seniority & Experience</span><strong>{{ exp_score }}%</strong></div><div class="portal-progress-track"><div class="portal-progress-value" style="--bar-color: #17a2b8; --progress-w: {{ exp_score }}%;"></div></div></div><div class="portal-progress-row"><div class="portal-progress-label"><span><i class="fas fa-file-pdf" style="color:#e53e3e"></i> Resume Health</span><strong>{{ resume_score }}%</strong></div><div class="portal-progress-track"><div class="portal-progress-value" style="--bar-color: #e53e3e; --progress-w: {{ resume_score }}%;"></div></div></div><div class="portal-progress-row"><div class="portal-progress-label"><span><i class="fas fa-user-check" style="color:#28a745"></i> Profile Completeness</span><strong>{{ completion_pct }}%</strong></div><div class="portal-progress-track"><div class="portal-progress-value" style="--bar-color: #28a745; --progress-w: {{ completion_pct }}%;"></div></div></div><a class="portal-actions-primary" style="display:block;text-align:center;text-decoration:none;margin-top:1rem" href="profile.php"><i class="fas fa-arrow-trend-up"></i> Improve Profile</a></section>
+                <section class="portal-card"><div class="portal-card-heading"><h2><i class="fas fa-gauge-high" style="color:#0056b3"></i> AI Employability Index</h2><span class="portal-status" style="--score-color: {{ score_color }}; color: var(--score-color); border: 1px solid var(--score-color);">{{ score_description|default:"Live Rating" }}</span></div><div class="portal-gauge" style="--score-color: {{ score_color }}; --score-pct: {{ employability_score|floatformat:0 }}%;"><div class="portal-gauge-center"><span class="portal-gauge-value">{{ employability_score|floatformat:0 }}%</span><span class="portal-gauge-label">Affinity</span></div></div><div class="portal-progress-row"><div class="portal-progress-label"><span><i class="fas fa-code" style="color:#0056b3"></i> Tech Skills Coverage</span><strong>{{ skills_score }}%</strong></div><div class="portal-progress-track"><div class="portal-progress-value" style="--bar-color: #0056b3; --progress-w: {{ skills_score }}%;"></div></div></div><div class="portal-progress-row"><div class="portal-progress-label"><span><i class="fas fa-briefcase" style="color:#17a2b8"></i> Seniority & Experience</span><strong>{{ exp_score }}%</strong></div><div class="portal-progress-track"><div class="portal-progress-value" style="--bar-color: #17a2b8; --progress-w: {{ exp_score }}%;"></div></div></div><div class="portal-progress-row"><div class="portal-progress-label"><span><i class="fas fa-file-pdf" style="color:#e53e3e"></i> Resume Health</span><strong>{{ resume_score }}%</strong></div><div class="portal-progress-track"><div class="portal-progress-value" style="--bar-color: #e53e3e; --progress-w: {{ resume_score }}%;"></div></div></div><div class="portal-progress-row"><div class="portal-progress-label"><span><i class="fas fa-user-check" style="color:#28a745"></i> Profile Completeness</span><strong>{{ completion_pct }}%</strong></div><div class="portal-progress-track"><div class="portal-progress-value" style="--bar-color: #28a745; --progress-w: {{ completion_pct }}%;"></div></div></div><a class="portal-actions-primary" style="display:block;text-align:center;text-decoration:none;margin-top:1rem" href="/applicant/profile.php"><i class="fas fa-arrow-trend-up"></i> Improve Profile</a></section>
                 <section class="portal-card"><div class="portal-card-heading"><h2><i class="fas fa-calendar-day" style="color:#ff9800"></i> Upcoming Interviews</h2><span class="portal-status">{{ upcoming_interviews|length }} Scheduled</span></div>{% for interview in upcoming_interviews %}<div class="portal-interview"><strong>{{ interview.application.job.title }}</strong><span>{{ interview.interview_date|date:"M d, Y" }} · {{ interview.start_time|time:"g:i A" }}</span>{% if interview.meeting_link %}<a href="{{ interview.meeting_link }}" target="_blank">Join Video Call</a>{% endif %}</div>{% empty %}<div class="portal-empty">No upcoming interviews scheduled.</div>{% endfor %}</section>
             </aside>
         </div>
@@ -933,11 +933,11 @@
                         {% endif %}
                     </p>
                     <div class="db-btn-group">
-                        <a href="chatbot.php" class="db-btn db-btn-primary">
+                        <a href="/applicant/chatbot.php" class="db-btn db-btn-primary">
                             <i class="fas fa-robot"></i> 
                             {% if latest_score == 0 %}Take Assessment{% else %}Retake Assessment{% endif %}
                         </a>
-                        <a href="profile.php" class="db-btn db-btn-secondary">
+                        <a href="/applicant/profile.php" class="db-btn db-btn-secondary">
                             <i class="fas fa-user-edit"></i> Update Profile
                         </a>
                     </div>
@@ -1007,7 +1007,7 @@
                 {% endfor %}
                 {% if feedback_count > 3 %}
                     <div style="text-align: center; margin-top: .5rem;">
-                        <a href="applications.php#feedback" style="color: #1866a3; text-decoration: none; font-weight: 600; font-size: .85rem;">
+                        <a href="/applicant/applications.php#feedback" style="color: #1866a3; text-decoration: none; font-weight: 600; font-size: .85rem;">
                             View All ({{ feedback_count }}) <i class="fas fa-arrow-right"></i>
                         </a>
                     </div>
@@ -1042,13 +1042,13 @@
                             <span class="match-badge-sm"><i class="fas fa-chart-line"></i> {{ rec.calculated_match_score|floatformat:1 }}%</span>
                         </div>
                         <div class="compact-actions">
-                            <a href="job_details.php?id={{ rec.job_id }}" class="compact-btn compact-btn-view"><i class="fas fa-eye"></i> Details</a>
-                            <a href="apply_job.php?id={{ rec.job_id }}" class="compact-btn compact-btn-apply"><i class="fas fa-paper-plane"></i> Apply</a>
+                            <a href="/applicant/job_details.php?id={{ rec.job_id }}" class="compact-btn compact-btn-view"><i class="fas fa-eye"></i> Details</a>
+                            <a href="/applicant/apply_job.php?id={{ rec.job_id }}" class="compact-btn compact-btn-apply"><i class="fas fa-paper-plane"></i> Apply</a>
                         </div>
                     </div>
                 {% endfor %}
                 <div style="text-align: center; margin-top: 0.8rem;">
-                    <a href="jobs.php" style="color: #1866a3; font-size: 0.75rem; text-decoration: none;">View all jobs →</a>
+                    <a href="/applicant/jobs.php" style="color: #1866a3; font-size: 0.75rem; text-decoration: none;">View all jobs →</a>
                 </div>
             {% else %}
                 <div class="db-empty-state" style="padding: 1.5rem;">
@@ -1056,9 +1056,9 @@
                     <h3 style="font-size: 0.9rem; margin-top: 0.5rem;">{% if chatbot_completed %}No 50%+ matches{% else %}Assessment required{% endif %}</h3>
                     <p style="font-size: 0.7rem;">{% if chatbot_completed %}Update your profile for better matches{% else %}Take assessment to unlock recommendations{% endif %}</p>
                     {% if not chatbot_completed %}
-                        <a href="chatbot.php" class="compact-btn compact-btn-view" style="display: inline-block;">Take Assessment</a>
+                        <a href="/applicant/chatbot.php" class="compact-btn compact-btn-view" style="display: inline-block;">Take Assessment</a>
                     {% else %}
-                        <a href="profile.php" class="compact-btn compact-btn-view" style="display: inline-block;">Update Profile</a>
+                        <a href="/applicant/profile.php" class="compact-btn compact-btn-view" style="display: inline-block;">Update Profile</a>
                     {% endif %}
                 </div>
             {% endif %}
@@ -1094,7 +1094,7 @@
 
 <!-- ── Floating Chat Button ── -->
 <div class="db-float">
-    <a href="chat.php" class="db-float-btn" title="Chat with Employers">
+    <a href="/applicant/chat.php" class="db-float-btn" title="Chat with Employers">
         <i class="fas fa-comments"></i>
         {% if unread_count > 0 %}
             <span class="db-float-badge">{% if unread_count > 9 %}9+{% else %}{{ unread_count }}{% endif %}</span>
@@ -1140,10 +1140,10 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
             </ul>
         </div>
         <div style="display: flex; gap: 0.8rem; justify-content: center;">
-            <a href="job_details.php?id=${jobId}" style="background: #1866a3; color: white; padding: 0.6rem 1.2rem; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.8rem;">
+            <a href="/applicant/job_details.php?id=${jobId}" style="background: #1866a3; color: white; padding: 0.6rem 1.2rem; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.8rem;">
                 View Details
             </a>
-            <a href="apply_job.php?id=${jobId}" style="background: #ff6a00; color: white; padding: 0.6rem 1.2rem; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.8rem;">
+            <a href="/applicant/apply_job.php?id=${jobId}" style="background: #ff6a00; color: white; padding: 0.6rem 1.2rem; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 0.8rem;">
                 Apply Now
             </a>
         </div>

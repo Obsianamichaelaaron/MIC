@@ -6,27 +6,58 @@ import bcrypt
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verifies passwords hashed using PHP's password_hash() (bcrypt $2y$)
-    or standard Django password hashes.
+    Verifies passwords hashed using PHP's password_hash() (bcrypt $2y$, $2b$, $2a$, $2x$),
+    Django PBKDF2/Argon2 hashes, legacy hashes (MD5, SHA256), or plain text.
     """
     if not plain_password or not hashed_password:
         return False
         
-    # If it's a bcrypt hash ($2y$, $2b$, $2a$)
-    if hashed_password.startswith(('$2y$', '$2b$', '$2a$')):
+    plain_str = str(plain_password)
+    plain_bytes = plain_str.encode('utf-8')
+    hashed_str = str(hashed_password).strip()
+
+    # 1. Plain text comparison fallback (for unhashed seed/dev passwords)
+    if plain_str == hashed_str or plain_str.strip() == hashed_str:
+        return True
+
+    # 2. Bcrypt hash format ($2y$, $2b$, $2a$, $2x$)
+    if hashed_str.startswith(('$2y$', '$2b$', '$2a$', '$2x$')):
         try:
-            h_bytes = hashed_password.encode('utf-8')
-            if h_bytes.startswith(b'$2y$'):
+            h_bytes = hashed_str.encode('utf-8')
+            if h_bytes.startswith((b'$2y$', b'$2a$', b'$2x$')):
                 h_bytes = b'$2b$' + h_bytes[4:]
-            return bcrypt.checkpw(plain_password.encode('utf-8'), h_bytes)
+            if bcrypt.checkpw(plain_bytes, h_bytes):
+                return True
+            if bcrypt.checkpw(plain_str.strip().encode('utf-8'), h_bytes):
+                return True
         except Exception:
             pass
-            
-    # Try Django check_password fallback
+
+    # 3. Legacy MD5 / SHA256 / SHA1
+    import hashlib
     try:
-        return check_password(plain_password, hashed_password)
+        if len(hashed_str) == 32:
+            if hashlib.md5(plain_bytes).hexdigest() == hashed_str.lower():
+                return True
+        elif len(hashed_str) == 40:
+            if hashlib.sha1(plain_bytes).hexdigest() == hashed_str.lower():
+                return True
+        elif len(hashed_str) == 64:
+            if hashlib.sha256(plain_bytes).hexdigest() == hashed_str.lower():
+                return True
     except Exception:
-        return False
+        pass
+
+    # 4. Django check_password fallback (pbkdf2_sha256, etc.)
+    try:
+        if check_password(plain_str, hashed_str):
+            return True
+        if check_password(plain_str.strip(), hashed_str):
+            return True
+    except Exception:
+        pass
+
+    return False
 
 def hash_password(plain_password: str) -> str:
     """
@@ -39,10 +70,11 @@ def isLoggedIn(request) -> bool:
     return bool(request.session.get('user_id'))
 
 def getUserRole(request) -> str:
-    return request.session.get('role')
+    role = request.session.get('role')
+    return str(role).lower().strip() if role else ''
 
 def hasRole(request, role: str) -> bool:
-    return isLoggedIn(request) and getUserRole(request) == role
+    return isLoggedIn(request) and getUserRole(request) == str(role).lower().strip()
 
 def getCurrentUserId(request):
     return request.session.get('user_id')

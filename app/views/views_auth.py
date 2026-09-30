@@ -48,7 +48,7 @@ def login_register_view(request):
             # Handle Registration
             first_name = request.POST.get('first_name', '').strip()
             last_name = request.POST.get('last_name', '').strip()
-            email = request.POST.get('email', '').strip()
+            email = request.POST.get('email', '').strip().lower()
             phone = request.POST.get('phone', '').strip()
             password = request.POST.get('password', '')
             confirm_password = request.POST.get('confirm_password', '')
@@ -60,7 +60,7 @@ def login_register_view(request):
                 error = "Passwords do not match"
             elif len(password) < 6:
                 error = "Password must be at least 6 characters"
-            elif User.objects.filter(email=email).exists():
+            elif User.objects.filter(email__iexact=email).exists():
                 error = "Email already registered"
             else:
                 # Handle resume upload
@@ -124,11 +124,21 @@ def login_register_view(request):
                         abs_pdf = settings.BASE_DIR / resume_rel_path
                         parse_and_save_applicant_resume(applicant, str(abs_pdf))
 
-                    welcome_result = send_welcome_email(email, new_user.first_name)
-                    if welcome_result['success']:
-                        success = "Registration successful! A welcome email has been sent. Please login."
-                    else:
-                        success = "Registration successful! Please login."
+                    # Auto-login newly registered applicant
+                    request.session['user_id'] = new_user.user_id
+                    request.session['email'] = new_user.email
+                    request.session['role'] = new_user.role
+                    request.session['first_name'] = new_user.first_name or ''
+                    request.session['last_name'] = new_user.last_name or ''
+
+                    try:
+                        send_welcome_email(email, new_user.first_name)
+                    except Exception:
+                        pass
+
+                    if redirect_target == 'apply' and job_id and job_id != '0':
+                        return redirect(f'/applicant/apply_job.php?id={job_id}')
+                    return redirect('/applicant/dashboard.php')
         else:
             # Handle Login
             email = request.POST.get('email', '').strip()
@@ -137,7 +147,7 @@ def login_register_view(request):
             if not email or not password:
                 error = "Please fill in all fields"
             else:
-                user = User.objects.filter(email=email).first()
+                user = User.objects.filter(email__iexact=email).first()
                 if user and verify_password(password, user.password):
                     if user.status == 'active':
                         # Set session data matching PHP
