@@ -1797,23 +1797,83 @@ unset($_SESSION['login_email']);
                 }
 
                 // Validation passed — proceed to OTP
-                const email = document.getElementById('email-input')?.value?.trim();
+                const emailInput = document.getElementById('email-input');
+                const email = emailInput?.value?.trim();
                 const firstName = registerFormEl.querySelector('input[name="first_name"]')?.value?.trim() || 'User';
                 if (!email) {
-                    showFieldError(document.getElementById('email-input'), 'Please enter your email address first.');
+                    showFieldError(emailInput, 'Please enter your email address first.');
                     return;
                 }
-                openOtpModal(email, firstName);
+
+                // Show loading state on register button
+                const regBtn = document.getElementById('register-btn');
+                const originalBtnContent = regBtn ? regBtn.innerHTML : '';
+                if (regBtn) {
+                    regBtn.disabled = true;
+                    regBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:0.5rem;"></i> Processing...';
+                }
+
+                // Request OTP — only open modal if email check / OTP dispatch succeeds
+                const fd = new FormData();
+                fd.append('email', email);
+                fd.append('first_name', firstName);
+
+                fetch('send_otp.php', { method: 'POST', body: fd })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (regBtn) {
+                            regBtn.disabled = false;
+                            regBtn.innerHTML = originalBtnContent;
+                        }
+                        if (data.success) {
+                            openOtpModal(email, firstName, data);
+                        } else {
+                            // Do not open modal — show error message on email field & toast
+                            if (data.message) {
+                                showFieldError(emailInput, data.message);
+                                showFormError(data.message);
+                                emailInput?.focus();
+                            } else {
+                                showFormError('Registration could not be completed. Please try again.');
+                            }
+                        }
+                    })
+                    .catch(() => {
+                        if (regBtn) {
+                            regBtn.disabled = false;
+                            regBtn.innerHTML = originalBtnContent;
+                        }
+                        showFormError('Network error. Please try again.');
+                    });
             });
         }
 
-        function openOtpModal(email, firstName) {
+        function openOtpModal(email, firstName, initialData) {
             document.getElementById('otp-email-display').textContent = email;
-            document.getElementById('otp-message').textContent = 'Sending verification code...';
-            document.getElementById('otp-message').className = 'info';
             document.getElementById('otp-modal-overlay').style.display = 'flex';
             clearOtpInputs();
-            sendOtpRequest(email, firstName);
+
+            if (initialData && initialData.success) {
+                setOtpMessage(initialData.message || 'Enter the 6-digit code from your email', 'info');
+                otpExpiresAt = Date.now() + 10 * 60 * 1000;
+                startCountdown();
+                startResendCooldown(60);
+                setTimeout(() => {
+                    const firstInput = document.querySelectorAll('.otp-digit')[0];
+                    if (firstInput) firstInput.focus();
+                }, 100);
+                if (initialData.dev_otp) {
+                    const hint = document.getElementById('otp-dev-hint');
+                    if (hint) {
+                        hint.style.display = 'block';
+                        hint.textContent = '🔧 Dev mode — OTP: ' + initialData.dev_otp;
+                    }
+                }
+            } else {
+                document.getElementById('otp-message').textContent = 'Sending verification code...';
+                document.getElementById('otp-message').className = 'info';
+                sendOtpRequest(email, firstName);
+            }
         }
 
         function closeOtpModal() {
@@ -1835,12 +1895,15 @@ unset($_SESSION['login_email']);
                         otpExpiresAt = Date.now() + 10 * 60 * 1000;
                         startCountdown();
                         startResendCooldown(60);
-                        document.querySelectorAll('.otp-digit')[0].focus();
+                        const firstInput = document.querySelectorAll('.otp-digit')[0];
+                        if (firstInput) firstInput.focus();
                         // Dev hint: show OTP if returned (remove in production)
                         if (data.dev_otp) {
                             const hint = document.getElementById('otp-dev-hint');
-                            hint.style.display = 'block';
-                            hint.textContent = '🔧 Dev mode — OTP: ' + data.dev_otp;
+                            if (hint) {
+                                hint.style.display = 'block';
+                                hint.textContent = '🔧 Dev mode — OTP: ' + data.dev_otp;
+                            }
                         }
                     } else {
                         setOtpMessage(data.message, 'error');
@@ -1854,7 +1917,9 @@ unset($_SESSION['login_email']);
             const firstName = document.getElementById('register-form')?.querySelector('input[name="first_name"]')?.value?.trim() || 'User';
             clearInterval(otpTimerInterval);
             clearOtpInputs();
-            document.getElementById('otp-dev-hint').style.display = 'none';
+            const hint = document.getElementById('otp-dev-hint');
+            if (hint) hint.style.display = 'none';
+            setOtpMessage('Sending verification code...', 'info');
             sendOtpRequest(email, firstName);
         }
 
