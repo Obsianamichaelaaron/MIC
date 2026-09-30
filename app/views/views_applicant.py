@@ -11,7 +11,7 @@ from django.utils import timezone
 from app.models import (
     User, Applicant, JobPosting, Application, SavedJob,
     InterviewSchedule, Qualification, Skill, ChatbotAnswer,
-    ChatbotRecommendation, ResumeAnalysis, Employer
+    ChatbotRecommendation, ResumeAnalysis, Employer, Notification
 )
 from app.auth_utils import require_role, getCurrentUserId
 from app.services.resume_parser import verify_resume_document, parse_and_save_applicant_resume
@@ -699,6 +699,15 @@ def apply_job_view(request, job_id=None):
                 classified_at=timezone.now(),
                 remarks_history=f"[{timezone.now().strftime('%Y-%m-%d %H:%M')}] Application submitted."
             )
+
+            # Create in-app notification for employer
+            if job.employer and job.employer.user:
+                Notification.objects.create(
+                    user=job.employer.user,
+                    title="New Application",
+                    message=f"A new application has been submitted for: {job.title}",
+                    type='application'
+                )
 
             # Send under review email to applicant
             try:
