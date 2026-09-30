@@ -30,6 +30,7 @@
                     <select name="role" class="form-select bg-light" onchange="this.form.submit()">
                         <option value="">All Account Roles</option>
                         <option value="applicant" {% if role_filter == 'applicant' %}selected{% endif %}>Candidate / Applicant</option>
+                        <option value="employer" {% if role_filter == 'employer' %}selected{% endif %}>Employer</option>
                         <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Administrator</option>
                     </select>
                 </div>

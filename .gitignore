@@ -18,9 +18,25 @@ local_settings.py
 db.sqlite3-journal
 staticfiles/
 
+# Credentials & Secrets
+auth_drive.py
+token.json
+client_secret*.json
+credentials*.json
+candidaites*.json
+service_account*.json
+gdrive_credentials*.json
+*.pem
+*.key
+.env
+
+# Deployment / Vercel
+.vercel/
+
 # Temporary / OS
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
 scratch/
+

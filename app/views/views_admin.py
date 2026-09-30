@@ -233,9 +233,9 @@ def users_view(request):
     """
     admin_id = getCurrentUserId(request)
     
-    search = request.GET.get('search', '').strip()
-    role_filter = request.GET.get('role', '')
-    status_filter = request.GET.get('status', '')
+    search = (request.GET.get('q') or request.GET.get('search') or '').strip()
+    role_filter = request.GET.get('role', '').strip()
+    status_filter = request.GET.get('status', '').strip()
 
     success_msg = None
     error_msg = None
@@ -339,12 +339,27 @@ def users_view(request):
     users_qs = User.objects.all().order_by('-created_at')
 
     if search:
-        users_qs = users_qs.filter(
+        search_filter = (
             Q(email__icontains=search) |
             Q(first_name__icontains=search) |
             Q(last_name__icontains=search) |
-            Q(phone__icontains=search)
+            Q(phone__icontains=search) |
+            Q(employer_profile__company_name__icontains=search)
         )
+        words = search.split()
+        if len(words) > 1:
+            multi_word_q = Q()
+            for word in words:
+                multi_word_q &= (
+                    Q(first_name__icontains=word) |
+                    Q(last_name__icontains=word) |
+                    Q(email__icontains=word) |
+                    Q(phone__icontains=word) |
+                    Q(employer_profile__company_name__icontains=word)
+                )
+            search_filter |= multi_word_q
+
+        users_qs = users_qs.filter(search_filter).distinct()
 
     if role_filter:
         users_qs = users_qs.filter(role=role_filter)
@@ -357,6 +372,8 @@ def users_view(request):
         'current_page': 'users.php',
         'users': users_qs,
         'search': search,
+        'query': search,
+        'q': search,
         'role_filter': role_filter,
         'status_filter': status_filter,
         'success_msg': success_msg,
