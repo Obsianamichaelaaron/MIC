@@ -7,17 +7,37 @@
 <style>
     /* CMS Studio Design System Overrides */
     .cms-stat-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border-color);
-        border-radius: var(--border-radius-lg);
-        box-shadow: var(--box-shadow-sm);
-        transition: all 0.25s ease;
-        padding: 1.25rem;
+        background: #ffffff;
+        border: 1px solid rgba(226, 232, 240, 0.9);
+        border-radius: 16px;
+        box-shadow: 0 4px 15px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.02);
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        padding: 1.25rem 1.4rem;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
     }
     .cms-stat-card:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--box-shadow-md);
+        transform: translateY(-3px);
+        box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.08), 0 4px 8px -2px rgba(15, 23, 42, 0.03);
         border-color: #cbd5e1;
+    }
+    .cms-stat-card .cms-stat-label {
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: #64748b;
+        letter-spacing: 0.01em;
+        margin-bottom: 0.35rem;
+    }
+    .cms-stat-card .cms-stat-value {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1;
+        letter-spacing: -0.02em;
     }
     .cms-nav-tabs {
         background: #ffffff;
@@ -58,18 +78,18 @@
         border: 1px solid var(--border-color);
     }
     .cms-avatar-box {
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-        color: #2563eb;
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-weight: 700;
-        font-size: 1rem;
-        border: 1px solid #bfdbfe;
+        font-size: 1.2rem;
         flex-shrink: 0;
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .cms-stat-card:hover .cms-avatar-box {
+        transform: scale(1.08);
     }
     .rating-stars {
         color: #f59e0b;
@@ -168,10 +188,10 @@
             <div class="cms-stat-card">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted small fw-semibold">Hero Slides</div>
-                        <div class="fs-4 fw-bold text-dark mt-1">{{ slides.count }}</div>
+                        <div class="cms-stat-label">Hero Slides</div>
+                        <div class="cms-stat-value">{{ slides.count }}</div>
                     </div>
-                    <div class="cms-avatar-box" style="background: rgba(59, 130, 246, 0.1); color: #2563eb; border-color: rgba(59, 130, 246, 0.2);">
+                    <div class="cms-avatar-box" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(37, 99, 235, 0.18)); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25);">
                         <i class="fa-solid fa-images"></i>
                     </div>
                 </div>
@@ -181,10 +201,10 @@
             <div class="cms-stat-card">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted small fw-semibold">Partner Brands</div>
-                        <div class="fs-4 fw-bold text-dark mt-1">{{ brands.count }}</div>
+                        <div class="cms-stat-label">Partner Brands</div>
+                        <div class="cms-stat-value">{{ brands.count }}</div>
                     </div>
-                    <div class="cms-avatar-box" style="background: rgba(14, 165, 233, 0.1); color: #0284c7; border-color: rgba(14, 165, 233, 0.2);">
+                    <div class="cms-avatar-box" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(2, 132, 199, 0.18)); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.25);">
                         <i class="fa-solid fa-building"></i>
                     </div>
                 </div>
@@ -194,10 +214,10 @@
             <div class="cms-stat-card">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted small fw-semibold">Testimonials</div>
-                        <div class="fs-4 fw-bold text-dark mt-1">{{ testimonials.count }}</div>
+                        <div class="cms-stat-label">Testimonials</div>
+                        <div class="cms-stat-value">{{ testimonials.count }}</div>
                     </div>
-                    <div class="cms-avatar-box" style="background: rgba(245, 158, 11, 0.1); color: #d97706; border-color: rgba(245, 158, 11, 0.2);">
+                    <div class="cms-avatar-box" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(217, 119, 6, 0.18)); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.25);">
                         <i class="fa-solid fa-star"></i>
                     </div>
                 </div>
@@ -207,10 +227,10 @@
             <div class="cms-stat-card">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <div class="text-muted small fw-semibold">News Articles</div>
-                        <div class="fs-4 fw-bold text-dark mt-1">{{ news_articles.count }}</div>
+                        <div class="cms-stat-label">News Articles</div>
+                        <div class="cms-stat-value">{{ news_articles.count }}</div>
                     </div>
-                    <div class="cms-avatar-box" style="background: rgba(16, 185, 129, 0.1); color: #059669; border-color: rgba(16, 185, 129, 0.2);">
+                    <div class="cms-avatar-box" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.18)); color: #059669; border: 1px solid rgba(16, 185, 129, 0.25);">
                         <i class="fa-solid fa-newspaper"></i>
                     </div>
                 </div>

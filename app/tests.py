@@ -1,5 +1,10 @@
 import json
+import os
+import sys
+import tempfile
+import types
 from decimal import Decimal
+from unittest.mock import Mock, patch
 from django.test import TestCase, Client
 from django.urls import reverse
 from app.models import (
@@ -89,6 +94,87 @@ class MultiBizConversionTests(TestCase):
         for url in pages:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200, f"Failed on URL: {url}")
+
+    def test_google_drive_service_account_upload_uses_shared_drive_support(self):
+        """Service account uploads should request shared-drive support for compatible parent folders."""
+        with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as f:
+            json.dump({
+                'type': 'service_account',
+                'client_email': 'example@project.iam.gserviceaccount.com',
+                'private_key': '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n',
+                'private_key_id': 'id123',
+                'project_id': 'demo-project'
+            }, f)
+            service_account_path = f.name
+
+        def fake_from_service_account_file(path, scopes):
+            self.assertEqual(path, service_account_path)
+            self.assertIn('https://www.googleapis.com/auth/drive', scopes)
+            return object()
+
+        fake_drive = Mock()
+        fake_file = Mock()
+        fake_create = Mock()
+        fake_create.execute.return_value = {'id': 'file-123', 'name': 'demo.xlsx', 'webViewLink': 'https://example.com'}
+        fake_file.create.return_value = fake_create
+        fake_drive.files.return_value = fake_file
+
+        fake_google = types.ModuleType('google')
+        fake_oauth2 = types.ModuleType('google.oauth2')
+        fake_service_account = types.ModuleType('google.oauth2.service_account')
+        fake_service_account.Credentials = types.SimpleNamespace(from_service_account_file=fake_from_service_account_file)
+        fake_oauth2.service_account = fake_service_account
+        fake_google.oauth2 = fake_oauth2
+        fake_discovery = types.ModuleType('googleapiclient.discovery')
+        fake_discovery.build = Mock(return_value=fake_drive)
+        fake_http = types.ModuleType('googleapiclient.http')
+        fake_http.MediaIoBaseUpload = Mock()
+
+        original_google = sys.modules.get('google')
+        original_oauth2 = sys.modules.get('google.oauth2')
+        original_service_account = sys.modules.get('google.oauth2.service_account')
+        original_discovery = sys.modules.get('googleapiclient.discovery')
+        original_http = sys.modules.get('googleapiclient.http')
+
+        try:
+            sys.modules['google'] = fake_google
+            sys.modules['google.oauth2'] = fake_oauth2
+            sys.modules['google.oauth2.service_account'] = fake_service_account
+            sys.modules['googleapiclient.discovery'] = fake_discovery
+            sys.modules['googleapiclient.http'] = fake_http
+
+            from app.services import google_drive_service
+            with patch('app.services.google_drive_service._upload_with_oauth_user', return_value={'success': False, 'error': 'oauth_missing'}):
+                with self.settings(GOOGLE_SERVICE_ACCOUNT_FILE=service_account_path):
+                    result = google_drive_service.upload_excel_to_google_drive(b'abc', 'demo.xlsx', folder_id='folder-123')
+        finally:
+            if original_google is not None:
+                sys.modules['google'] = original_google
+            else:
+                sys.modules.pop('google', None)
+            if original_oauth2 is not None:
+                sys.modules['google.oauth2'] = original_oauth2
+            else:
+                sys.modules.pop('google.oauth2', None)
+            if original_service_account is not None:
+                sys.modules['google.oauth2.service_account'] = original_service_account
+            else:
+                sys.modules.pop('google.oauth2.service_account', None)
+            if original_discovery is not None:
+                sys.modules['googleapiclient.discovery'] = original_discovery
+            else:
+                sys.modules.pop('googleapiclient.discovery', None)
+            if original_http is not None:
+                sys.modules['googleapiclient.http'] = original_http
+            else:
+                sys.modules.pop('googleapiclient.http', None)
+
+        self.assertTrue(result['success'])
+        fake_file.create.assert_called_once()
+        kwargs = fake_file.create.call_args.kwargs
+        self.assertTrue(kwargs['supportsAllDrives'])
+
+        os.unlink(service_account_path)
 
     def test_contact_form_submission(self):
         """Test contact inquiry submission"""
