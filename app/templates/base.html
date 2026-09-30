@@ -2,62 +2,72 @@
 
 <style>
 	body {
-		background: #c7d1dd;
+		background: #f4f6f9;
+		color: #1e293b;
+		font-family: 'DM Sans', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 	.container {
 		width: 100%;
-		max-width: 1240px !important;
+		max-width: 1400px !important;
 		margin: 0 auto;
-		padding: 0 .75rem 1rem;
+		padding: 0 1.25rem 2rem;
 		font-family: 'DM Sans', sans-serif;
 	}
-	.container h3 { font-size: 1.4rem; line-height: 1.25; }
-	.container h5 { font-size: 1rem; line-height: 1.35; }
+	.container h3 { font-size: 1.4rem; line-height: 1.25; font-weight: 700; color: #0f172a; }
+	.container h5 { font-size: 1rem; line-height: 1.35; font-weight: 600; color: #1e293b; }
 	.container p,
-	.container .small { font-size: .78rem; }
+	.container .small { font-size: .82rem; }
 	.container .form-control,
 	.container .form-select,
 	.container .btn { font-family: 'DM Sans', sans-serif; }
 	.employer-hero-banner {
 		position: relative;
 		overflow: hidden;
-		padding: 1.5rem 1.75rem;
-		border-radius: 16px;
-		background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 58%, #2196f3 100%);
+		padding: 1.75rem 2rem;
+		border-radius: 18px;
+		background: linear-gradient(135deg, #09203f 0%, #1e40af 60%, #0284c7 100%);
 		color: #ffffff;
-		box-shadow: 0 8px 22px rgba(10, 61, 107, 0.16);
+		box-shadow: 0 10px 30px rgba(10, 61, 107, 0.18);
 	}
 	.employer-hero-banner::after {
 		content: '';
 		position: absolute;
-		width: 220px;
-		height: 220px;
-		right: -80px;
-		top: -130px;
-		border: 34px solid rgba(255, 255, 255, 0.08);
+		width: 260px;
+		height: 260px;
+		right: -60px;
+		top: -100px;
+		border: 36px solid rgba(255, 255, 255, 0.07);
 		border-radius: 50%;
+		pointer-events: none;
 	}
 	.portal-hero-content { position: relative; z-index: 1; }
 	.custom-card {
 		border: 1px solid #e2e8f0 !important;
-		border-radius: 14px !important;
-		box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06) !important;
+		border-radius: 16px !important;
+		box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05) !important;
+		background: #ffffff;
 	}
 	.btn-primary-custom {
 		border: 0;
-		background: #0056b3;
+		background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
 		color: #ffffff;
 		font-weight: 600;
+		border-radius: 8px;
+		padding: 0.55rem 1.15rem;
+		box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+		transition: all 0.2s ease;
 	}
 	.btn-primary-custom:hover,
 	.btn-primary-custom:focus {
-		background: #00458f;
+		background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
 		color: #ffffff;
+		transform: translateY(-1px);
+		box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
 	}
 	.cms-nav-tabs .nav-link.active {
-		background: #0056b3 !important;
+		background: #0284c7 !important;
 		color: #ffffff !important;
-		box-shadow: 0 4px 14px rgba(0, 86, 179, 0.25);
+		box-shadow: 0 4px 14px rgba(2, 132, 199, 0.25);
 	}
 	.cms-nav-tabs .nav-link.active .badge {
 		background: rgba(255, 255, 255, 0.25) !important;
