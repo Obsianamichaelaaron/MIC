@@ -274,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['email']) && !isset($_
     
     if (empty($login_errors)) {
         // Check if user exists and verify password
-        $stmt = $conn->prepare("SELECT user_id, first_name, password, role FROM users WHERE email = ?");
+        $stmt = $conn->prepare("SELECT user_id, first_name, password, role FROM users WHERE LOWER(email) = LOWER(?)");
         $stmt->bind_param("s", $email);
         $stmt->execute();
         $result = $stmt->get_result();
@@ -529,7 +529,7 @@ $stmt->bind_param("sssss", $first_name, $last_name, $email, $phone, $hashed_pass
                 $_SESSION['first_name'] = $first_name;
                 
                 // Redirect to profile
-                header("Location: applicant/Profile.php");
+                header("Location: applicant/profile.php");
                 exit();
             } else {
                 $_SESSION['error'] = "Registration failed. Please try again.";

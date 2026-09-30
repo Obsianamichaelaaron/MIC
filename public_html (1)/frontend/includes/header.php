@@ -878,19 +878,18 @@ $currentPage = basename($_SERVER['PHP_SELF']);
 <body>
 <script>
     // When the browser restores a page from back/forward cache (bfcache),
-    // check if the session is still valid. If not, redirect to login.
+    // check if the session is still valid.
     window.addEventListener('pageshow', function(event) {
         if (event.persisted) {
-            // Page was restored from bfcache — verify session is still alive
             fetch('/frontend/includes/auth/check_session.php', { cache: 'no-store' })
                 .then(function(res) { return res.json(); })
                 .then(function(data) {
-                    if (!data.logged_in) {
+                    if (data && data.logged_in === false) {
                         window.location.replace('/frontend/loginregister.php');
                     }
                 })
                 .catch(function() {
-                    window.location.replace('/frontend/loginregister.php');
+                    // Do not force logout on aborted requests or temporary network drops
                 });
         }
     });
