@@ -18,7 +18,7 @@
                             {% if profile.profile_pic %}
                                 <img src="{{ profile.profile_pic.url }}" alt="{{ user.full_name }}" class="w-100 h-100 object-fit-cover">
                             {% else %}
-                                <span>{{ user.first _name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}</span>
+                                <span>{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}</span>
                             {% endif %}
                         </div>
                     </div>
