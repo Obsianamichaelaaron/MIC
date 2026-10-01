@@ -1,533 +1,587 @@
 {% include 'includes/header.html' %}
-<!-- ═══════════════════ DASHBOARD PAGE STYLES (Matching Profile Design) ═══════════════════ -->
+<!-- ═══════════════════ APPLICANT DASHBOARD STYLES ═══════════════════ -->
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap');
 
-/* ── Base ── */
-.db-page { font-family: 'DM Sans', sans-serif; background: #c7d1dd; min-height: 100vh; }
+/* ── Base Container ── */
+.portal-dashboard {
+    min-height: 100vh;
+    padding: 1.25rem 1rem 3rem;
+    background: #c7d1dd;
+    color: #1a1a2e;
+    font-family: 'DM Sans', sans-serif;
+}
+.portal-shell {
+    max-width: 1260px;
+    margin: 0 auto;
+}
 
-/* ── Hero Banner ── */
-.db-hero {
-    background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 55%, #2196f3 100%);
-    padding: 2.5rem 0 4.5rem;
+/* ── Hero Profile Card ── */
+.applicant-hero-card {
     position: relative;
     overflow: hidden;
+    width: 100%;
+    padding: 1.6rem 1.8rem;
+    margin: 0 auto 1.25rem;
+    border-radius: 18px;
+    background:
+        linear-gradient(115deg, rgba(10,61,107,.98) 0%, rgba(24,102,163,.96) 58%, rgba(33,150,243,.96) 100%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 1px, transparent 1px 18px);
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(10,61,107,.2);
 }
-.db-hero::before {
+.applicant-hero-card::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: url('../images/bg.jpg') center/cover no-repeat;
-    opacity: 1px;
+    background: linear-gradient(90deg, transparent 0 65%, rgba(84,213,239,.18) 100%);
+    pointer-events: none;
 }
-.db-hero::after {
+.applicant-hero-card::after {
     content: '';
     position: absolute;
-    bottom: -2px;
-    left: 0; right: 0;
-    height: 60px;
-    background: #c7d1dd;
-    clip-path: ellipse(55% 100% at 50% 100%);
+    width: 320px;
+    height: 320px;
+    right: -100px;
+    top: -160px;
+    border: 44px solid rgba(255,255,255,.08);
+    border-radius: 50%;
+    pointer-events: none;
 }
-.db-hero-inner {
+.portal-hero-content {
     position: relative;
     z-index: 1;
-    text-align: center;
-    color: #fff;
 }
-.db-hero-inner h1 {
-    font-family: 'DM Serif Display', serif;
-    font-size: 2rem;
-    font-weight: 400;
-    margin: 0 0 .4rem;
-    letter-spacing: .3px;
-}
-.db-hero-inner p {
-    font-size: .92rem;
-    color: rgba(255,255,255,.8);
-    margin: 0;
-}
-
-/* ── Page shell - 3 COLUMN LAYOUT (sidebar | center | right) ── */
-.db-shell {
-    max-width: 1400px;
-    margin: -2rem auto 4rem;
-    padding: 0 1.25rem;
-    display: grid;
-    grid-template-columns: 280px 1fr 360px;
-    gap: 1.75rem;
-    align-items: start;
-}
-
-/* ── Sidebar (column 1) ── */
-.db-sidebar {
-    position: sticky;
-    top: 80px;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-.db-id-card {
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(0,0,0,.08);
-    overflow: hidden;
-}
-.db-id-top {
-    background: linear-gradient(135deg, #1a2f5a, #ab2a85);
-    padding: 1.6rem 1.2rem 3.5rem;
-    text-align: center;
-    position: relative;
-}
-.db-avatar {
-    width: 80px; height: 80px;
-    border-radius: 50%;
-    background: rgba(255,255,255,.18);
-    border: 3px solid rgba(255,255,255,.5);
-    margin: 0 auto 0;
-    display: flex; align-items: center; justify-content: center;
-    font-family: 'DM Serif Display', serif;
-    font-size: 2rem;
-    color: #fff;
-    letter-spacing: 1px;
-}
-.db-id-body { padding: 2.2rem 1.2rem 1.4rem; text-align: center; }
-.db-id-name { font-size: 1.1rem; font-weight: 700; color: #1a1a2e; margin-bottom: .2rem; }
-.db-id-email { font-size: .8rem; color: #888; margin-bottom: .8rem; }
-.db-id-badge {
-    display: inline-flex; align-items: center; gap: .35rem;
-    background: #e8f0fe; color: #1866a3;
-    font-size: .75rem; font-weight: 600;
-    padding: .3rem .75rem; border-radius: 20px;
-    margin-bottom: 1rem;
-}
-.db-id-stats {
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
-    gap: .6rem; border-top: 1px solid #f0f0f0; padding-top: 1rem;
-}
-.db-stat { text-align: center; }
-.db-stat-num { font-size: 1.3rem; font-weight: 700; color: #1866a3; }
-.db-stat-lbl { font-size: .72rem; color: #999; }
-
-/* Sidebar nav */
-.db-sidenav {
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(0,0,0,.08);
-    overflow: hidden;
-}
-.db-sidenav-title {
-    font-size: .7rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 1.2px; color: #aaa;
-    padding: 1rem 1.2rem .5rem;
-}
-.db-sidenav a {
-    display: flex; align-items: center; gap: .75rem;
-    padding: .75rem 1.2rem;
-    font-size: .87rem; font-weight: 500;
-    color: #555; text-decoration: none;
-    border-left: 3px solid transparent;
-    transition: all .18s;
-}
-.db-sidenav a:hover, .db-sidenav a.active {
-    background: #f0f5ff; color: #1866a3;
-    border-left-color: #1866a3;
-}
-.db-sidenav a i { width: 18px; text-align: center; font-size: .85rem; }
-
-/* ── Center Column (main content) ── */
-.db-center {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    min-width: 0;
-}
-
-/* ── Right Column (job recommendations) ── */
-.db-right {
-    position: sticky;
-    top: 80px;
-    display: flex;
-    flex-direction: column;
-    gap: 1.25rem;
-}
-
-/* Right column custom header */
-.right-col-header {
-   background: linear-gradient(135deg, #1a2f5a, #ab2a85);
-    border-radius: 16px 16px 0 0;
-    padding: 1rem 1.2rem;
-    color: white;
-}
-.right-col-header h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0;
+.portal-identity {
     display: flex;
     align-items: center;
-    gap: 8px;
-}
-.right-col-header p {
-    font-size: 0.7rem;
-    margin: 4px 0 0;
-    opacity: 0.85;
-}
-.right-content {
-    background: #fff;
-    border-radius: 0 0 16px 16px;
-    padding: 1.2rem;
-}
-
-/* Compact job card for right column */
-.job-compact-card {
-    border: 1px solid #f0f0f0;
-    border-radius: 12px;
-    padding: 0.9rem;
-    margin-bottom: 1rem;
-    transition: all 0.2s;
-}
-.job-compact-card:hover {
-    border-color: #1866a3;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-.job-compact-title {
-    font-weight: 700;
-    color: #1866a3;
-    font-size: 0.85rem;
-    margin-bottom: 4px;
-}
-.job-compact-company {
-    font-size: 0.7rem;
-    color: #888;
-    margin-bottom: 6px;
-}
-.job-compact-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    font-size: 0.65rem;
-    color: #666;
-    margin: 6px 0;
-}
-.match-badge-sm {
-    background: #28a745;
-    color: white;
-    padding: 2px 8px;
-    border-radius: 12px;
-    font-size: 0.65rem;
-    font-weight: 600;
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-}
-.compact-actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-}
-.compact-btn {
-    padding: 4px 10px;
-    border-radius: 6px;
-    text-decoration: none;
-    font-size: 0.7rem;
-    font-weight: 500;
-}
-.compact-btn-view { background: #1866a3; color: white; }
-.compact-btn-apply { background: #ff6a00; color: white; }
-
-/* Alert banners */
-.db-alert {
-    border-radius: 10px;
-    padding: .9rem 1.1rem;
-    font-size: .88rem;
-    display: flex; align-items: flex-start; gap: .65rem;
-    animation: db-fadein .3s ease;
-}
-@keyframes db-fadein { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
-.db-alert-success { background: #f0faf0; color: #2e7d32; border: 1px solid #c8e6c9; }
-.db-alert-error   { background: #fff5f5; color: #c62828; border: 1px solid #ffcdd2; }
-.db-alert-info    { background: #e8f4ff; color: #1565c0; border: 1px solid #bbdefb; }
-.db-alert i { margin-top: .15rem; flex-shrink: 0; }
-
-/* ── Section Cards (center) ── */
-.db-section {
-    background: #fff;
-    border-radius: 16px;
-    box-shadow: 0 2px 16px rgba(0,0,0,.06);
-    overflow: hidden;
-    transition: box-shadow .25s;
-}
-.db-section:hover { box-shadow: 0 6px 28px rgba(0,0,0,.1); }
-.db-section-head {
-    padding: 1.25rem 1.75rem;
-    border-bottom: 1px solid #f2f4f8;
-    display: flex; align-items: center; gap: .7rem;
-}
-.db-section-icon {
-    width: 36px; height: 36px; border-radius: 10px;
-    background: #e8f0fe; color: #1866a3;
-    display: flex; align-items: center; justify-content: center;
-    font-size: .9rem; flex-shrink: 0;
-}
-.db-section-head h2 {
-    font-size: 1rem; font-weight: 700; color: #1a1a2e; margin: 0;
-}
-.db-section-head p {
-    font-size: .78rem; color: #999; margin: .1rem 0 0;
-}
-.db-section-body { padding: 1.5rem 1.75rem; }
-
-/* Stats Grid (3 cards) */
-.db-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(150px, 1fr));
     gap: 1.1rem;
-    align-items: stretch;
-    width: 100%;
 }
-.db-stat-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 1.1rem .9rem;
-    text-align: center;
-    box-shadow: 0 2px 16px rgba(0,0,0,.06);
-    transition: all .25s;
-    border: 1px solid #f0f0f0;
-    min-height: 195px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    width: 100%;
-    overflow: visible;
-}
-.db-stat-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 28px rgba(0,0,0,.1);
-}
-.db-stat-icon {
-    width: 52px; height: 52px;
+.applicant-avatar-ring {
+    width: 72px;
+    height: 72px;
+    flex: 0 0 72px;
+    padding: 3px;
     border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    margin: 0 auto .85rem;
-    font-size: 1.2rem;
-    flex-shrink: 0;
-    line-height: 1;
+    background: rgba(255,255,255,.35);
 }
-.db-score-gauge {
-    width: 74px;
-    height: 74px;
+.applicant-avatar-inner {
+    width: 100%;
+    height: 100%;
     border-radius: 50%;
     display: grid;
     place-items: center;
-    margin: 0 auto .85rem;
-    background: conic-gradient(var(--score-color, #4CAF50) var(--latest-score, 0%), #e8f0fe 0);
-    position: relative;
-    flex-shrink: 0;
-}
-.db-score-gauge::after {
-    content: '';
-    position: absolute;
-    inset: 7px;
-    border-radius: 50%;
-    background: #fff;
-}
-.db-score-gauge-value {
-    position: relative;
-    z-index: 1;
-    color: #1a1a2e;
-    font-size: .9rem;
+    overflow: hidden;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    font-size: 1.4rem;
     font-weight: 700;
 }
-.db-stat-value {
-    font-size: clamp(1.5rem, 2vw, 2.5rem);
-    font-weight: 700;
-    color: #1a1a2e;
-    margin-bottom: .2rem;
-    line-height: 1.2;
-    letter-spacing: -0.03em;
-    display: block;
-    white-space: nowrap;
-}
-.db-stat-label {
-    font-size: .8rem;
-    color: #666;
-    font-weight: 500;
-    max-width: 100%;
-    line-height: 1.45;
-    word-break: break-word;
-    display: block;
-}
-.db-stat-sub {
-    font-size: .72rem;
-    color: #999;
-    margin-top: .45rem;
-    line-height: 1.4;
-    min-height: 2.2em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    white-space: normal;
+.applicant-avatar-inner img {
     width: 100%;
-    max-width: 180px;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
-
-/* Quick Actions */
-.db-quick-actions {
-    background: #f8fafd;
-    border-radius: 14px;
-    padding: 1.2rem;
-    border-left: 4px solid #9C27B0;
+.portal-name {
+    margin: 0;
+    color: #fff;
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
 }
-.db-quick-actions h3 {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: .5rem;
-}
-.db-quick-actions p {
-    font-size: .85rem;
-    color: #666;
-    margin-bottom: 1rem;
-    line-height: 1.5;
-}
-.db-btn-group {
+.portal-meta {
+    margin: .3rem 0 0;
+    color: rgba(255,255,255,.82);
+    font-size: .84rem;
     display: flex;
-    gap: .8rem;
     flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
 }
-.db-btn {
-    padding: .6rem 1.2rem;
-    border-radius: 6px;
+.portal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .45rem;
+}
+.portal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .25rem .6rem;
+    border: 1px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.12);
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+}
+.profile-health {
+    margin-top: .9rem;
+    max-width: 580px;
+}
+.profile-health-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: .35rem;
+    color: rgba(255,255,255,.9);
+    font-size: .75rem;
+    font-weight: 500;
+}
+.profile-health-track {
+    height: 7px;
+    overflow: hidden;
+    border-radius: 99px;
+    background: rgba(0,0,0,.28);
+}
+.profile-health-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #38bdf8 0%, #4ade80 100%);
+    transition: width .5s ease;
+}
+.portal-actions {
+    position: absolute;
+    top: 50%;
+    right: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .6rem;
+    transform: translateY(-50%);
+}
+.portal-actions a {
+    padding: .65rem .95rem;
+    border-radius: 8px;
     text-decoration: none;
+    font-size: .8rem;
     font-weight: 600;
     display: inline-flex;
     align-items: center;
-    gap: .4rem;
-    transition: all .2s;
-    font-size: .85rem;
+    gap: .45rem;
+    transition: all .2s ease;
 }
-.db-btn-primary {
-    background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%);
-    color: white;
+.portal-actions-primary {
+    background: #0056b3;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.2);
+    box-shadow: 0 4px 12px rgba(0,86,179,.25);
 }
-.db-btn-primary:hover {
+.portal-actions-primary:hover {
+    background: #004494;
+    color: #fff;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(156, 39, 176, 0.3);
 }
-.db-btn-secondary {
-    background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-    color: white;
+.portal-actions-secondary {
+    border: 1px solid rgba(255,255,255,.65);
+    background: rgba(255,255,255,.1);
+    color: #fff;
+    backdrop-filter: blur(4px);
 }
-.db-btn-secondary:hover {
+.portal-actions-secondary:hover {
+    background: rgba(255,255,255,.22);
+    color: #fff;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
-/* Score info box */
-.db-score-info {
-    border-radius: 12px;
-    padding: 1rem;
-    border-left: 4px solid;
+/* ── Top 4 KPI Metrics ── */
+.portal-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: .85rem;
+    margin-bottom: 1.25rem;
+    width: 100%;
+    box-sizing: border-box;
 }
-.db-score-info h4 {
-    font-size: .9rem;
-    font-weight: 600;
-    margin-bottom: .5rem;
-}
-.db-score-info p {
-    font-size: .85rem;
-    line-height: 1.5;
-    margin: 0;
-}
-
-/* Feedback cards (center) */
-.db-feedback-card {
-    border: 1.5px solid #f0f0f0;
-    border-radius: 12px;
-    padding: 1.2rem;
+.portal-kpi, .portal-card {
     background: #fff;
-    transition: all .2s;
-    margin-bottom: 1rem;
+    border: 1px solid #e5eaf1;
+    border-radius: 14px;
+    box-shadow: 0 3px 14px rgba(15,23,42,.06);
+    width: 100%;
+    box-sizing: border-box;
 }
-.db-feedback-card:hover {
-    border-color: #1866a3;
-    box-shadow: 0 4px 16px rgba(24,102,163,.1);
+.portal-kpi {
+    transition: transform .2s ease, box-shadow .2s ease;
+    padding: 1.1rem 1.25rem;
+    border-top: 3.5px solid #0056b3;
 }
-.db-feedback-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: .8rem;
+.portal-kpi:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(10,61,107,.12);
 }
-.db-job-title {
-    font-size: 1rem;
+.portal-kpi:nth-child(2) { border-top-color: #0284c7; }
+.portal-kpi:nth-child(3) { border-top-color: #f59e0b; }
+.portal-kpi:nth-child(4) { border-top-color: #10b981; }
+.portal-kpi-label {
+    color: #64748b;
+    font-size: .7rem;
     font-weight: 700;
-    color: #1866a3;
-    margin-bottom: .2rem;
+    letter-spacing: .06em;
+    text-transform: uppercase;
 }
-.db-job-desc {
-    font-size: .83rem;
-    color: #666;
-    line-height: 1.55;
-    margin-bottom: 1rem;
-}
-.db-job-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .8rem;
-    margin-bottom: .8rem;
-}
-.db-job-meta span {
-    font-size: .8rem;
-    color: #666;
+.portal-kpi-row {
     display: flex;
     align-items: center;
-    gap: .3rem;
+    justify-content: space-between;
+    margin-top: .3rem;
+}
+.portal-kpi-value {
+    color: #0f172a;
+    font-size: 1.85rem;
+    font-weight: 700;
+    line-height: 1;
+}
+.portal-kpi-icon {
+    color: #0056b3;
+    font-size: 1.35rem;
+}
+.portal-kpi:nth-child(2) .portal-kpi-icon { color: #0284c7; }
+.portal-kpi:nth-child(3) .portal-kpi-icon { color: #f59e0b; }
+.portal-kpi:nth-child(4) .portal-kpi-icon { color: #10b981; }
+
+/* ── Main Content Grid (Left / Right) ── */
+.portal-main-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.85fr) minmax(320px, 1.15fr);
+    gap: 1.25rem;
+    align-items: start;
+    width: 100%;
+    box-sizing: border-box;
+}
+.portal-main-grid > main, .portal-main-grid > aside {
+    width: 100%;
+    box-sizing: border-box;
+}
+.portal-card {
+    padding: 1.35rem;
+    margin-bottom: 1.25rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+.portal-card-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding-bottom: .85rem;
+    margin-bottom: 1.1rem;
+    border-bottom: 1px solid #e8edf3;
+}
+.portal-card-heading h2 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1.05rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+}
+.portal-card-heading a {
+    color: #0056b3;
+    font-size: .8rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+.portal-card-heading a:hover {
+    color: #004494;
+    text-decoration: underline;
 }
 
-/* Empty state */
-.db-empty-state {
+/* ── Job Cards Grid ── */
+.portal-jobs {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    width: 100%;
+    box-sizing: border-box;
+}
+.portal-jobs article.portal-job:only-child {
+    grid-column: 1 / -1;
+}
+.portal-job {
+    display: flex;
+    min-height: 160px;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 1.1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #fff;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.portal-job:hover {
+    transform: translateY(-3px);
+    border-color: #0056b3;
+    box-shadow: 0 8px 20px rgba(0,86,179,.1);
+}
+.portal-job-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .5rem;
+}
+.portal-job h3 {
+    margin: 0 0 .25rem;
+    color: #0f172a;
+    font-size: .96rem;
+    font-weight: 700;
+}
+.portal-job p {
+    margin: .2rem 0 0;
+    color: #64748b;
+    font-size: .76rem;
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+}
+.portal-match {
+    padding: .25rem .6rem;
+    border-radius: 999px;
+    background: #e8f5e9;
+    color: #2e7d32;
+    font-size: .7rem;
+    font-weight: 700;
+    white-space: nowrap;
+    border: 1px solid #c8e6c9;
+}
+.portal-job-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin-top: .8rem;
+}
+.portal-job-tag {
+    padding: .22rem .5rem;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 6px;
+    color: #475569;
+    font-size: .7rem;
+    font-weight: 500;
+}
+.portal-job-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+    padding-top: .85rem;
+    margin-top: .9rem;
+    border-top: 1px solid #f1f5f9;
+}
+.portal-job-actions a {
+    color: #0056b3;
+    font-size: .78rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+.portal-job-actions a:last-child {
+    color: #fff;
+    padding: .4rem .75rem;
+    border-radius: 6px;
+    background: #0056b3;
+    font-weight: 600;
+    transition: background .2s ease;
+}
+.portal-job-actions a:last-child:hover {
+    background: #004494;
+}
+
+/* ── Application Pipeline Table ── */
+.portal-table-wrap {
+    overflow-x: auto;
+    width: 100%;
+    box-sizing: border-box;
+}
+.portal-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .8rem;
+}
+.portal-table th, .portal-table td {
+    padding: .85rem .65rem;
+    border-bottom: 1px solid #edf0f4;
+    text-align: left;
+}
+.portal-table th {
+    color: #64748b;
+    font-size: .7rem;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    font-weight: 700;
+    background: #f8fafc;
+}
+.portal-table td {
+    color: #334155;
+}
+.portal-status {
+    padding: .25rem .6rem;
+    border-radius: 999px;
+    background: #e8f0fe;
+    color: #1866a3;
+    font-size: .7rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: inline-block;
+}
+
+/* ── Employability Gauge & Breakdown ── */
+.portal-gauge {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    margin: .75rem auto 1.35rem;
+    border-radius: 50%;
+    background: conic-gradient(var(--score-color, #0056b3) var(--score-pct, 0%), #edf1f5 0);
+}
+.portal-gauge::after {
+    content: '';
+    position: absolute;
+    inset: 15px;
+    border-radius: 50%;
+    background: #fff;
+}
+.portal-gauge-center {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: grid;
+    place-content: center;
     text-align: center;
-    padding: 2rem;
-    color: #666;
 }
-.db-empty-state i {
-    font-size: 2.5rem;
-    color: #ddd;
-    margin-bottom: .8rem;
+.portal-gauge-value {
+    color: #0f172a;
+    font-size: 1.9rem;
+    font-weight: 700;
+    line-height: 1.1;
 }
-.db-empty-state h3 {
-    font-size: 1rem;
-    color: #333;
-    margin-bottom: .5rem;
+.portal-gauge-label {
+    color: #64748b;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
 }
-.db-empty-state p {
-    font-size: .85rem;
-    margin-bottom: 1rem;
+.portal-progress-row {
+    margin: .85rem 0;
+    color: #475569;
+    font-size: .76rem;
+}
+.portal-progress-label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: .35rem;
+    font-weight: 500;
+}
+.portal-progress-track {
+    height: 7px;
+    border-radius: 99px;
+    background: #edf1f5;
+    overflow: hidden;
+}
+.portal-progress-value {
+    height: 100%;
+    border-radius: inherit;
+    background: var(--bar-color, #0056b3);
+    width: var(--progress-w, 0%);
+    transition: width .5s ease;
 }
 
-/* Floating chat */
+/* ── Interviews & Empty States ── */
+.portal-interview {
+    padding: .95rem;
+    border-left: 3.5px solid #f59e0b;
+    border-radius: 8px;
+    background: #fffbeb;
+    margin-bottom: .75rem;
+}
+.portal-interview strong {
+    display: block;
+    color: #0f172a;
+    font-size: .88rem;
+    margin-bottom: .2rem;
+}
+.portal-interview span {
+    color: #64748b;
+    font-size: .76rem;
+    display: block;
+    margin-bottom: .4rem;
+}
+.portal-interview a {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    font-size: .75rem;
+    font-weight: 600;
+    color: #0056b3;
+    text-decoration: none;
+}
+.portal-interview a:hover {
+    text-decoration: underline;
+}
+.portal-empty {
+    padding: 1.75rem 1.25rem;
+    border: 1.5px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+    color: #64748b;
+    text-align: center;
+    font-size: .84rem;
+}
+.portal-empty a {
+    color: #0056b3;
+    font-weight: 600;
+    text-decoration: none;
+}
+.portal-empty a:hover {
+    color: #004494;
+    text-decoration: underline;
+}
+
+/* ── Floating Chat Button ── */
 .db-float {
-    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 9999;
 }
 .db-float-btn {
-    width: 58px; height: 58px; border-radius: 50%;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
     background: linear-gradient(135deg, #1866a3, #0a3d6b);
-    color: #fff; display: flex; align-items: center; justify-content: center;
-    font-size: 1.35rem; text-decoration: none;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
+    text-decoration: none;
     box-shadow: 0 6px 20px rgba(24,102,163,.45);
-    transition: all .25s; position: relative;
+    transition: all .25s;
+    position: relative;
 }
-.db-float-btn:hover { transform: translateY(-3px) scale(1.06); color: #fff; }
+.db-float-btn:hover {
+    transform: translateY(-3px) scale(1.06);
+    color: #fff;
+}
 .db-float-badge {
-    position: absolute; top: -3px; right: -3px;
-    background: #f44336; color: #fff;
-    border-radius: 50%; width: 22px; height: 22px;
-    font-size: .7rem; font-weight: 700;
-    display: flex; align-items: center; justify-content: center;
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    background: #f44336;
+    color: #fff;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    font-size: .7rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border: 2.5px solid #fff;
     animation: db-pulse 2s infinite;
 }
@@ -537,364 +591,417 @@
     100%{ box-shadow: 0 0 0 0 rgba(244,67,54,0); }
 }
 .db-float-tip {
-    position: absolute; right: 68px; top: 50%;
+    position: absolute;
+    right: 68px;
+    top: 50%;
     transform: translateY(-50%);
-    background: rgba(0,0,0,.78); color: #fff;
-    padding: .45rem .9rem; border-radius: 7px;
-    font-size: .78rem; white-space: nowrap;
-    opacity: 0; visibility: hidden; transition: all .2s;
+    background: rgba(0,0,0,.8);
+    color: #fff;
+    padding: .45rem .9rem;
+    border-radius: 7px;
+    font-size: .78rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all .2s;
     pointer-events: none;
 }
-.db-float-tip::after {
-    content: ''; position: absolute;
-    top: 50%; left: 100%; transform: translateY(-50%);
-    border: 5px solid transparent;
-    border-left-color: rgba(0,0,0,.78);
+.db-float-btn:hover .db-float-tip {
+    opacity: 1;
+    visibility: visible;
+    right: 72px;
 }
-.db-float-btn:hover .db-float-tip { opacity: 1; visibility: visible; right: 72px; }
 
-/* Dark mode support */
-[data-theme="dark"] .db-page             { background: #0f1117; }
-[data-theme="dark"] .db-hero::after      { background: #0f1117; }
-[data-theme="dark"] .db-id-card,
-[data-theme="dark"] .db-sidenav,
-[data-theme="dark"] .db-section,
-[data-theme="dark"] .db-stat-card,
-[data-theme="dark"] .right-content        { background: #1a1d27; box-shadow: 0 2px 16px rgba(0,0,0,.3); }
-[data-theme="dark"] .db-section-head     { border-bottom-color: #2d3348; }
-[data-theme="dark"] .db-section-head h2,
-[data-theme="dark"] .db-id-name,
-[data-theme="dark"] .db-stat-value       { color: #e2e8f0; }
-[data-theme="dark"] .db-id-email,
-[data-theme="dark"] .db-stat-label,
-[data-theme="dark"] .db-stat-lbl         { color: #94a3b8; }
-[data-theme="dark"] .db-score-gauge::after { background: #1a1d27; }
-[data-theme="dark"] .db-score-gauge-value { color: #e2e8f0; }
-[data-theme="dark"] .db-quick-actions    { background: #1e2235; }
-[data-theme="dark"] .db-quick-actions h3,
-[data-theme="dark"] .db-quick-actions p  { color: #cbd5e1; }
-[data-theme="dark"] .job-compact-card,
-[data-theme="dark"] .db-feedback-card    { background: #1e2235; border-color: #2d3348; }
-[data-theme="dark"] .db-job-title,
-[data-theme="dark"] .job-compact-title   { color: #7aa2f7; }
-[data-theme="dark"] .db-job-desc,
-[data-theme="dark"] .job-compact-company { color: #94a3b8; }
-[data-theme="dark"] .db-sidenav a        { color: #94a3b8; }
-[data-theme="dark"] .db-sidenav a:hover,
-[data-theme="dark"] .db-sidenav a.active { background: rgba(99,179,237,.08); color: #7aa2f7; border-left-color: #7aa2f7; }
-
-/* Responsive */
-@media (max-width: 1100px) {
-    .db-shell {
-        grid-template-columns: 260px 1fr;
-    }
-    .db-right {
-        grid-column: span 2;
+/* ── Responsive ── */
+@media (max-width: 992px) {
+    .portal-kpis { grid-template-columns: repeat(2, 1fr); }
+    .portal-main-grid { grid-template-columns: 1fr; }
+    .portal-actions {
         position: static;
+        justify-content: flex-start;
+        margin-top: 1rem;
+        transform: none;
     }
 }
-@media (max-width: 768px) {
-    .db-shell {
-        grid-template-columns: 1fr;
-    }
-    .db-right {
-        grid-column: span 1;
-    }
-    .db-stats-grid {
-        grid-template-columns: repeat(2, minmax(140px, 1fr));
-        gap: .8rem;
-    }
-    .db-stat-card {
-        min-height: 180px;
-    }
+@media (max-width: 600px) {
+    .portal-dashboard { padding: .85rem .6rem 2.5rem; }
+    .applicant-hero-card { padding: 1.25rem; }
+    .portal-kpis, .portal-jobs { grid-template-columns: 1fr; }
+    .portal-identity { align-items: flex-start; }
+    .portal-name { font-size: 1.2rem; }
 }
-@media (max-width: 520px) {
-    .db-stats-grid {
-        grid-template-columns: 1fr;
-        gap: .8rem;
-    }
-    .db-stat-card {
-        min-height: 170px;
-    }
-    .db-stat-value {
-        white-space: normal;
-    }
+
+/* ── Dark Mode Support ── */
+[data-theme="dark"] .portal-dashboard {
+    background: #0f1117;
+    color: #e2e8f0;
 }
-@media (max-width: 480px) {
-    .db-hero-inner h1 { font-size: 1.5rem; }
-    .db-shell { padding: 0 .75rem; margin-top: -1.5rem; }
-    .db-section-body { padding: 1rem; }
-    .db-float { bottom: 16px; right: 16px; }
+[data-theme="dark"] .portal-kpi,
+[data-theme="dark"] .portal-card,
+[data-theme="dark"] .portal-job {
+    background: #1a1d27;
+    border-color: #2d3348;
+}
+[data-theme="dark"] .portal-kpi-value,
+[data-theme="dark"] .portal-card-heading h2,
+[data-theme="dark"] .portal-job h3,
+[data-theme="dark"] .portal-interview strong {
+    color: #e2e8f0;
+}
+[data-theme="dark"] .portal-job-tag,
+[data-theme="dark"] .portal-table th,
+[data-theme="dark"] .portal-table td {
+    border-color: #2d3348;
+    color: #cbd5e1;
+}
+[data-theme="dark"] .portal-table th {
+    background: #141721;
+}
+[data-theme="dark"] .portal-gauge::after {
+    background: #1a1d27;
+}
+[data-theme="dark"] .portal-gauge-value {
+    color: #e2e8f0;
+}
+[data-theme="dark"] .portal-progress-track {
+    background: #2d3348;
+}
+[data-theme="dark"] .portal-empty {
+    background: #151926;
+    border-color: #2d3348;
+    color: #94a3b8;
 }
 </style>
 
-<div class="db-page">
+<div class="portal-dashboard">
+    <div class="portal-shell">
 
-<!-- ── Hero ── -->
-<div class="db-hero">
-    <div class="db-hero-inner">
-        <h1><i class="fas fa-tachometer-alt" style="font-size:1.6rem;vertical-align:middle;margin-right:.4rem;"></i> Dashboard</h1>
-        <p>Welcome back, {{ applicant.user.first_name }}! Here's your job search overview.</p>
-    </div>
-</div>
-
-<!-- ── 3-COLUMN SHELL (Sidebar | Center | Right/Recommendations) ── -->
-<div class="db-shell">
-
-    <!-- ══ COLUMN 1: SIDEBAR (unchanged design) ══ -->
-    <aside class="db-sidebar">
-
-        <!-- Identity card -->
-        <div class="db-id-card">
-            <div class="db-id-top">
-              <div class="db-avatar">
-    {% if applicant.profile_pic %}
-        <img src="../{{ applicant.profile_pic }}" alt="Profile" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">
-    {% else %}
-        {{ applicant|initials }}
-    {% endif %}
-</div>
-            </div>
-            <div class="db-id-body">
-                <div class="db-id-name">{{ applicant.user.first_name }}</div>
-                <div class="db-id-email">{{ applicant.email|default:"" }}</div>
-                <div class="db-id-badge"><i class="fas fa-user-tie"></i> Applicant</div>
-                <div class="db-id-stats">
-                    <div class="db-stat">
-                        <div class="db-stat-num">{{ app_count }}</div>
-                        <div class="db-stat-lbl">Applications</div>
-                    </div>
-                    <div class="db-stat">
-                        <div class="db-stat-num">{{ pending_count }}</div>
-                        <div class="db-stat-lbl">Pending</div>
-                    </div>
-                    <div class="db-stat">
-                        <div class="db-stat-num">{{ latest_score|floatformat:0 }}%</div>
-                        <div class="db-stat-lbl">Score</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Sidenav -->
-        <nav class="db-sidenav">
-            <div class="db-sidenav-title">Dashboard Sections</div>
-            <a href="#sec-stats"><i class="fas fa-chart-line"></i> Statistics</a>
-            <a href="#sec-quick"><i class="fas fa-bolt"></i> Quick Actions</a>
-            {% if feedback_list %}
-                <a href="#sec-feedback"><i class="fas fa-comments"></i> Recent Feedback</a>
-            {% endif %}
-        </nav>
-
-    </aside>
-
-    <!-- ══ COLUMN 2: CENTER MAIN CONTENT (Stats, Quick Actions, Score, Feedback) ══ -->
-    <div class="db-center">
-
-        <!-- Stats Cards Section -->
-        <div class="db-section" id="sec-stats">
-            <div class="db-section-head">
-                <div class="db-section-icon"><i class="fas fa-chart-simple"></i></div>
-                <div>
-                    <h2>Your Statistics</h2>
-                    <p>Overview of your job search activity</p>
-                </div>
-            </div>
-            <div class="db-section-body">
-                <div class="db-stats-grid">
-                    <!-- Employability Score Card -->
-                    <div class="db-stat-card">
-                        <div class="db-stat-icon" style="background: linear-gradient(135deg, {{ score_color }} 0%, {{ score_color }}dd 100%); color: white;">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div class="db-stat-value">{{ display_score }}%</div>
-                        <div class="db-stat-label">Employability Score</div>
-                        {% if latest_score > 0 %}
-                            <div class="db-stat-sub" style="--score-color: {{ score_color }}; color: var(--score-color); font-weight: 600;">
-                                {{ score_description }}
-                            </div>
-                        {% else %}
-                            <div class="db-stat-sub">Take assessment to get score</div>
-                        {% endif %}
-                    </div>
-                    
-                    <!-- Total Applications Card -->
-                    <div class="db-stat-card">
-                        <div class="db-stat-icon" style="background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); color: white;">
-                            <i class="fas fa-paper-plane"></i>
-                        </div>
-                        <div class="db-stat-value">{{ app_count }}</div>
-                        <div class="db-stat-label">Total Applications</div>
-                    </div>
-                    
-                    <!-- Pending Applications Card -->
-                    <div class="db-stat-card">
-                        <div class="db-stat-icon" style="background: linear-gradient(135deg, #ff6b00 0%, #e55a00 100%); color: white;">
-                            <i class="fas fa-clock"></i>
-                        </div>
-                        <div class="db-stat-value">{{ pending_count }}</div>
-                        <div class="db-stat-label">Pending Applications</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Quick Actions Section -->
-        <div class="db-section" id="sec-quick">
-            <div class="db-section-head">
-                <div class="db-section-icon" style="background: #f3e5f5; color: #9C27B0;"><i class="fas fa-bolt"></i></div>
-                <div>
-                    <h2>Quick Actions</h2>
-                    <p>Take action to improve your job search</p>
-                </div>
-            </div>
-            <div class="db-section-body">
-                <div class="db-quick-actions">
-                    <h3><i class="fas fa-rocket"></i> What's Next?</h3>
-                    <p>
-                        {% if latest_score == 0 %}
-                            Complete your career assessment to get your employability score and better job recommendations.
-                        {% else %}
-                            Your current employability score is {{ display_score }}%. Improve your profile to increase your score.
-                        {% endif %}
-                    </p>
-                    <div class="db-btn-group">
-                        <a href="/applicant/chatbot.php" class="db-btn db-btn-primary">
-                            <i class="fas fa-robot"></i> 
-                            {% if latest_score == 0 %}Take Assessment{% else %}Retake Assessment{% endif %}
-                        </a>
-                        <a href="/applicant/profile.php" class="db-btn db-btn-secondary">
-                            <i class="fas fa-user-edit"></i> Update Profile
-                        </a>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Score Explanation if available -->
-        {% if latest_score > 0 %}
-        <div class="db-section">
-            <div class="db-section-head">
-                <div class="db-section-icon"><i class="fas fa-info-circle"></i></div>
-                <div>
-                    <h2>Score Breakdown</h2>
-                    <p>Understanding your employability score</p>
-                </div>
-            </div>
-            <div class="db-section-body">
-                <div class="db-score-info" style="--score-color: {{ score_color }}; border-color: var(--score-color);">
-                    <h4 style="color: #333;"><i class="fas fa-chart-line" style="--score-color: {{ score_color }}; color: var(--score-color);"></i> About Your Employability Score</h4>
-                    <p style="color: #666;">
-                        Your score of <strong>{{ display_score }}%</strong> is calculated based on your career assessment answers. 
-                        {% if latest_score >= 70 %}
-                            This is an excellent score! Employers are likely to view you as a strong candidate.
-                        {% elif latest_score >= 50 %}
-                            This is a good score. Consider updating your skills and experience to improve further.
-                        {% else %}
-                            Consider taking the assessment again or updating your profile to improve your score.
-                        {% endif %}
-                        {% if score_source == 'api' %}
-                            <br><small><i>Calculated using AI assessment</i></small>
-                        {% endif %}
-                    </p>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        <!-- Recent Employer Feedback Section -->
-        {% if feedback_list %}
-        <div class="db-section" id="sec-feedback">
-            <div class="db-section-head">
-                <div class="db-section-icon"><i class="fas fa-comments"></i></div>
-                <div>
-                    <h2>Recent Employer Feedback</h2>
-                    <p>{{ feedback_count }} feedback record{% if feedback_count != 1 %}s{% endif %}</p>
-                </div>
-            </div>
-            <div class="db-section-body">
-                {% for feedback in feedback_list %}
-                    <div class="db-feedback-card">
-                        <div class="db-feedback-header">
-                            <div>
-                                <div class="db-job-title"><i class="fas fa-briefcase" style="font-size:.85rem;margin-right:.3rem;"></i> {{ feedback.job_title }}</div>
-                                <div class="db-feedback-company"><i class="fas fa-building" style="margin-right:.3rem;"></i> {{ feedback.company_name }}</div>
-                            </div>
-                            <span style="background: #4CAF50; color: white; padding: .25rem .8rem; border-radius: 12px; font-size: .7rem; font-weight: 600;">
-                                {{ feedback.application_status|title }}
-                            </span>
-                        </div>
-                        <div class="db-job-desc">{{ feedback.feedback_message }}</div>
-                        <div class="db-job-meta" style="justify-content: space-between; margin-bottom: 0;">
-                            <span><i class="fas fa-user"></i> {{ feedback.employer_first }} {{ feedback.employer_last }}</span>
-                            <span><i class="fas fa-clock"></i> {{ feedback.created_at|date:"M d, Y" }}</span>
-                        </div>
-                    </div>
-                {% endfor %}
-                {% if feedback_count > 3 %}
-                    <div style="text-align: center; margin-top: .5rem;">
-                        <a href="/applicant/applications.php#feedback" style="color: #1866a3; text-decoration: none; font-weight: 600; font-size: .85rem;">
-                            View All ({{ feedback_count }}) <i class="fas fa-arrow-right"></i>
-                        </a>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endif %}
-
-    </div>
-
-    <!-- ══ COLUMN 3: JOB RECOMMENDATIONS (RIGHT SIDE) ══ -->
-    <div class="db-right">
-        <div class="right-col-header">
-            <h3><i class="fas fa-star"></i> Recommended for You</h3>
-            <p>{% if chatbot_completed %}Based on your profile & assessment{% else %}Complete assessment to see matches{% endif %}</p>
-        </div>
-        <div class="right-content">
-            {% if recommendations %}
-                {% for rec in recommendations %}
-                    <div class="job-compact-card">
-                        <div class="job-compact-title">{{ rec.title }}</div>
-                        {% if rec.company_name %}
-                            <div class="job-compact-company"><i class="fas fa-building"></i> {{ rec.company_name }}</div>
-                        {% endif %}
-                        <div class="job-compact-meta">
-                            {% if rec.location %}
-                                <span><i class="fas fa-map-marker-alt"></i> {{ rec.location }}</span>
+        <!-- ════════ 1. APPLICANT HERO BANNER ════════ -->
+        <section class="applicant-hero-card">
+            <div class="portal-hero-content">
+                <div class="portal-identity">
+                    <div class="applicant-avatar-ring">
+                        <div class="applicant-avatar-inner">
+                            {% if applicant.profile_pic %}
+                                <img src="/{{ applicant.profile_pic }}" alt="{{ user.first_name }}">
+                            {% else %}
+                                <span>{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}</span>
                             {% endif %}
-                            {% if rec.employment_type %}
-                                <span><i class="fas fa-briefcase"></i> {{ rec.employment_type|title }}</span>
-                            {% endif %}
-                            <span class="match-badge-sm"><i class="fas fa-chart-line"></i> {{ rec.calculated_match_score|floatformat:1 }}%</span>
-                        </div>
-                        <div class="compact-actions">
-                            <a href="/applicant/job_details.php?id={{ rec.job_id }}" class="compact-btn compact-btn-view"><i class="fas fa-eye"></i> Details</a>
-                            <a href="/applicant/apply_job.php?id={{ rec.job_id }}" class="compact-btn compact-btn-apply"><i class="fas fa-paper-plane"></i> Apply</a>
                         </div>
                     </div>
-                {% endfor %}
-                <div style="text-align: center; margin-top: 0.8rem;">
-                    <a href="/applicant/jobs.php" style="color: #1866a3; font-size: 0.75rem; text-decoration: none;">View all jobs →</a>
+                    <div>
+                        <h1 class="portal-name">{{ user.first_name }} {{ user.last_name }}</h1>
+                        <div class="portal-badges">
+                            {% if chatbot_completed or latest_score >= 60 %}
+                                <span class="portal-badge"><i class="fas fa-circle-check" style="color: #4ade80;"></i> Verified Talent</span>
+                            {% else %}
+                                <span class="portal-badge" style="background: rgba(255,255,255,0.18);"><i class="fas fa-sparkles text-warning"></i> New Talent</span>
+                            {% endif %}
+                            <span class="portal-badge"><i class="fas fa-code" style="color: #67e8f9;"></i> {{ applicant.experience_years|default:0 }} Yrs Exp</span>
+                            <span class="portal-badge"><i class="fas fa-shield-halved"></i> MultiBiz Talent Network</span>
+                        </div>
+                        <p class="portal-meta">
+                            <span><i class="fas fa-graduation-cap"></i> {{ applicant.qualifications|default:"Tech Candidate" }}</span>
+                            <span><i class="fas fa-location-dot"></i> Philippines / Remote</span>
+                        </p>
+                    </div>
                 </div>
-            {% else %}
-                <div class="db-empty-state" style="padding: 1.5rem;">
-                    <i class="fas fa-search" style="font-size: 2rem; color: #ddd;"></i>
-                    <h3 style="font-size: 0.9rem; margin-top: 0.5rem;">{% if chatbot_completed %}No 50%+ matches{% else %}Assessment required{% endif %}</h3>
-                    <p style="font-size: 0.7rem;">{% if chatbot_completed %}Update your profile for better matches{% else %}Take assessment to unlock recommendations{% endif %}</p>
+
+                <!-- Profile Health Meter -->
+                <div class="profile-health">
+                    <div class="profile-health-label">
+                        <span><i class="fas fa-heart-pulse"></i> Profile Completeness</span>
+                        <strong>{{ completion_pct }}% Complete</strong>
+                    </div>
+                    <div class="profile-health-track">
+                        <div class="profile-health-fill" style="width: {{ completion_pct }}%;"></div>
+                    </div>
+                </div>
+
+                <!-- Quick Action Command Strip -->
+                <div class="portal-actions">
+                    <a class="portal-actions-primary" href="/applicant/jobs.php">
+                        <i class="fas fa-wand-magic-sparkles"></i> Explore Matched Jobs
+                    </a>
+                    <a class="portal-actions-secondary" href="/applicant/chatbot.php">
+                        <i class="fas fa-robot"></i> AI Career Copilot
+                    </a>
+                    <a class="portal-actions-secondary" href="/applicant/profile.php">
+                        <i class="fas fa-file-pdf"></i> Manage Resume & Skills
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ════════ 2. TOP 4 METRIC STAT CARDS ════════ -->
+        <section class="portal-kpis">
+            <div class="portal-kpi">
+                <div class="portal-kpi-label">Applications</div>
+                <div class="portal-kpi-row">
+                    <strong class="portal-kpi-value">{{ total_apps }}</strong>
+                    <i class="portal-kpi-icon fas fa-file-signature"></i>
+                </div>
+            </div>
+            <div class="portal-kpi">
+                <div class="portal-kpi-label">Shortlisted</div>
+                <div class="portal-kpi-row">
+                    <strong class="portal-kpi-value">{{ shortlisted_count }}</strong>
+                    <i class="portal-kpi-icon fas fa-star-half-stroke"></i>
+                </div>
+            </div>
+            <div class="portal-kpi">
+                <div class="portal-kpi-label">Interviews</div>
+                <div class="portal-kpi-row">
+                    <strong class="portal-kpi-value">{{ upcoming_interviews|length }}</strong>
+                    <i class="portal-kpi-icon fas fa-video"></i>
+                </div>
+            </div>
+            <div class="portal-kpi">
+                <div class="portal-kpi-label">Offers & Hired</div>
+                <div class="portal-kpi-row">
+                    <strong class="portal-kpi-value">{{ accepted_count }}</strong>
+                    <i class="portal-kpi-icon fas fa-award"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- ════════ 3. MAIN CONTENT GRID ════════ -->
+        <div class="portal-main-grid">
+
+            <!-- ── LEFT COLUMN (65%): Matched Jobs & Application Pipeline ── -->
+            <main>
+                <!-- AI Matched Jobs Card -->
+                <section class="portal-card">
+                    <div class="portal-card-heading">
+                        <h2><i class="fas fa-microchip" style="color:#0056b3"></i> AI Matched Job Opportunities</h2>
+                        <a href="/applicant/jobs.php">View All ({{ recommended_jobs|length }}) <i class="fas fa-arrow-right"></i></a>
+                    </div>
+                    <div class="portal-jobs">
+                        {% for item in recommended_jobs %}
+                            <article class="portal-job">
+                                <div>
+                                    <div class="portal-job-top">
+                                        <div>
+                                            <h3>{{ item.job.title }}</h3>
+                                            <p><i class="fas fa-building"></i> {{ item.job.employer.company_name|default:"MultiBiz Partner" }}</p>
+                                            <p><i class="fas fa-location-dot"></i> {{ item.job.location }}</p>
+                                        </div>
+                                        <span class="portal-match"><i class="fas fa-chart-line"></i> {{ item.match_score }}% Match</span>
+                                    </div>
+                                    <div class="portal-job-tags">
+                                        <span class="portal-job-tag"><i class="fas fa-briefcase"></i> {{ item.job.employment_type|title }}</span>
+                                        <span class="portal-job-tag"><i class="fas fa-money-bill-wave"></i> {{ item.job.salary_range|default:"Negotiable" }}</span>
+                                    </div>
+                                </div>
+                                <div class="portal-job-actions">
+                                    <a href="/applicant/job_details.php?id={{ item.job.job_id }}">
+                                        <i class="fas fa-eye"></i> Details
+                                    </a>
+                                    <a href="/applicant/apply_job.php?id={{ item.job.job_id }}">
+                                        <i class="fas fa-paper-plane"></i> Quick Apply
+                                    </a>
+                                </div>
+                            </article>
+                        {% empty %}
+                            <div class="portal-empty" style="grid-column: 1 / -1; padding: 2.2rem 1.5rem;">
+                                <div style="width: 52px; height: 52px; border-radius: 50%; background: #e0f2fe; color: #0284c7; display: inline-flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 0.8rem;">
+                                    <i class="fas fa-sparkles"></i>
+                                </div>
+                                <h3 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0.3rem;">
+                                    {% if not chatbot_completed %}Unlock Personalized AI Job Matches{% else %}No active 40%+ match listings yet{% endif %}
+                                </h3>
+                                <p style="font-size: 0.8rem; color: #64748b; max-width: 440px; margin: 0 auto 1rem; line-height: 1.5;">
+                                    {% if not chatbot_completed %}
+                                        Complete your conversational career quiz or add tech skills to your profile so our AI ranking engine can curate high-affinity jobs for you.
+                                    {% else %}
+                                        Update your profile skills and experience to expand your recommendation reach.
+                                    {% endif %}
+                                </p>
+                                <div style="display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap;">
+                                    {% if not chatbot_completed %}
+                                        <a href="/applicant/chatbot.php" class="portal-actions-primary" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 0.8rem;">
+                                            <i class="fas fa-robot"></i> Take AI Assessment
+                                        </a>
+                                    {% endif %}
+                                    <a href="/applicant/profile.php" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: #f1f5f9; color: #334155; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 0.8rem; border: 1px solid #cbd5e1;">
+                                        <i class="fas fa-user-gear"></i> Update Profile
+                                    </a>
+                                    <a href="/applicant/jobs.php" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: #f8fafc; color: #0056b3; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 0.8rem; border: 1px solid #bfdbfe;">
+                                        <i class="fas fa-briefcase"></i> Browse All Jobs
+                                    </a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <!-- Live Application Pipeline Card -->
+                <section class="portal-card">
+                    <div class="portal-card-heading">
+                        <h2><i class="fas fa-bars-progress" style="color:#0056b3"></i> Live Application Pipeline</h2>
+                        <a href="/applicant/applications.php">Full Tracker ({{ total_apps }})</a>
+                    </div>
+                    <div class="portal-table-wrap">
+                        <table class="portal-table">
+                            <thead>
+                                <tr>
+                                    <th>Role & Company</th>
+                                    <th>Match</th>
+                                    <th>Stage</th>
+                                    <th>Submitted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for app in recent_applications %}
+                                    <tr>
+                                        <td>
+                                            <strong>{{ app.job.title }}</strong><br>
+                                            <small class="text-muted"><i class="fas fa-building"></i> {{ app.job.employer.company_name|default:"MultiBiz Partner" }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="portal-match" style="padding: 0.15rem 0.45rem; font-size: 0.68rem;">{{ app.match_score }}%</span>
+                                        </td>
+                                        <td>
+                                            <span class="portal-status">{{ app.status|title }}</span>
+                                        </td>
+                                        <td>{{ app.applied_at|date:"M d, Y" }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="4" class="portal-empty" style="padding: 2rem 1rem;">
+                                            <i class="fas fa-folder-open" style="font-size: 1.8rem; color: #94a3b8; margin-bottom: 0.4rem; display: block;"></i>
+                                            <strong style="color: #475569; font-size: 0.88rem;">No active job applications found.</strong>
+                                            <p style="font-size: 0.78rem; color: #94a3b8; margin: 0.2rem 0 0.8rem;">Apply to matching positions to track employer reviews and interviews in real time.</p>
+                                            <a href="/applicant/jobs.php" style="color: #0056b3; font-weight: 600; font-size: 0.82rem;">
+                                                <i class="fas fa-magnifying-glass"></i> Browse Open Positions →
+                                            </a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </main>
+
+            <!-- ── RIGHT COLUMN (35%): AI Employability Index & Interviews ── -->
+            <aside>
+                <!-- AI Employability Index Card -->
+                <section class="portal-card">
+                    <div class="portal-card-heading">
+                        <h2><i class="fas fa-gauge-high" style="color:#0056b3"></i> AI Employability Index</h2>
+                        <span class="portal-status" style="--score-color: {{ score_color }}; color: var(--score-color); border: 1px solid var(--score-color); background: transparent;">
+                            {{ score_description|default:"Live Rating" }}
+                        </span>
+                    </div>
+
+                    <!-- Circular Progress Gauge -->
+                    <div class="portal-gauge" style="--score-color: {{ score_color }}; --score-pct: {{ employability_score|floatformat:0 }}%;">
+                        <div class="portal-gauge-center">
+                            <span class="portal-gauge-value">{{ display_score }}%</span>
+                            <span class="portal-gauge-label">Affinity</span>
+                        </div>
+                    </div>
+
+                    <!-- Breakdown Progress Bars -->
+                    <div class="portal-progress-row">
+                        <div class="portal-progress-label">
+                            <span><i class="fas fa-code" style="color:#0056b3"></i> Tech Skills Coverage</span>
+                            <strong>{{ skills_score }}%</strong>
+                        </div>
+                        <div class="portal-progress-track">
+                            <div class="portal-progress-value" style="--bar-color: #0056b3; --progress-w: {{ skills_score }}%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="portal-progress-row">
+                        <div class="portal-progress-label">
+                            <span><i class="fas fa-briefcase" style="color:#0284c7"></i> Seniority & Experience</span>
+                            <strong>{{ exp_score }}%</strong>
+                        </div>
+                        <div class="portal-progress-track">
+                            <div class="portal-progress-value" style="--bar-color: #0284c7; --progress-w: {{ exp_score }}%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="portal-progress-row">
+                        <div class="portal-progress-label">
+                            <span><i class="fas fa-file-pdf" style="color:#e11d48"></i> Resume Health</span>
+                            <strong>{{ resume_score }}%</strong>
+                        </div>
+                        <div class="portal-progress-track">
+                            <div class="portal-progress-value" style="--bar-color: #e11d48; --progress-w: {{ resume_score }}%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="portal-progress-row">
+                        <div class="portal-progress-label">
+                            <span><i class="fas fa-user-check" style="color:#10b981"></i> Profile Completeness</span>
+                            <strong>{{ completion_pct }}%</strong>
+                        </div>
+                        <div class="portal-progress-track">
+                            <div class="portal-progress-value" style="--bar-color: #10b981; --progress-w: {{ completion_pct }}%;"></div>
+                        </div>
+                    </div>
+
+                    <a class="portal-actions-primary" style="display:block; text-align:center; text-decoration:none; margin-top:1.1rem" href="/applicant/profile.php">
+                        <i class="fas fa-arrow-trend-up"></i> {% if completion_pct < 100 %}Complete Profile{% else %}Improve Profile{% endif %}
+                    </a>
                     {% if not chatbot_completed %}
-                        <a href="/applicant/chatbot.php" class="compact-btn compact-btn-view" style="display: inline-block;">Take Assessment</a>
-                    {% else %}
-                        <a href="/applicant/profile.php" class="compact-btn compact-btn-view" style="display: inline-block;">Update Profile</a>
+                        <a style="display:block; text-align:center; text-decoration:none; margin-top:0.5rem; padding:0.55rem; background:#f0f9ff; color:#0284c7; border-radius:8px; font-size:0.78rem; font-weight:600; border:1px solid #bae6fd;" href="/applicant/chatbot.php">
+                            <i class="fas fa-robot"></i> Take AI Career Quiz
+                        </a>
                     {% endif %}
-                </div>
-            {% endif %}
-        </div>
-    </div>
+                </section>
 
-</div><!-- /db-shell -->
-</div><!-- /db-page -->
+                <!-- Upcoming Interviews Card -->
+                <section class="portal-card">
+                    <div class="portal-card-heading">
+                        <h2><i class="fas fa-calendar-day" style="color:#f59e0b"></i> Upcoming Interviews</h2>
+                        <span class="portal-status">{{ upcoming_interviews|length }} Scheduled</span>
+                    </div>
+                    {% for interview in upcoming_interviews %}
+                        <div class="portal-interview">
+                            <strong>{{ interview.application.job.title }}</strong>
+                            <span><i class="fas fa-clock"></i> {{ interview.interview_date|date:"M d, Y" }} · {{ interview.start_time|time:"g:i A" }}</span>
+                            {% if interview.meeting_link %}
+                                <a href="{{ interview.meeting_link }}" target="_blank">
+                                    <i class="fas fa-video"></i> Join Video Call
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <div class="portal-empty">
+                            <i class="fas fa-calendar-check" style="font-size: 1.4rem; color: #94a3b8; margin-bottom: 0.4rem; display: block;"></i>
+                            No upcoming interviews scheduled.<br>
+                            <span style="font-size: 0.74rem; color: #94a3b8;">Employer interview invitations will appear here.</span>
+                        </div>
+                    {% endfor %}
+                </section>
 
-<!-- Match Score Popup -->
+                <!-- Feedback Card (if feedback exists) -->
+                {% if feedback_list %}
+                <section class="portal-card">
+                    <div class="portal-card-heading">
+                        <h2><i class="fas fa-comments" style="color:#0056b3"></i> Employer Feedback</h2>
+                        <span class="portal-status">{{ feedback_count }}</span>
+                    </div>
+                    {% for fb in feedback_list %}
+                        <div style="padding: 0.75rem; border-radius: 8px; background: #f8fafc; margin-bottom: 0.6rem; border: 1px solid #e2e8f0;">
+                            <div style="font-weight: 700; font-size: 0.85rem; color: #1e293b;">{{ fb.job_title }}</div>
+                            <div style="font-size: 0.75rem; color: #64748b; margin: 0.15rem 0 0.35rem;">{{ fb.company_name }}</div>
+                            <p style="font-size: 0.78rem; color: #475569; margin: 0; line-height: 1.45;">"{{ fb.feedback_message }}"</p>
+                        </div>
+                    {% endfor %}
+                </section>
+                {% endif %}
+            </aside>
+
+        </div><!-- /portal-main-grid -->
+    </div><!-- /portal-shell -->
+</div><!-- /portal-dashboard -->
+
+<!-- ════════ MATCH SCORE POPUP MODAL ════════ -->
 <div id="matchScorePopup" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 10000; overflow-y: auto;">
     <div style="max-width: 500px; margin: 2rem auto; background: white; border-radius: 16px; padding: 1.5rem; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
@@ -907,7 +1014,7 @@
         </div>
         
         <div id="matchScoreContent" style="text-align: center;">
-            <!-- Content will be inserted here -->
+            <!-- Dynamic content inserted by JS -->
         </div>
         
         <div style="margin-top: 1.2rem; text-align: center;">
@@ -918,7 +1025,7 @@
     </div>
 </div>
 
-<!-- ── Floating Chat Button ── -->
+<!-- ════════ FLOATING CHAT BUTTON ════════ -->
 <div class="db-float">
     <a href="/applicant/chat.php" class="db-float-btn" title="Chat with Employers">
         <i class="fas fa-comments"></i>
@@ -935,6 +1042,7 @@
 function showMatchScorePopup(jobId, jobTitle, matchScore) {
     const popup = document.getElementById('matchScorePopup');
     const content = document.getElementById('matchScoreContent');
+    if (!popup || !content) return;
     
     const scoreColor = matchScore >= 80 ? '#28a745' : 
                      matchScore >= 60 ? '#ffc107' : 
@@ -980,7 +1088,8 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
 }
 
 function closeMatchScorePopup() {
-    document.getElementById('matchScorePopup').style.display = 'none';
+    const popup = document.getElementById('matchScorePopup');
+    if (popup) popup.style.display = 'none';
 }
 
 // Close popup when clicking outside
@@ -989,51 +1098,6 @@ document.getElementById('matchScorePopup')?.addEventListener('click', function(e
         closeMatchScorePopup();
     }
 });
-
-// Active sidenav highlight on scroll
-(function() {
-    var sections = document.querySelectorAll('#sec-stats, #sec-quick, #sec-feedback');
-    var links    = document.querySelectorAll('.db-sidenav a');
-    if (!sections.length || !links.length) return;
-    function onScroll() {
-        var scrollY = window.scrollY + 120;
-        var current = '';
-        sections.forEach(function(s) { if (s.offsetTop <= scrollY) current = s.id; });
-        links.forEach(function(a) {
-            a.classList.toggle('active', a.getAttribute('href') === '#' + current);
-        });
-    }
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-})();
-
-// Auto-refresh unread count
-(function() {
-    function refresh() {
-        fetch('../includes/handlers/message_handler.php?action=get_unread_count')
-            .then(function(r){ return r.json(); })
-            .then(function(d){
-                if (!d.success) return;
-                var badge = document.querySelector('.db-float-badge');
-                var tip   = document.querySelector('.db-float-tip');
-                var btn   = document.querySelector('.db-float-btn');
-                if (d.count > 0) {
-                    if (badge) { badge.textContent = d.count > 9 ? '9+' : d.count; }
-                    else {
-                        var b = document.createElement('span');
-                        b.className = 'db-float-badge';
-                        b.textContent = d.count > 9 ? '9+' : d.count;
-                        btn.appendChild(b);
-                    }
-                    if (tip) tip.textContent = 'You have ' + d.count + ' unread message(s)';
-                } else {
-                    if (badge) badge.remove();
-                    if (tip) tip.textContent = 'Chat with Employers';
-                }
-            }).catch(function(){});
-    }
-    if (document.querySelector('.db-float-btn')) setInterval(refresh, 30000);
-})();
 </script>
 
 {% include 'includes/footer.html' %}
