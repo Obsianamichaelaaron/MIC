@@ -811,18 +811,18 @@ function executeJobsPageGoogleDriveExport(btnElement) {
                 window.open(data.folder_url, '_blank');
                 closeJobTableExportModal();
             } else if (data.error === 'no_credentials') {
-                window.open(data.folder_url || 'https://drive.google.com/drive/folders/1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K?usp=sharing', '_blank');
+                window.open(data.folder_url || 'https://drive.google.com/drive/folders/1pDIHRWfljyosJ0mJtVSL9zvSsYl2CjZv?usp=sharing', '_blank');
                 alert('ℹ️ Google Drive opened!\n\nTo enable 100% automated direct server upload without downloading, place your service_account.json in the project root or configure GOOGLE_DRIVE_WEBHOOK_URL.');
                 closeJobTableExportModal();
             } else {
                 alert('⚠️ Google Drive notice: ' + (data.message || data.error));
-                window.open('https://drive.google.com/drive/folders/1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K?usp=sharing', '_blank');
+                window.open('https://drive.google.com/drive/folders/1pDIHRWfljyosJ0mJtVSL9zvSsYl2CjZv?usp=sharing', '_blank');
                 closeJobTableExportModal();
             }
         })
         .catch(err => {
             console.error(err);
-            window.open('https://drive.google.com/drive/folders/1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K?usp=sharing', '_blank');
+            window.open('https://drive.google.com/drive/folders/1pDIHRWfljyosJ0mJtVSL9zvSsYl2CjZv?usp=sharing', '_blank');
             closeJobTableExportModal();
         })
         .finally(() => {
