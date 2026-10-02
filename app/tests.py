@@ -4,6 +4,7 @@ import sys
 import tempfile
 import types
 from decimal import Decimal
+from pathlib import Path
 from unittest.mock import Mock, patch
 from django.test import TestCase, Client
 from django.urls import reverse
@@ -175,6 +176,66 @@ class MultiBizConversionTests(TestCase):
         self.assertTrue(kwargs['supportsAllDrives'])
 
         os.unlink(service_account_path)
+
+    def test_google_drive_oauth_upload_refreshes_expired_token(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            client_secret_path = os.path.join(temp_dir, 'client_secret.json')
+            token_path = os.path.join(temp_dir, 'token.json')
+            with open(client_secret_path, 'w', encoding='utf-8') as secret_file:
+                json.dump({'installed': {}}, secret_file)
+            with open(token_path, 'w', encoding='utf-8') as token_file:
+                token_file.write('{}')
+
+            credentials = Mock(expired=True, refresh_token='refresh-token', valid=True)
+            credentials.to_json.return_value = '{"refreshed": true}'
+            fake_google = types.ModuleType('google')
+            fake_oauth2 = types.ModuleType('google.oauth2')
+            fake_credentials_module = types.ModuleType('google.oauth2.credentials')
+            fake_credentials_module.Credentials = types.SimpleNamespace(
+                from_authorized_user_file=Mock(return_value=credentials)
+            )
+            fake_auth = types.ModuleType('google.auth')
+            fake_transport = types.ModuleType('google.auth.transport')
+            fake_requests = types.ModuleType('google.auth.transport.requests')
+            fake_requests.Request = Mock()
+            fake_oauth2.credentials = fake_credentials_module
+            fake_auth.transport = fake_transport
+            fake_transport.requests = fake_requests
+            fake_google.oauth2 = fake_oauth2
+            fake_google.auth = fake_auth
+
+            fake_discovery = types.ModuleType('googleapiclient.discovery')
+            fake_http = types.ModuleType('googleapiclient.http')
+            fake_service = Mock()
+            fake_service.files.return_value.create.return_value.execute.return_value = {
+                'id': 'file-123', 'name': 'demo.xlsx', 'webViewLink': 'https://example.com'
+            }
+            fake_discovery.build = Mock(return_value=fake_service)
+            fake_http.MediaIoBaseUpload = Mock()
+
+            modules = {
+                'google': fake_google,
+                'google.oauth2': fake_oauth2,
+                'google.oauth2.credentials': fake_credentials_module,
+                'google.auth': fake_auth,
+                'google.auth.transport': fake_transport,
+                'google.auth.transport.requests': fake_requests,
+                'googleapiclient.discovery': fake_discovery,
+                'googleapiclient.http': fake_http,
+            }
+            from app.services import google_drive_service
+            with patch.dict(sys.modules, modules), patch.object(
+                google_drive_service.settings, 'BASE_DIR', Path(temp_dir)
+            ), patch.object(
+                google_drive_service, '_find_oauth_client_secret', return_value=client_secret_path
+            ):
+                result = google_drive_service._upload_with_oauth_user(b'abc', 'demo.xlsx', 'folder-123')
+
+            self.assertTrue(result['success'], result)
+            self.assertEqual(result['method'], 'oauth_user')
+            credentials.refresh.assert_called_once_with(fake_requests.Request.return_value)
+            with open(token_path, 'r', encoding='utf-8') as token_file:
+                self.assertEqual(token_file.read(), '{"refreshed": true}')
 
     def test_contact_form_submission(self):
         """Test contact inquiry submission"""

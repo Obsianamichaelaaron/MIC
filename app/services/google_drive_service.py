@@ -6,7 +6,7 @@ import base64
 import requests
 from django.conf import settings
 
-TARGET_FOLDER_ID = "1DLJ68NVmD-j6zHhrDSLKouFvDO-9WW6K"
+TARGET_FOLDER_ID = "1pDIHRWfljyosJ0mJtVSL9zvSsYl2CjZv"
 TARGET_DRIVE_FOLDER_URL = f"https://drive.google.com/drive/folders/{TARGET_FOLDER_ID}?usp=sharing"
 
 
@@ -50,10 +50,16 @@ def _upload_with_oauth_user(file_bytes, filename, folder_id):
 
     try:
         from google.oauth2.credentials import Credentials
+        from google.auth.transport.requests import Request
         from googleapiclient.discovery import build
         from googleapiclient.http import MediaIoBaseUpload
 
         creds = Credentials.from_authorized_user_file(token_path, ['https://www.googleapis.com/auth/drive'])
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+            with open(token_path, 'w', encoding='utf-8') as token_file:
+                token_file.write(creds.to_json())
+
         if not creds or not creds.valid:
             return {
                 'success': False,
