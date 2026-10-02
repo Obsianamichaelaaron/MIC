@@ -96,24 +96,23 @@ def dashboard_view(request):
     # Fresh account check
     is_fresh_account = bool(app_count == 0 and not chatbot_completed and completion_pct < 75)
 
-    # Recommendations calculation (Only suggest if assessment or skills provided)
+    # Recommendations are personalized from applicant information parsed from their resume.
     recommendations = []
-    if applicant and (chatbot_completed or candidate_skills or (applicant.experience_years and int(applicant.experience_years) > 0)):
+    if applicant.resume_file:
         all_jobs = JobPosting.objects.filter(status='active').select_related('employer').order_by('-posted_at')
         for job in all_jobs:
             score = compute_job_match_score(applicant, job, chatbot_answers)
-            if score >= 40:
-                recommendations.append({
-                    'job': job,
-                    'job_id': job.job_id,
-                    'title': job.title,
-                    'location': job.location,
-                    'employment_type': job.employment_type,
-                    'company_name': job.employer.company_name if job.employer else 'MultiBiz Partner',
-                    'calculated_match_score': round(score, 2),
-                })
+            recommendations.append({
+                'job': job,
+                'job_id': job.job_id,
+                'title': job.title,
+                'location': job.location,
+                'employment_type': job.employment_type,
+                'company_name': job.employer.company_name if job.employer else 'MultiBiz Partner',
+                'calculated_match_score': round(score, 2),
+            })
         recommendations.sort(key=lambda x: x['calculated_match_score'], reverse=True)
-        recommendations = recommendations[:6]
+        recommendations = recommendations[:4]
 
     # Feedback list
     feedback_list = []
@@ -340,7 +339,7 @@ def jobs_view(request):
     now = timezone.now()
     jobs_list = []
     for job in all_jobs:
-        score = compute_applicant_job_match(applicant, job, chatbot_answers) if applicant else 0
+        score = compute_applicant_job_match(applicant, job, chatbot_answers) if applicant and applicant.resume_file else 0
         if score >= 80:
             score_color = '#28a745'
         elif score >= 60:

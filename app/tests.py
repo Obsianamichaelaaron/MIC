@@ -203,6 +203,102 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(dash_response.status_code, 200)
         self.assertContains(dash_response, 'Job')
 
+    def test_login_switches_to_the_new_applicant_dashboard(self):
+        second_user = User.objects.create(
+            email='second-applicant@gmail.com',
+            password=hash_password('second123'),
+            role='applicant',
+            first_name='Second',
+            last_name='Applicant',
+            status='active',
+        )
+        second_applicant = Applicant.objects.create(
+            user=second_user,
+            skills='Rust, Go',
+            qualifications='Software Engineering',
+            experience_years=1,
+        )
+
+        first_login = self.client.post('/loginregister.php', {
+            'email': self.applicant_user.email,
+            'password': 'jobseeker123',
+        })
+        self.assertEqual(first_login.status_code, 302)
+
+        second_login = self.client.post('/loginregister.php', {
+            'email': second_user.email,
+            'password': 'second123',
+        })
+        self.assertEqual(second_login.status_code, 302)
+
+        dashboard = self.client.get('/applicant/dashboard.php')
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertEqual(dashboard.context['applicant'].pk, second_applicant.pk)
+        self.assertEqual(dashboard.context['candidate_skills'], ['Rust', 'Go'])
+
+    def test_dashboard_recommendations_require_resume_and_show_top_four(self):
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        jobs = [self.job]
+        for index in range(4):
+            jobs.append(JobPosting.objects.create(
+                employer=self.employer,
+                title=f'Recommendation Job {index}',
+                description='Test job description',
+                requirements='Test requirements',
+                skills_required='Python',
+                location='Manila',
+                employment_type='full-time',
+                status='active',
+            ))
+
+        scores = {job.job_id: score for job, score in zip(jobs, [12, 39, 22, 99, 83])}
+        with patch('app.views.views_applicant.compute_job_match_score', side_effect=lambda applicant, job, answers: scores[job.job_id]):
+            response = self.client.get('/applicant/dashboard.php')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context['recommended_jobs'], [])
+
+            self.applicant.resume_file = 'resumes/test-resume.pdf'
+            self.applicant.save(update_fields=['resume_file'])
+            response = self.client.get('/applicant/dashboard.php')
+
+        self.assertEqual(response.status_code, 200)
+        recommended = response.context['recommended_jobs']
+        self.assertEqual(len(recommended), 4)
+        self.assertEqual(
+            [item['match_score'] for item in recommended],
+            [99, 83, 39, 22],
+        )
+
+    def test_browse_job_matches_are_zero_until_resume_uploaded(self):
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        with patch('app.views.views_applicant.compute_applicant_job_match', return_value=68) as score_match:
+            response = self.client.get('/applicant/jobs.php')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(
+                [item['match_score'] for item in response.context['scored_jobs']],
+                [0],
+            )
+            score_match.assert_not_called()
+
+            self.applicant.resume_file = 'resumes/test-resume.pdf'
+            self.applicant.save(update_fields=['resume_file'])
+            response = self.client.get('/applicant/jobs.php')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [item['match_score'] for item in response.context['scored_jobs']],
+            [68],
+        )
+        score_match.assert_called_once()
+
     def test_job_application_flow(self):
         """Test applicant applying for a job"""
         # Log in applicant
