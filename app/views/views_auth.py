@@ -17,9 +17,12 @@ def login_register_view(request):
     """
     redirect_target = request.GET.get('redirect') or request.POST.get('redirect') or ''
     job_id = request.GET.get('job_id') or request.POST.get('job_id') or '0'
+    is_login_attempt = request.method == 'POST' and not (
+        'first_name' in request.POST or 'confirm_password' in request.POST
+    )
     
     # Check if user is already logged in
-    if isLoggedIn(request):
+    if isLoggedIn(request) and not is_login_attempt:
         role = getUserRole(request)
         if redirect_target == 'apply' and job_id and job_id != '0' and role == 'applicant':
             return redirect(f'/applicant/apply_job.php?id={job_id}')
@@ -150,7 +153,7 @@ def login_register_view(request):
                 user = User.objects.filter(email__iexact=email).first()
                 if user and verify_password(password, user.password):
                     if user.status == 'active':
-                        # Set session data matching PHP
+                        request.session.flush()
                         request.session['user_id'] = user.user_id
                         request.session['email'] = user.email
                         request.session['role'] = user.role
