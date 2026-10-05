@@ -14,6 +14,11 @@ from app.models import (
     CmsHeroSlide, CmsBrand, CmsTestimonial
 )
 from app.auth_utils import verify_password, hash_password
+from app.services.ml_job_matching import (
+    MATCH_CLASSES,
+    evaluate_match_model,
+    train_match_classifier,
+)
 
 class MultiBizConversionTests(TestCase):
     def setUp(self):
@@ -359,6 +364,195 @@ class MultiBizConversionTests(TestCase):
             [68],
         )
         score_match.assert_called_once()
+
+    def test_tfidf_svm_match_model_uses_three_classes_and_holdout_metrics(self):
+        samples = [
+            {'text': f'{label} match role {index} skill experience', 'label': label}
+            for label in MATCH_CLASSES
+            for index in range(4)
+        ]
+
+        model, status = train_match_classifier(samples)
+        evaluation = evaluate_match_model(samples)
+
+        self.assertTrue(status['ready'])
+        self.assertEqual(tuple(model.named_steps['svm'].classes_), tuple(sorted(MATCH_CLASSES)))
+        self.assertIn('tfidf', model.named_steps)
+        self.assertEqual(set(model.predict(['high match role skill'])), {'high'})
+        self.assertTrue(evaluation['ready'], evaluation)
+        self.assertEqual(len(evaluation['confusion_rows']), 3)
+        self.assertTrue(all(len(row['cells']) == 3 for row in evaluation['confusion_rows']))
+        self.assertEqual(
+            sum(cell['count'] for row in evaluation['confusion_rows'] for cell in row['cells']),
+            evaluation['test_count'],
+        )
+        matrix = [
+            [cell['count'] for cell in row['cells']]
+            for row in evaluation['confusion_rows']
+        ]
+        total = sum(sum(row) for row in matrix)
+        true_positives = [matrix[index][index] for index in range(3)]
+        expected_accuracy = sum(true_positives) / total
+        expected_precision = sum(
+            true_positives[index] / sum(row[index] for row in matrix)
+            if sum(row[index] for row in matrix) else 0
+            for index in range(3)
+        ) / 3
+        expected_recall = sum(
+            true_positives[index] / sum(matrix[index])
+            for index in range(3)
+        ) / 3
+        expected_f1 = sum(
+            2 * (
+                (true_positives[index] / sum(row[index] for row in matrix)
+                 if sum(row[index] for row in matrix) else 0)
+                * (true_positives[index] / sum(matrix[index]))
+            ) / (
+                (true_positives[index] / sum(row[index] for row in matrix)
+                 if sum(row[index] for row in matrix) else 0)
+                + (true_positives[index] / sum(matrix[index]))
+            )
+            if (
+                (true_positives[index] / sum(row[index] for row in matrix)
+                 if sum(row[index] for row in matrix) else 0)
+                + (true_positives[index] / sum(matrix[index]))
+            ) else 0
+            for index in range(3)
+        ) / 3
+        expected_chance = sum(
+            sum(matrix[index]) * sum(row[index] for row in matrix)
+            for index in range(3)
+        ) / total ** 2
+        expected_kappa = (
+            (expected_accuracy - expected_chance) / (1 - expected_chance)
+            if expected_chance < 1 else 1
+        )
+        self.assertAlmostEqual(evaluation['accuracy'], expected_accuracy)
+        self.assertAlmostEqual(evaluation['precision'], expected_precision)
+        self.assertAlmostEqual(evaluation['recall'], expected_recall)
+        self.assertAlmostEqual(evaluation['f1'], expected_f1)
+        self.assertAlmostEqual(evaluation['kappa'], expected_kappa)
+        for metric in ('accuracy', 'precision', 'recall', 'f1', 'kappa'):
+            self.assertIn(metric, evaluation)
+        self.assertEqual(evaluation['test_count'], 6)
+
+    def test_tfidf_svm_waits_for_reviewed_examples_in_all_three_classes(self):
+        samples = [
+            {'text': f'{label} match role {index}', 'label': label}
+            for label, count in [('high', 2), ('medium', 2), ('low', 1)]
+            for index in range(count)
+        ]
+
+        model, status = train_match_classifier(samples)
+
+        self.assertIsNone(model)
+        self.assertFalse(status['ready'])
+        self.assertIn('at least two admin-reviewed examples each', status['reason'])
+
+    def test_job_list_adds_svm_class_without_changing_numeric_match_score(self):
+        reviewed_labels = [
+            ('qualified', 'python django senior developer'),
+            ('under_qualified', 'training internship junior'),
+            ('not_qualified', 'beginner unrelated background'),
+        ]
+        for label, skills in reviewed_labels:
+            for index in range(2):
+                user = User.objects.create(
+                    email=f'match-{label}-{index}@example.com',
+                    password='test-password',
+                    role='applicant',
+                    status='active',
+                )
+                applicant = Applicant.objects.create(
+                    user=user,
+                    skills=skills,
+                    qualifications='Information Technology',
+                    experience_years=index,
+                )
+                Application.objects.create(
+                    job=self.job,
+                    applicant=applicant,
+                    admin_qualification=label,
+                )
+
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        response = self.client.get('/applicant/jobs.php')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['match_model_status']['ready'])
+        self.assertIn(response.context['jobs'][0]['ml_match_class'], MATCH_CLASSES)
+        self.assertEqual(response.context['jobs'][0]['match_score'], 0)
+        self.assertContains(response, 'SVM ')
+
+    def test_admin_analytics_renders_svm_evaluation_status(self):
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.get('/admin/analytics.php')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context['match_model_evaluation']['ready'])
+        self.assertContains(response, 'NLP + TF-IDF + SVM Match Evaluation')
+        self.assertContains(response, 'at least two admin-reviewed examples each')
+
+    def test_admin_analytics_renders_three_by_three_heatmap(self):
+        for label, skills in [
+            ('qualified', 'python django senior developer'),
+            ('under_qualified', 'training internship junior'),
+            ('not_qualified', 'beginner unrelated background'),
+        ]:
+            for index in range(2):
+                user = User.objects.create(
+                    email=f'analytics-{label}-{index}@example.com',
+                    password='test-password',
+                    role='applicant',
+                    status='active',
+                )
+                applicant = Applicant.objects.create(
+                    user=user,
+                    skills=skills,
+                    qualifications='Information Technology',
+                    experience_years=index,
+                )
+                Application.objects.create(
+                    job=self.job,
+                    applicant=applicant,
+                    admin_qualification=label,
+                )
+
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.get('/admin/analytics.php')
+
+        evaluation = response.context['match_model_evaluation']
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(evaluation['ready'], evaluation)
+        self.assertEqual(len(evaluation['confusion_rows']), 3)
+        self.assertTrue(all(len(row['cells']) == 3 for row in evaluation['confusion_rows']))
+        self.assertContains(response, "Cohen's Kappa")
+        self.assertContains(response, 'background-color:rgba(13,110,253,')
+
+    def test_employer_active_jobs_are_rendered_in_job_list(self):
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session.save()
+
+        response = self.client.get('/employer/jobs.php?status=active')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.job.title)
+        self.assertNotContains(response, 'No Job Requisitions Found')
 
     def test_job_application_flow(self):
         """Test applicant applying for a job"""

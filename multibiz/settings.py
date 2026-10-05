@@ -66,27 +66,39 @@ TEMPLATES = [
 WSGI_APPLICATION = 'multibiz.wsgi.application'
 ASGI_APPLICATION = 'multibiz.asgi.application'
 
-# Database
-# Default to SQLite for seamless execution; easily switched to MySQL/Postgres if desired
-# In Vercel serverless environments (/var/task is read-only), copy to /tmp for write access
-db_path = BASE_DIR / 'db.sqlite3'
-if os.environ.get('VERCEL') == '1' or 'VERCEL' in os.environ:
-    import shutil
-    tmp_db = '/tmp/db.sqlite3'
-    if not os.path.exists(tmp_db) and os.path.exists(db_path):
-        try:
-            shutil.copyfile(str(db_path), tmp_db)
-        except Exception:
-            pass
-    if os.path.exists(tmp_db):
-        db_path = tmp_db
+# Use Supabase/PostgreSQL when DATABASE_URL is configured; retain SQLite locally.
+database_url = os.environ.get('DATABASE_URL')
+if database_url:
+    import dj_database_url
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': str(db_path),
+    DATABASES = {
+        'default': dj_database_url.parse(
+            database_url,
+            conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '600')),
+            conn_health_checks=True,
+            ssl_require=True,
+        )
     }
-}
+else:
+    # In Vercel serverless environments (/var/task is read-only), copy SQLite to /tmp.
+    db_path = BASE_DIR / 'db.sqlite3'
+    if os.environ.get('VERCEL') == '1' or 'VERCEL' in os.environ:
+        import shutil
+        tmp_db = '/tmp/db.sqlite3'
+        if not os.path.exists(tmp_db) and os.path.exists(db_path):
+            try:
+                shutil.copyfile(str(db_path), tmp_db)
+            except Exception:
+                pass
+        if os.path.exists(tmp_db):
+            db_path = tmp_db
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': str(db_path),
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [

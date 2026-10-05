@@ -133,6 +133,64 @@
             </div>
         </div>
     </div>
+
+    <section class="custom-card p-4 mt-4 bg-white border-0 shadow-sm rounded-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+            <div>
+                <h5 class="fw-bold text-dark mb-1"><i class="fa-solid fa-brain text-primary me-2"></i>NLP + TF-IDF + SVM Match Evaluation</h5>
+                <p class="text-muted small mb-0">Three-class evaluation uses admin-reviewed outcomes: qualified → high, under-qualified → medium, not qualified → low.</p>
+            </div>
+            {% if match_model_evaluation.ready %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2">Stratified holdout · {{ match_model_evaluation.test_count }} test records</span>
+            {% endif %}
+        </div>
+        {% if match_model_evaluation.ready %}
+            <div class="row g-3 mb-4">
+                <div class="col-6 col-lg">
+                    <div class="p-3 rounded-3 bg-light h-100"><div class="text-muted small">Accuracy</div><div class="fs-4 fw-bold text-primary">{{ match_model_evaluation.accuracy_percent }}%</div></div>
+                </div>
+                <div class="col-6 col-lg">
+                    <div class="p-3 rounded-3 bg-light h-100"><div class="text-muted small">Macro Precision</div><div class="fs-4 fw-bold text-primary">{{ match_model_evaluation.precision_percent }}%</div></div>
+                </div>
+                <div class="col-6 col-lg">
+                    <div class="p-3 rounded-3 bg-light h-100"><div class="text-muted small">Macro Recall</div><div class="fs-4 fw-bold text-primary">{{ match_model_evaluation.recall_percent }}%</div></div>
+                </div>
+                <div class="col-6 col-lg">
+                    <div class="p-3 rounded-3 bg-light h-100"><div class="text-muted small">Macro F1</div><div class="fs-4 fw-bold text-primary">{{ match_model_evaluation.f1_percent }}%</div></div>
+                </div>
+                <div class="col-6 col-lg">
+                    <div class="p-3 rounded-3 bg-light h-100"><div class="text-muted small">Cohen's Kappa</div><div class="fs-4 fw-bold text-primary">{{ match_model_evaluation.kappa|floatformat:3 }}</div></div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered align-middle text-center mb-2">
+                    <caption class="caption-top text-muted small">Confusion matrix · rows are actual classes; columns are predicted classes. Cell shading shows row-normalized accuracy distribution.</caption>
+                    <thead class="table-light">
+                        <tr><th scope="col">Actual \ Predicted</th><th scope="col">High</th><th scope="col">Medium</th><th scope="col">Low</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for row in match_model_evaluation.confusion_rows %}
+                            <tr>
+                                <th scope="row" class="text-capitalize">{{ row.label }}</th>
+                                {% for cell in row.cells %}
+                                    <td style="background-color:rgba(13,110,253,{{ cell.opacity }});">
+                                        <span class="fw-bold">{{ cell.count }}</span>
+                                        <span class="d-block small text-muted">{{ cell.row_accuracy }}%</span>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted small mb-0">Trained on {{ match_model_evaluation.training_count }} records; all five metrics use the same held-out predictions.</p>
+        {% else %}
+            <div class="alert alert-info mb-0" role="status">
+                <i class="fa-solid fa-circle-info me-2"></i>{{ match_model_evaluation.reason }}
+                <span class="d-block small mt-1">Reviewed labels: High {{ match_model_evaluation.class_counts.high }}, Medium {{ match_model_evaluation.class_counts.medium }}, Low {{ match_model_evaluation.class_counts.low }}.</span>
+            </div>
+        {% endif %}
+    </section>
 </div>
 {% endblock %}
 

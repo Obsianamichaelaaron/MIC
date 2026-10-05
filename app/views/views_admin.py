@@ -26,6 +26,7 @@ from app.services.mailer import (
     send_job_posted_live_notification
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_score
+from app.services.ml_job_matching import evaluate_match_model
 
 LANDING_CMS_DEFAULTS = {
     'hero': {
@@ -1547,6 +1548,7 @@ def analytics_view(request):
     avg_match_score = Application.objects.aggregate(value=Avg('match_score'))['value'] or 0
     status_counts = Application.objects.values('status').annotate(count=Count('application_id')).order_by('status')
     jobs_by_type = JobPosting.objects.values('employment_type').annotate(count=Count('job_id')).order_by('employment_type')
+    match_model_evaluation = evaluate_match_model()
 
     top_qualifications = Qualification.objects.annotate(
         job_count=Count('jobqualificationmapping')
@@ -1571,6 +1573,7 @@ def analytics_view(request):
         'new_apps_30d': Application.objects.filter(applied_at__gte=thirty_days_ago).count(),
         'status_counts': status_counts,
         'jobs_by_type': jobs_by_type,
+        'match_model_evaluation': match_model_evaluation,
         'top_qualifications': top_qualifications,
     }
     return render(request, 'admin/analytics.html', context)

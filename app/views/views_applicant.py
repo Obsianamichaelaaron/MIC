@@ -16,6 +16,7 @@ from app.models import (
 from app.auth_utils import require_role, getCurrentUserId
 from app.services.resume_parser import verify_resume_document, parse_and_save_applicant_resume
 from app.services.ml_ranking import compute_job_match_score
+from app.services.ml_job_matching import get_match_classifier, predict_match_class
 from app.services.mailer import send_application_submitted_email
 
 @require_role('applicant')
@@ -100,6 +101,10 @@ def dashboard_view(request):
     recommendations = []
     if applicant.resume_file:
         all_jobs = JobPosting.objects.filter(status='active').select_related('employer').order_by('-posted_at')
+        match_classifier, _ = get_match_classifier(exclude_applicant_id=applicant.pk)
+        resume_text = ResumeAnalysis.objects.filter(
+            applicant=applicant
+        ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
         for job in all_jobs:
             score = compute_job_match_score(applicant, job, chatbot_answers)
             recommendations.append({
@@ -110,6 +115,10 @@ def dashboard_view(request):
                 'employment_type': job.employment_type,
                 'company_name': job.employer.company_name if job.employer else 'MultiBiz Partner',
                 'calculated_match_score': round(score, 2),
+                'ml_match_class': (
+                    predict_match_class(match_classifier, applicant, job, resume_text)
+                    if match_classifier else None
+                ),
             })
         recommendations.sort(key=lambda x: x['calculated_match_score'], reverse=True)
         recommendations = recommendations[:4]
@@ -167,6 +176,7 @@ def dashboard_view(request):
             recommended_jobs.append({
                 'job': recommended_job,
                 'match_score': recommendation['calculated_match_score'],
+                'ml_match_class': recommendation['ml_match_class'],
                 'matched_skills': [],
                 'missing_skills': [],
             })
@@ -338,8 +348,26 @@ def jobs_view(request):
 
     now = timezone.now()
     jobs_list = []
+    if applicant and all_jobs:
+        match_classifier, match_model_status = get_match_classifier(
+            exclude_applicant_id=applicant.pk
+        )
+        resume_text = ResumeAnalysis.objects.filter(
+            applicant=applicant
+        ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
+    else:
+        match_classifier = None
+        match_model_status = {
+            'ready': False,
+            'reason': 'SVM match classification is unavailable without an applicant profile and active jobs.',
+        }
+        resume_text = ''
     for job in all_jobs:
         score = compute_applicant_job_match(applicant, job, chatbot_answers) if applicant and applicant.resume_file else 0
+        ml_match_class = (
+            predict_match_class(match_classifier, applicant, job, resume_text)
+            if match_classifier and applicant else None
+        )
         if score >= 80:
             score_color = '#28a745'
         elif score >= 60:
@@ -386,6 +414,7 @@ def jobs_view(request):
             'posted_at': job.posted_at,
             'time_ago': time_ago,
             'match_score': score,
+            'ml_match_class': ml_match_class,
             'score_color': score_color,
             'qualification_matches': qual_match,
             'is_saved': job.job_id in saved_job_ids,
