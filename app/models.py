@@ -91,7 +91,10 @@ class JobPosting(models.Model):
         ('internship', 'Internship'),
     ]
     STATUS_CHOICES = [
-        ('active', 'Active'),
+        ('pending', 'Pending Review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('active', 'Active / Posted'),
         ('closed', 'Closed'),
         ('draft', 'Draft'),
     ]
@@ -105,9 +108,16 @@ class JobPosting(models.Model):
     location = models.CharField(max_length=255, null=True, blank=True)
     employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_TYPE_CHOICES, default='full-time')
     salary_range = models.CharField(max_length=100, null=True, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    positions_available = models.IntegerField(default=1)
+    urgency = models.CharField(max_length=50, default='Normal', null=True, blank=True)
+    special_notes = models.TextField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    rejection_reason = models.TextField(null=True, blank=True)
+    admin_notes = models.TextField(null=True, blank=True)
     target_qualifications = models.TextField(null=True, blank=True, help_text="Comma-separated qualification IDs")
     posted_at = models.DateTimeField(default=timezone.now)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    reviewed_by_admin = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_jobs')
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -138,18 +148,43 @@ class Skill(models.Model):
 
 class Application(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
+        ('pending', 'Pending Admin Review'),
+        ('forwarded', 'Forwarded to Employer'),
+        ('for_review', 'For Employer Review'),
+        ('qualified', 'Qualified'),
+        ('not_qualified', 'Not Qualified'),
+        ('for_interview', 'For Interview'),
+        ('interviewed', 'Interviewed'),
+        ('interview_completed', 'Interview Completed'),
+        ('accepted', 'Hired / Accepted'),
+        ('hired', 'Hired'),
+        ('rejected', 'Rejected'),
         ('reviewed', 'Reviewed'),
         ('shortlisted', 'Shortlisted'),
-        ('interviewed', 'Interviewed'),
-        ('accepted', 'Accepted'),
+    ]
+
+    EMPLOYER_STATUS_CHOICES = [
+        ('for_review', 'For Review'),
+        ('qualified', 'Qualified'),
+        ('not_qualified', 'Not Qualified'),
+        ('for_interview', 'For Interview'),
+        ('interview_completed', 'Interview Completed'),
+        ('hired', 'Hired'),
         ('rejected', 'Rejected'),
     ]
 
     application_id = models.AutoField(primary_key=True)
     job = models.ForeignKey(JobPosting, on_delete=models.CASCADE, db_column='job_id', related_name='applications')
     applicant = models.ForeignKey(Applicant, on_delete=models.CASCADE, db_column='applicant_id', related_name='applications')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending')
+    forwarded_to_employer = models.BooleanField(default=False)
+    forwarded_at = models.DateTimeField(null=True, blank=True)
+    forwarded_by_admin = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='forwarded_applications')
+    admin_qualification = models.CharField(max_length=50, default='pending')
+    admin_notes = models.TextField(null=True, blank=True)
+    employer_status = models.CharField(max_length=50, choices=EMPLOYER_STATUS_CHOICES, default='for_review')
+    employer_notes = models.TextField(null=True, blank=True)
+    status_history = models.JSONField(default=list, blank=True)
     remarks_history = models.TextField(null=True, blank=True)
     applicant_remarks_history = models.TextField(null=True, blank=True)
     reviewed_by_employer_id = models.IntegerField(null=True, blank=True)
@@ -213,11 +248,14 @@ class InterviewSchedule(models.Model):
     application = models.ForeignKey(Application, on_delete=models.CASCADE, db_column='application_id', related_name='interviews')
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE, db_column='employer_id')
     interview_date = models.DateField()
-    start_time = models.TimeField()
-    end_time = models.TimeField()
-    interview_type = models.CharField(max_length=50, help_text="in-person, phone, video")
+    start_time = models.TimeField(null=True, blank=True)
+    end_time = models.TimeField(null=True, blank=True)
+    interview_time = models.CharField(max_length=50, null=True, blank=True)
+    interview_type = models.CharField(max_length=50, default='Online', help_text="Online, In-person, phone, video")
+    interviewer_name = models.CharField(max_length=255, null=True, blank=True)
     location = models.CharField(max_length=255, null=True, blank=True)
-    meeting_link = models.CharField(max_length=255, null=True, blank=True)
+    meeting_link = models.CharField(max_length=500, null=True, blank=True)
+    instructions = models.TextField(null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=20, default='scheduled', help_text="scheduled, completed, cancelled, rescheduled")
     created_at = models.DateTimeField(default=timezone.now)
