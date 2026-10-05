@@ -1,188 +1,366 @@
-{% include 'includes/header.html' %}
+﻿{% include 'includes/header.html' %}
 <style>
-.req-container { max-width: 1000px; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
-.req-header { background: url('/images/bg.jpg') center/cover no-repeat; padding: 2rem 0; margin: 0 -1rem 1.75rem; text-align: center; color: white; border-radius: 0 0 16px 16px; }
-.req-header h1 { margin: 0; font-size: clamp(1.4rem, 4vw, 1.8rem); font-weight: 800; letter-spacing: -0.5px; }
-.req-header p { margin: .4rem 0 0; opacity: .9; font-size: .95rem; }
 
-.req-card { background: white; border-radius: 16px; border: 1px solid #e2e8f0; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.04); }
-.req-section-title { font-size: 1.05rem; font-weight: 700; color: #0a3d6b; margin-bottom: 1rem; padding-bottom: .4rem; border-bottom: 2px solid #f1f5f9; display: flex; align-items: center; gap: .5rem; }
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
-.form-group { margin-bottom: 1.25rem; }
-.form-label { display: block; font-size: .85rem; font-weight: 700; color: #334155; margin-bottom: .35rem; }
-.form-label .req-star { color: #dc2626; }
-.form-control { width: 100%; padding: .65rem .85rem; border: 1.5px solid #cbd5e1; border-radius: 8px; font-size: .9rem; box-sizing: border-box; transition: all .2s; font-family: inherit; }
-.form-control:focus { outline: none; border-color: #1866a3; box-shadow: 0 0 0 3px rgba(24,102,163,0.12); }
-.form-hint { font-size: .75rem; color: #64748b; margin-top: .25rem; display: block; }
-
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
-@media(max-width: 768px) {
-    .grid-2, .grid-3 { grid-template-columns: 1fr; }
-    .req-card { padding: 1.25rem; }
+.portal-dashboard {
+    min-height: 100vh;
+    padding: 1.25rem 1rem 3rem;
+    background: #c7d1dd;
+    color: #1e293b;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+}
+.portal-shell {
+    max-width: 1260px;
+    margin: 0 auto;
 }
 
-.benefit-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1rem; display: flex; align-items: flex-start; gap: .75rem; }
-.benefit-icon { width: 36px; height: 36px; border-radius: 8px; background: #e0f2fe; color: #0369a1; display: flex; align-items: center; justify-content: center; font-size: 1rem; flex-shrink: 0; }
+/* ── Hero Profile Card (Shared with Applicant & Admin) ── */
+.employer-hero-card {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    padding: 1.6rem 1.8rem;
+    margin: 0 auto 1.25rem;
+    border-radius: 18px;
+    background:
+        linear-gradient(115deg, rgba(10,61,107,.98) 0%, rgba(24,102,163,.96) 58%, rgba(33,150,243,.96) 100%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 1px, transparent 1px 18px);
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(10,61,107,.2);
+}
+.employer-hero-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0 65%, rgba(84,213,239,.18) 100%);
+    pointer-events: none;
+}
+.employer-hero-card::after {
+    content: '';
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    right: -100px;
+    top: -160px;
+    border: 44px solid rgba(255,255,255,.08);
+    border-radius: 50%;
+    pointer-events: none;
+}
+.portal-hero-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    width: 100%;
+}
+.portal-identity {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+}
+.employer-avatar-ring {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    padding: 3px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.employer-avatar-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 13px;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+.portal-name {
+    margin: 0;
+    color: #fff;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.portal-meta {
+    margin: .2rem 0 0;
+    color: rgba(255,255,255,.85);
+    font-size: .84rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+}
+.portal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .4rem;
+}
+.portal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .2rem .6rem;
+    border: 1px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.12);
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+}
+.portal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+.portal-actions a, .portal-actions button {
+    padding: .55rem .95rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: .82rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    transition: all .2s ease;
+    border: none;
+    cursor: pointer;
+}
+.portal-actions-primary {
+    background: #0056b3;
+    color: #fff !important;
+    border: 1px solid rgba(255,255,255,.25) !important;
+    box-shadow: 0 4px 12px rgba(0,86,179,.3);
+}
+.portal-actions-primary:hover {
+    background: #004494;
+    color: #fff !important;
+    transform: translateY(-2px);
+}
+.portal-actions-secondary {
+    border: 1px solid rgba(255,255,255,.65) !important;
+    background: rgba(255,255,255,.12);
+    color: #fff !important;
+    backdrop-filter: blur(4px);
+}
+.portal-actions-secondary:hover {
+    background: rgba(255,255,255,.25);
+    color: #fff !important;
+    transform: translateY(-2px);
+}
 
-.btn-submit { background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 100%); color: white; padding: .85rem 2rem; border: none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all .25s; display: inline-flex; align-items: center; gap: .6rem; box-shadow: 0 4px 15px rgba(24,102,163,0.25); }
-.btn-submit:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(24,102,163,0.35); }
+/* ── Content Cards ── */
+.custom-card, .portal-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.custom-card:hover, .portal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.09);
+}
+
+/* ── Match Badges ── */
+.badge-match {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.72rem;
+}
+.badge-match-excellent { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-match-good { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge-match-average { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.badge-match-low { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+/* ── Modern Tabs ── */
+.status-tabs, .tabs-nav {
+    display: flex;
+    gap: 0.45rem;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 1.25rem;
+    overflow-x: auto;
+    padding-bottom: 2px;
+}
+.status-tab, .tab-btn {
+    padding: 0.6rem 1rem;
+    font-size: 0.84rem;
+    font-weight: 600;
+    color: #64748b;
+    border-radius: 8px 8px 0 0;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    white-space: nowrap;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -4px;
+    transition: all 0.2s ease;
+}
+.status-tab:hover, .tab-btn:hover {
+    color: #0056b3;
+    background: #f1f5f9;
+}
+.status-tab.active, .tab-btn.active {
+    color: #0056b3;
+    border-bottom: 3px solid #0056b3;
+    background: #e0f2fe;
+}
+.tab-badge {
+    padding: 0.15rem 0.45rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    background: #e2e8f0;
+    color: #475569;
+}
+.status-tab.active .tab-badge, .tab-btn.active .tab-badge {
+    background: #0056b3;
+    color: #fff;
+}
+
+/* ── Form Inputs ── */
+.form-control-custom, .form-select-custom {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    transition: all 0.2s ease;
+    background: white;
+    color: #0f172a;
+}
+.form-control-custom:focus, .form-select-custom:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.12);
+}
+
 </style>
 
-<div class="req-header">
-    <div style="max-width: 1000px; margin: 0 auto; padding: 0 1rem;">
-        <h1><i class="fas fa-handshake"></i> Request Talent &amp; Applicant Sourcing</h1>
-        <p>Provide your Job Description &amp; Requirements. MultiBiz Admin will review, approve, and publish your opening live to top candidates.</p>
+<div class="portal-dashboard">
+    <div class="portal-shell">
+        
+        <!-- ── Top Hero Banner ── -->
+        <div class="employer-hero-card">
+            <div class="portal-hero-content">
+                <div class="portal-identity">
+                    <div class="employer-avatar-ring">
+                        <div class="employer-avatar-inner">
+                            <i class="fa-solid fa-plus-circle"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-1 small text-white" style="font-size:0.78rem;">
+                                <li class="breadcrumb-item"><a href="/employer/dashboard.php" class="text-white text-decoration-none">Dashboard</a></li>
+                                <li class="breadcrumb-item"><a href="/employer/jobs.php" class="text-white text-decoration-none">Jobs</a></li>
+                                <li class="breadcrumb-item active text-white" aria-current="page">New Requisition</li>
+                            </ol>
+                        </nav>
+                        <h1 class="portal-name" style="color: #ffffff !important;">Submit Job / Talent Request</h1>
+                        
+                    </div>
+                </div>
+                
+                <div class="portal-actions">
+                    <a href="/employer/jobs.php" class="portal-actions-secondary">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Jobs
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="portal-card p-4">
+            
+            {% if error_msg %}
+                <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert" style="border-radius:10px; font-size:0.88rem;">
+                    <i class="fa-solid fa-circle-exclamation fs-5"></i>
+                    <div>{{ error_msg }}</div>
+                </div>
+            {% endif %}
+
+            <form method="POST" action="">
+                {% csrf_token %}
+
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-briefcase text-primary me-1"></i> Job Title *</label>
+                        <input type="text" name="title" required value="{{ form_data.title|default:'' }}" class="form-control-custom" placeholder="e.g., Senior Full-Stack Python Engineer">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-layer-group text-primary me-1"></i> Category *</label>
+                        <input type="text" name="category" required value="{{ form_data.category|default:'' }}" class="form-control-custom" placeholder="e.g., Information Technology">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-clock text-primary me-1"></i> Employment Type</label>
+                        <select name="employment_type" class="form-select-custom">
+                            <option value="full_time">Full-time</option>
+                            <option value="part_time">Part-time</option>
+                            <option value="contract">Contract</option>
+                            <option value="remote">Remote</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-location-dot text-primary me-1"></i> Location / Work Setup</label>
+                        <input type="text" name="location" value="{{ form_data.location|default:'' }}" class="form-control-custom" placeholder="e.g., BGC, Taguig / Hybrid">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-money-bill-wave text-primary me-1"></i> Salary Range (Optional)</label>
+                        <input type="text" name="salary_range" value="{{ form_data.salary_range|default:'' }}" class="form-control-custom" placeholder="e.g., PHP 80,000 - 120,000">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-calendar text-primary me-1"></i> Minimum Experience (Years)</label>
+                        <input type="number" name="experience_years" value="{{ form_data.experience_years|default:1 }}" min="0" max="30" class="form-control-custom">
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-wand-magic-sparkles text-primary me-1"></i> Required Skills & Tags (Comma-separated)</label>
+                        <input type="text" name="skills_required" value="{{ form_data.skills_required|default:'' }}" class="form-control-custom" placeholder="e.g., Python, Django, PostgreSQL, Docker, AWS, React">
+                        <div class="form-text text-muted small">Our AI matching engine uses these skills to calculate applicant employability match scores.</div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-align-left text-primary me-1"></i> Job Description & Responsibilities *</label>
+                        <textarea name="description" rows="5" required class="form-control-custom" placeholder="Describe the day-to-day responsibilities, mission, and objectives for this role...">{{ form_data.description|default:'' }}</textarea>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-list-check text-primary me-1"></i> Role Requirements & Qualifications</label>
+                        <textarea name="requirements" rows="4" class="form-control-custom" placeholder="List certifications, tools, soft skills, or specific industry background required...">{{ form_data.requirements|default:'' }}</textarea>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <a href="/employer/jobs.php" class="btn btn-outline-secondary px-4 fw-semibold" style="border-radius:8px;">Cancel</a>
+                    <button type="submit" class="btn btn-primary px-4 fw-semibold" style="background:#0056b3; border:none; border-radius:8px;">
+                        <i class="fa-solid fa-paper-plane me-1"></i> Submit Requisition for Review
+                    </button>
+                </div>
+            </form>
+
+        </div>
+
     </div>
 </div>
-
-<div class="req-container">
-
-    <!-- Benefits row -->
-    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.75rem;">
-        <div class="benefit-card">
-            <div class="benefit-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
-            <div>
-                <div style="font-weight:700;font-size:.88rem;color:#0f172a;">AI-Ranked Matchmaking</div>
-                <div style="font-size:.8rem;color:#64748b;">Automatic qualification screening and resume scoring against your job description.</div>
-            </div>
-        </div>
-        <div class="benefit-card">
-            <div class="benefit-icon"><i class="fas fa-shield-halved"></i></div>
-            <div>
-                <div style="font-weight:700;font-size:.88rem;color:#0f172a;">Admin Verified Sourcing</div>
-                <div style="font-size:.8rem;color:#64748b;">MultiBiz Operations validates job specs and features your listing to active jobseekers.</div>
-            </div>
-        </div>
-        <div class="benefit-card">
-            <div class="benefit-icon"><i class="fas fa-envelope-circle-check"></i></div>
-            <div>
-                <div style="font-weight:700;font-size:.88rem;color:#0f172a;">Instant Notifications</div>
-                <div style="font-size:.8rem;color:#64748b;">Receive email updates the moment your job is approved and as applications arrive.</div>
-            </div>
-        </div>
-    </div>
-
-    {% if success %}
-        <div style="background:#f0fdf4;color:#166534;border:1.5px solid #bbf7d0;padding:1.25rem 1.5rem;border-radius:12px;margin-bottom:1.75rem;display:flex;align-items:center;gap:1rem;box-shadow:0 4px 12px rgba(22,101,52,0.06);">
-            <i class="fas fa-check-circle" style="font-size:1.8rem;color:#16a34a;"></i>
-            <div>
-                <div style="font-weight:700;font-size:1rem;">Talent Request Successfully Submitted!</div>
-                <div style="font-size:.88rem;margin-top:2px;">{{ success }}</div>
-            </div>
-        </div>
-    {% endif %}
-
-    {% if error %}
-        <div style="background:#fef2f2;color:#991b1b;border:1.5px solid #fecaca;padding:1.25rem 1.5rem;border-radius:12px;margin-bottom:1.75rem;display:flex;align-items:center;gap:1rem;">
-            <i class="fas fa-exclamation-circle" style="font-size:1.8rem;color:#ef4444;"></i>
-            <div>
-                <div style="font-weight:700;font-size:1rem;">Please check your input</div>
-                <div style="font-size:.88rem;margin-top:2px;">{{ error }}</div>
-            </div>
-        </div>
-    {% endif %}
-
-    <div class="req-card">
-        <form method="POST" action="">
-            {% csrf_token %}
-
-            <!-- Section 1: Position Overview -->
-            <div class="req-section-title">
-                <i class="fas fa-briefcase" style="color:#1866a3;"></i> 1. Position &amp; Headcount Overview
-            </div>
-
-            <div class="grid-2">
-                <div class="form-group">
-                    <label class="form-label">Position Title Needed <span class="req-star">*</span></label>
-                    <input type="text" name="title" required class="form-control" placeholder="e.g., Senior Full Stack Python / Django Engineer" value="{{ request.POST.title }}">
-                    <span class="form-hint">The target role name to be published on the job board.</span>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Number of Applicants Needed / Headcount</label>
-                    <input type="number" name="headcount" min="1" max="100" class="form-control" value="{{ request.POST.headcount|default:'1' }}">
-                    <span class="form-hint">Number of openings for this role.</span>
-                </div>
-            </div>
-
-            <!-- Section 2: Work Setup & Compensation -->
-            <div class="req-section-title" style="margin-top:1.5rem;">
-                <i class="fas fa-building" style="color:#1866a3;"></i> 2. Terms, Location &amp; Compensation
-            </div>
-
-            <div class="grid-3">
-                <div class="form-group">
-                    <label class="form-label">Employment Type</label>
-                    <select name="employment_type" class="form-control">
-                        <option value="full-time" {% if request.POST.employment_type == 'full-time' %}selected{% endif %}>Full-time</option>
-                        <option value="part-time" {% if request.POST.employment_type == 'part-time' %}selected{% endif %}>Part-time</option>
-                        <option value="contract"  {% if request.POST.employment_type == 'contract' %}selected{% endif %}>Contract / Project-based</option>
-                        <option value="internship"{% if request.POST.employment_type == 'internship' %}selected{% endif %}>Internship</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Location / Work Setup</label>
-                    <input type="text" name="location" class="form-control" placeholder="e.g., Makati City / Hybrid" value="{{ request.POST.location|default:employer.company_address }}">
-                    <span class="form-hint">Office address or remote/hybrid arrangement.</span>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Offered Salary Range</label>
-                    <input type="text" name="salary_range" class="form-control" placeholder="e.g., 60,000 - 85,000 PHP" value="{{ request.POST.salary_range }}">
-                    <span class="form-hint">Optional / Negotiable</span>
-                </div>
-            </div>
-
-            <div class="grid-2">
-                <div class="form-group">
-                    <label class="form-label">Hiring Urgency</label>
-                    <select name="urgency" class="form-control">
-                        <option value="Immediate" {% if request.POST.urgency == 'Immediate' %}selected{% endif %}>🚨 Immediate (Within 1-2 Weeks)</option>
-                        <option value="Normal" {% if request.POST.urgency == 'Normal' or not request.POST.urgency %}selected{% endif %}>⚡ Normal (Within 30 Days)</option>
-                        <option value="Flexible" {% if request.POST.urgency == 'Flexible' %}selected{% endif %}>📅 Flexible / Pipeline Building</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Key Required Skills</label>
-                    <input type="text" name="skills_required" class="form-control" placeholder="e.g., Python, SQL, REST APIs, Git, Leadership" value="{{ request.POST.skills_required }}">
-                    <span class="form-hint">Comma separated list of must-have technical/soft skills.</span>
-                </div>
-            </div>
-
-            <!-- Section 3: Job Description & Requirements -->
-            <div class="req-section-title" style="margin-top:1.5rem;">
-                <i class="fas fa-file-lines" style="color:#1866a3;"></i> 3. Job Description &amp; Candidate Qualifications
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Detailed Job Description &amp; Responsibilities <span class="req-star">*</span></label>
-                <textarea name="description" rows="5" required class="form-control" placeholder="Outline the main responsibilities, team structure, and day-to-day duties for this role...">{{ request.POST.description }}</textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Candidate Requirements &amp; Qualifications</label>
-                <textarea name="requirements" rows="4" class="form-control" placeholder="Specify education, years of experience, certifications, and required background...">{{ request.POST.requirements }}</textarea>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Special Notes for Admin (Optional)</label>
-                <textarea name="special_notes" rows="2" class="form-control" placeholder="Any specific sourcing instructions or confidentiality notes for the MultiBiz team...">{{ request.POST.special_notes }}</textarea>
-            </div>
-
-            <!-- Submission Actions -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2rem; padding-top:1.5rem; border-top:1px solid #e2e8f0; flex-wrap:wrap; gap:1rem;">
-                <a href="/employer/dashboard.php" style="color:#64748b; font-weight:600; text-decoration:none; font-size:.9rem;">
-                    <i class="fas fa-arrow-left"></i> Return to Dashboard
-                </a>
-                <button type="submit" class="btn-submit">
-                    <i class="fas fa-paper-plane"></i> Send Talent Request to Admin
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
 {% include 'includes/footer.html' %}

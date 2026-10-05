@@ -1,520 +1,501 @@
-{% include 'includes/header.html' %}
-<div class="container">
-    <div class="card">
+﻿{% include 'includes/header.html' %}
+<style>
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+.portal-dashboard {
+    min-height: 100vh;
+    padding: 1.25rem 1rem 3rem;
+    background: #c7d1dd;
+    color: #1e293b;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+}
+.portal-shell {
+    max-width: 1260px;
+    margin: 0 auto;
+}
+
+.employer-hero-card {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    padding: 1.6rem 1.8rem;
+    margin: 0 auto 1.25rem;
+    border-radius: 18px;
+    background:
+        linear-gradient(115deg, rgba(10,61,107,.98) 0%, rgba(24,102,163,.96) 58%, rgba(33,150,243,.96) 100%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 1px, transparent 1px 18px);
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(10,61,107,.2);
+}
+.employer-hero-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0 65%, rgba(84,213,239,.18) 100%);
+    pointer-events: none;
+}
+.employer-hero-card::after {
+    content: '';
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    right: -100px;
+    top: -160px;
+    border: 44px solid rgba(255,255,255,.08);
+    border-radius: 50%;
+    pointer-events: none;
+}
+.portal-hero-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    width: 100%;
+}
+.portal-identity {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+}
+.employer-avatar-ring {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    padding: 3px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.employer-avatar-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 13px;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+.portal-name {
+    margin: 0;
+    color: #fff;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.portal-meta {
+    margin: .2rem 0 0;
+    color: rgba(255,255,255,.85);
+    font-size: .84rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+}
+.portal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .4rem;
+}
+.portal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .2rem .6rem;
+    border: 1px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.12);
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+}
+.portal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+.portal-actions a, .portal-actions button {
+    padding: .55rem .95rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: .82rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    transition: all .2s ease;
+    border: none;
+    cursor: pointer;
+}
+.portal-actions-primary {
+    background: #0056b3;
+    color: #fff !important;
+    border: 1px solid rgba(255,255,255,.25) !important;
+    box-shadow: 0 4px 12px rgba(0,86,179,.3);
+}
+.portal-actions-primary:hover {
+    background: #004494;
+    color: #fff !important;
+    transform: translateY(-2px);
+}
+.portal-actions-secondary {
+    border: 1px solid rgba(255,255,255,.65) !important;
+    background: rgba(255,255,255,.12);
+    color: #fff !important;
+    backdrop-filter: blur(4px);
+}
+.portal-actions-secondary:hover {
+    background: rgba(255,255,255,.25);
+    color: #fff !important;
+    transform: translateY(-2px);
+}
+
+.custom-card, .portal-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.custom-card:hover, .portal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.09);
+}
+
+.badge-match {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.72rem;
+}
+.badge-match-excellent { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-match-good { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge-match-average { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.badge-match-low { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+.form-control-custom, .form-select-custom {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    transition: all 0.2s ease;
+    background: white;
+    color: #0f172a;
+}
+.form-control-custom:focus, .form-select-custom:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.12);
+}
+
+.workflow-stepper {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+    background: #f8fafc;
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    overflow-x: auto;
+    gap: 0.5rem;
+}
+.step-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 90px;
+    text-align: center;
+    position: relative;
+}
+.step-circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+.step-item.active .step-circle {
+    background: #0056b3;
+    color: white;
+    box-shadow: 0 0 0 4px rgba(0, 86, 179, 0.2);
+}
+.step-item.completed .step-circle {
+    background: #15803d;
+    color: white;
+}
+.step-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+}
+.step-item.active .step-label {
+    color: #0056b3;
+    font-weight: 700;
+}
+</style>
+
+<div class="portal-dashboard">
+    <div class="portal-shell">
         
-        {% if success %}
-            <div class="alert alert-success" style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                {{ success }}
-            </div>
-        {% endif %}
-        
-        {% if error %}
-            <div class="alert alert-danger" style="background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                {{ error }}
-            </div>
-        {% endif %}
-        
-        {% if interview_success %}
-            <div class="alert alert-success" style="background: #d4edda; color: #155724; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                {{ interview_success }}
-            </div>
-        {% endif %}
-        
-        {% if interview_error %}
-            <div class="alert alert-danger" style="background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                {{ interview_error }}
-            </div>
-        {% endif %}
-        
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
-            <div>
-                <h1 style="margin-bottom: 1rem; color: #0056b3;">
-                    {{ application.first_name }} {{ application.last_name }}
-                </h1>
-                
-                <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem;">
-                    <h3 style="color: #333; margin-bottom: 1rem;">Contact Information</h3>
-                    <p style="color: #666; margin-bottom: 0.5rem;">
-                        <i class="fas fa-envelope"></i> {{ application.email }}
-                    </p>
-                    {% if application.phone %}
-                        <p style="color: #666; margin-bottom: 0.5rem;">
-                            <i class="fas fa-phone"></i> {{ application.phone }}
-                        </p>
-                    {% endif %}
-                </div>
-                
-                <div style="margin-bottom: 2rem;">
-                    <h3 style="color: #333; margin-bottom: 1rem;">
-                        Skills
-                        {% if resume_analysis and resume_analysis.skills_extracted %}
-                            <span style="font-size: 0.8rem; color: #28a745; font-weight: normal;">
-                                <i class="fas fa-check-circle"></i> Extracted from Resume
-                            </span>
-                        {% endif %}
-                    </h3>
-                                        {% if display_skills %}
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                            {% for skill in display_skills|split:"," %}
-                                <span style="background: #0056b3; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem;">
-                                    {{ skill }}
-                                </span>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p style="color: #666;">No skills listed</p>
-                    {% endif %}
-                </div>
-                
-                <div style="margin-bottom: 2rem;">
-                    <h3 style="color: #333; margin-bottom: 1rem;">
-                        Qualifications
-                        {% if resume_analysis and resume_analysis.qualifications_extracted %}
-                            <span style="font-size: 0.8rem; color: #28a745; font-weight: normal;">
-                                <i class="fas fa-check-circle"></i> Extracted from Resume
-                            </span>
-                        {% endif %}
-                    </h3>
-                                        {% if display_qualifications %}
-                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                            {% for qual in display_qualifications|split:"," %}
-                                <span style="background: #28a745; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem;">
-                                    {{ qual }}
-                                </span>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p style="color: #666;">No qualifications listed</p>
-                    {% endif %}
-                </div>
-                
-                <!-- Interview Schedule Section -->
-                {% if application.application_id %}
-                    <div style="margin-bottom: 2rem; border: 2px solid #9C27B0; border-radius: 10px; overflow: hidden;">
-                        <div style="background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%); padding: 1rem; color: white;">
-                            <h3 style="color: white; margin: 0; font-size: 1.2rem;">
-                                <i class="fas fa-calendar-alt"></i> Interview Schedule
-                            </h3>
-                            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">
-                                Schedule and manage interviews with the candidate
-                            </p>
-                        </div>
-                        
-                        <div style="background: #f8f9fa; padding: 1.5rem;">
-                            <!-- Interview List -->
-                            {% if interviews %}
-                                <h4 style="color: #333; margin-bottom: 1rem; font-size: 1.1rem;">Scheduled Interviews</h4>
-                                {% for interview in interviews %}
-                                    <div style="background: white; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #9C27B0;">
-                                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                                            <div>
-                                                <span style="background: ; color: white; padding: 0.25rem 0.75rem; border-radius: 15px; font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem;">
-                                                    {{ interview.status|title }}
-                                                </span>
-                                                <span style="color: #333; font-weight: 600; font-size: 1.1rem;">
-                                                    {{ interview.interview_date|date:"F d, Y" }}
-                                                </span>
-                                            </div>
-                                            <span style="color: #666; font-size: 0.9rem;">
-                                                {{ interview.start_time|date:"h:i A" }} - 
-                                                {{ interview.end_time|date:"h:i A" }}
-                                            </span>
-                                        </div>
-                                        
-                                        <div style="color: #666; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                                            <i class="fas fa-video"></i> {{ interview.status|title }} Interview
-                                            {% if interview.interview_type == 'in-person' and interview.location %}
-                                                at {{ interview.location }}
-                                            {% endif %}
-                                        </div>
-                                        
-                                        {% if interview.meeting_link %}
-                                            <div style="margin-bottom: 0.5rem;">
-                                                <a href="{{ interview.meeting_link }}" 
-                                                   target="_blank"
-                                                   style="color: #0056b3; text-decoration: none; font-size: 0.9rem;">
-                                                    <i class="fas fa-link"></i> Join Meeting
-                                                </a>
-                                            </div>
-                                        {% endif %}
-                                        
-                                        {% if interview.notes %}
-                                            <p style="color: #333; font-size: 0.9rem; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #eee;">
-                                                <strong>Notes:</strong> {{ interview.notes }}
-                                            </p>
-                                        {% endif %}
-                                        
-                                        <!-- Interview Actions -->
-                                        {% if interview.status == 'scheduled' %}
-                                            <form method="POST" action="" style="margin-top: 0.75rem;">
-    {% csrf_token %}
-                                                <input type="hidden" name="interview_id" value="{{ interview.id }}">
-                                                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                                                    <select name="interview_status" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem;" required>
-                                                        <option value="">Update Status</option>
-                                                        <option value="completed">Mark as Completed</option>
-                                                        <option value="cancelled">Cancel Interview</option>
-                                                        <option value="rescheduled">Mark as Rescheduled</option>
-                                                    </select>
-                                                    <textarea name="cancellation_reason" 
-                                                              placeholder="Reason for cancellation (if applicable)"
-                                                              style="flex: 1; min-width: 200px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9rem;"></textarea>
-                                                    <button type="submit" name="update_interview_status" 
-                                                            style="background: #dc3545; color: white; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-size: 0.9rem; cursor: pointer;">
-                                                        Update
-                                                    </button>
-                                                </div>
-                                            </form>
-                                        {% endif %}
-                                    </div>
-                                {% endfor %}
-                            {% else %}
-                                <p style="color: #666; text-align: center; padding: 2rem 0;">
-                                    <i class="fas fa-calendar-times"></i> No interviews scheduled yet.
-                                </p>
-                            {% endif %}
-                            
-                            <!-- Schedule New Interview Form -->
-                            <hr style="margin: 1.5rem 0; border-color: #eee;">
-                            <h4 style="color: #333; margin-bottom: 1rem; font-size: 1.1rem;">Schedule New Interview</h4>
-                            <form method="POST" action="">
-    {% csrf_token %}
-                                <input type="hidden" name="schedule_interview" value="1">
-                                
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                                    <div>
-                                        <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">
-                                            Interview Date <span style="color: #dc3545;">*</span>
-                                        </label>
-                                        <input type="date" 
-                                               name="interview_date" 
-                                               min="{% now 'Y-m-d' %}" 
-                                               style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 8px; font-size: 1rem;"
-                                               required>
-                                    </div>
-                                    
-                                    <div>
-                                        <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">
-                                            Interview Type <span style="color: #dc3545;">*</span>
-                                        </label>
-                                        <select name="interview_type" 
-                                                style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 8px; font-size: 1rem;"
-                                                required>
-                                            <option value="">Select Type</option>
-                                            <option value="in-person">In-Person</option>
-                                            <option value="video">Video Call</option>
-                                            <option value="phone">Phone Call</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                                    <div>
-                                        <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">
-                                            Start Time <span style="color: #dc3545;">*</span>
-                                        </label>
-                                        <input type="time" 
-                                               name="start_time" 
-                                               style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 8px; font-size: 1rem;"
-                                               required>
-                                    </div>
-                                    
-                                    <div>
-                                        <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">
-                                            End Time <span style="color: #dc3545;">*</span>
-                                        </label>
-                                        <input type="time" 
-                                               name="end_time" 
-                                               style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 8px; font-size: 1rem;"
-                                               required>
-                                    </div>
-                                </div>
-                                
-                                <div style="margin-bottom: 1rem;">
-                                    <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">
-                                        Location / Meeting Link
-                                    </label>
-                                    <input type="text" 
-                                           name="location" 
-                                           placeholder="Office address for in-person, or leave blank for virtual"
-                                           style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 8px; font-size: 1rem; margin-bottom: 0.5rem;">
-                                    
-                                    <input type="url" 
-                                           name="meeting_link" 
-                                           placeholder="Video meeting link (Zoom, Google Meet, etc.)"
-                                           style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 8px; font-size: 1rem;">
-                                </div>
-                                
-                                <div style="margin-bottom: 1rem;">
-                                    <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">
-                                        Notes / Instructions for Candidate
-                                    </label>
-                                    <textarea name="notes" 
-                                              placeholder="Any special instructions, agenda, or preparation needed..."
-                                              style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 8px; font-size: 1rem; min-height: 100px;"></textarea>
-                                </div>
-                                
-                                <button type="submit" 
-                                        style="width: 100%; background: linear-gradient(135deg, #9C27B0 0%, #7B1FA2 100%); color: white; padding: 0.75rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem;">
-                                    <i class="fas fa-calendar-plus"></i> Schedule Interview
-                                </button>
-                            </form>
+        <!-- ── Top Hero Banner ── -->
+        <div class="employer-hero-card">
+            <div class="portal-hero-content">
+                <div class="portal-identity">
+                    <div class="employer-avatar-ring">
+                        <div class="employer-avatar-inner">
+                            <i class="fa-solid fa-id-card"></i>
                         </div>
                     </div>
-                {% endif %}
-                
-                <!-- New Section: Remarks Visible to Applicant -->
-                {% if applicant_remarks %}
-                    <div style="margin-bottom: 2rem; border: 2px solid #0056b3; border-radius: 10px; overflow: hidden;">
-                        <div style="background: linear-gradient(135deg, #0056b3 0%, #004494 100%); padding: 1rem; color: white;">
-                            <h3 style="color: white; margin: 0; font-size: 1.2rem;">
-                                <i class="fas fa-eye"></i> Remarks Visible to Applicant
-                            </h3>
-                            <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem; opacity: 0.9;">
-                                These remarks will be visible to the candidate when they view their application status.
-                            </p>
-                        </div>
-                        <div style="background: #f8f9fa; padding: 1.5rem;">
-                            {% for entry in applicant_remarks %}
-                                <div style="margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid #e0e0e0; {% if forloop.last %}border-bottom: none; margin-bottom: 0; padding-bottom: 0;{% endif %}">
-                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                                        <span style="background: #0056b3; color: white; padding: 0.25rem 0.75rem; border-radius: 15px; font-size: 0.85rem; font-weight: 600;">
-                                            {{ interview.status|title }}
-                                        </span>
-                                        <span style="color: #666; font-size: 0.85rem;">
-                                            <i class="fas fa-clock"></i> {{ entry.timestamp|date:"F d, Y h:i A" }}
-                                        </span>
-                                    </div>
-                                    {% if entry.reviewed_by %}
-                                        <p style="color: #666; margin-bottom: 0.5rem; font-size: 0.9rem;">
-                                            <i class="fas fa-user"></i> Reviewed by: {{ entry.reviewed_by }}
-                                        </p>
-                                    {% endif %}
-                                    <p style="color: #333; line-height: 1.6; background: white; padding: 1rem; border-radius: 8px; border-left: 4px solid #28a745;">
-                                        <strong style="color: #28a745;">Remarks to Applicant:</strong><br>
-                                        {{ entry.remarks }}
-                                    </p>
-                                </div>
-                            {% endfor %}
+                    <div>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-1 small text-white" style="font-size:0.78rem;">
+                                <li class="breadcrumb-item"><a href="/employer/dashboard.php" class="text-white text-decoration-none">Dashboard</a></li>
+                                <li class="breadcrumb-item"><a href="/employer/candidates.php" class="text-white text-decoration-none">Candidates</a></li>
+                                <li class="breadcrumb-item active text-white" aria-current="page">Dossier #{{ application.application_id }}</li>
+                            </ol>
+                        </nav>
+                        <h1 class="portal-name" style="color: #ffffff !important;">{{ application.first_name }} {{ application.last_name }}</h1>
+                        <div class="portal-meta">
+                            <span><i class="fa-solid fa-briefcase text-white"></i> {{ application.job_title }}</span>
+                            <span>&bull;</span>
+                            <span><i class="fa-solid fa-envelope text-white"></i> {{ application.email }}</span>
                         </div>
                     </div>
-                {% endif %}
-                
-                <div style="margin-bottom: 2rem;">
-                    <h3 style="color: #333; margin-bottom: 1rem;">Resume</h3>
-                    
-                    
-                    {% if resume_to_show %}
-                        <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-bottom: 0.5rem;">
-                            <p style="color: #666; margin: 0; font-size: 0.9rem;">
-                                <i class="fas fa-info-circle"></i> {{ resume_source }}
-                            </p>
-                        </div>
-                        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-                            <a href="../{{ resume_to_show }}" 
-                               target="_blank" 
-                               style="background: #28a745; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600;"
-                               title="View Resume PDF">
-                                <i class="fas fa-file-pdf"></i> View Resume PDF
-                            </a>
-                            <a href="../{{ resume_to_show }}" 
-                               download
-                               style="background: #0056b3; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; display: inline-flex; align-items: center; gap: 0.5rem; font-weight: 600;"
-                               title="Download Resume PDF">
-                                <i class="fas fa-download"></i> Download
-                            </a>
-                        </div>
-                    {% elif application.resume_file %}
-                        <p style="color: #dc3545;">
-                            <i class="fas fa-exclamation-triangle"></i> Resume file not found at the specified path.
-                        </p>
-                        {% if application.profile_resume_file %}
-                            <p style="color: #666; font-size: 0.9rem;">
-                                <i class="fas fa-info-circle"></i> Resume path: {{ application.profile_resume_file }}
-                            </p>
-                        {% endif %}
-                    {% else %}
-                        <p style="color: #6c757d;">
-                            <i class="fas fa-minus"></i> No resume uploaded by the applicant
-                        </p>
-                    {% endif %}
                 </div>
                 
-                {% if application.cover_letter %}
-                    <div style="margin-bottom: 2rem;">
-                        <h3 style="color: #333; margin-bottom: 1rem;">Cover Letter</h3>
-                        <p style="color: #666; line-height: 1.8; white-space: pre-wrap;">
-                            {{ application.cover_letter }}
-                        </p>
-                    </div>
-                {% endif %}
+                <div class="portal-actions">
+                    <a href="/employer/candidates.php" class="portal-actions-secondary">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Pipeline
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="portal-card p-4">
+            
+            {% if success %}
+                <div class="alert alert-success d-flex align-items-center gap-2 mb-3" role="alert" style="border-radius:10px; font-size:0.88rem;">
+                    <i class="fa-solid fa-circle-check fs-5"></i>
+                    <div>{{ success }}</div>
+                </div>
+            {% endif %}
+
+            {% if error %}
+                <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert" style="border-radius:10px; font-size:0.88rem;">
+                    <i class="fa-solid fa-circle-exclamation fs-5"></i>
+                    <div>{{ error }}</div>
+                </div>
+            {% endif %}
+
+            <!-- Workflow Visual Stepper -->
+            <div class="workflow-stepper">
+                <div class="step-item completed">
+                    <div class="step-circle"><i class="fa-solid fa-check"></i></div>
+                    <div class="step-label">Applied</div>
+                </div>
+                <div class="step-item completed">
+                    <div class="step-circle"><i class="fa-solid fa-check"></i></div>
+                    <div class="step-label">Sent to Employer</div>
+                </div>
+                <div class="step-item {% if application.employer_status in 'qualified,not_qualified,for_interview,interview_completed,hired' %}completed{% else %}active{% endif %}">
+                    <div class="step-circle">3</div>
+                    <div class="step-label">Employer Review</div>
+                </div>
+                <div class="step-item {% if application.employer_status in 'for_interview,interview_completed,hired' %}completed{% elif application.employer_status == 'qualified' %}active{% endif %}">
+                    <div class="step-circle">4</div>
+                    <div class="step-label">Interview</div>
+                </div>
+                <div class="step-item {% if application.employer_status == 'hired' %}completed{% endif %}">
+                    <div class="step-circle">5</div>
+                    <div class="step-label">Hired</div>
+                </div>
+            </div>
+
+            <!-- 2 Columns: Dossier Left & Evaluation Right -->
+            <div class="row g-4">
                 
-                
-                <!-- Remarks History Section (Internal) -->
-                {% with history=application.remarks_history|parse_remarks %}
-                    {% if history %}
-                        <div style="margin-bottom: 2rem; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-                            <div style="background: linear-gradient(135deg, #1866a3 0%, #0a3d6b 100%); padding: 1rem 1.25rem; color: white;">
-                                <h3 style="color: white; margin: 0; font-size: 1.1rem; display: flex; align-items: center; gap: 0.5rem;">
-                                    <i class="fas fa-history"></i> Internal Review & Status History
-                                </h3>
-                                <p style="margin: 0.35rem 0 0 0; font-size: 0.82rem; opacity: 0.85;">
-                                    Confidential timeline of reviewer actions, notes, and status updates.
-                                </p>
+                <!-- Left Column: Candidate Information Dossier -->
+                <div class="col-lg-7">
+                    <div class="p-3.5 border rounded-3 bg-white shadow-sm mb-3">
+                        <div class="d-flex justify-content-between align-items-start mb-3 pb-2 border-bottom">
+                            <div>
+                                <h5 class="fw-bold text-dark mb-1">{{ application.first_name }} {{ application.last_name }}</h5>
+                                <div class="text-muted small">Applicant ID: #{{ application.applicant_id }} &bull; Applied on {{ application.applied_at|date:"M d, Y" }}</div>
                             </div>
-                            <div style="background: #f8fafc; padding: 1.25rem;">
-                                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                                    {% for entry in history %}
-                                        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 9px; padding: 0.9rem 1.1rem;">
-                                            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.4rem;">
-                                                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                                                    {% if entry.status %}
-                                                        <span style="background: {% if entry.status == 'accepted' %}#dcfce7; color: #15803d;{% elif 'interview' in entry.status %}#ede9fe; color: #6d28d9;{% elif entry.status == 'shortlisted' %}#e0f2fe; color: #0369a1;{% elif entry.status == 'rejected' %}#fee2e2; color: #b91c1c;{% else %}#ffedd5; color: #c2410c;{% endif %} padding: 0.2rem 0.65rem; border-radius: 999px; font-size: 0.74rem; font-weight: 700; text-transform: capitalize;">
-                                                            {{ entry.status|title }}
-                                                        </span>
-                                                    {% endif %}
-                                                    <span style="font-size: 0.82rem; font-weight: 600; color: #475569;">
-                                                        <i class="fas fa-user-tie" style="color: #94a3b8;"></i> {{ entry.reviewed_by|default:"Hiring Lead" }}
-                                                    </span>
-                                                </div>
-                                                {% if entry.timestamp %}
-                                                    <span style="color: #64748b; font-size: 0.78rem;">
-                                                        <i class="fas fa-clock" style="color: #94a3b8;"></i> {{ entry.timestamp }}
-                                                    </span>
-                                                {% endif %}
-                                            </div>
-                                            {% if entry.remarks %}
-                                                <div style="color: #1e293b; font-size: 0.85rem; line-height: 1.5; background: #f8fafc; padding: 0.6rem 0.85rem; border-radius: 7px; border-left: 3px solid #1866a3; margin-top: 0.35rem;">
-                                                    {{ entry.remarks }}
-                                                </div>
-                                            {% endif %}
-                                        </div>
+                            {% if application.match_score >= 70 %}
+                                <span class="badge-match badge-match-excellent fs-6">
+                                    <i class="fa-solid fa-circle-check"></i> {{ application.match_score|floatformat:0 }}% AI Match
+                                </span>
+                            {% elif application.match_score >= 50 %}
+                                <span class="badge-match badge-match-average fs-6">
+                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ application.match_score|floatformat:0 }}% AI Match
+                                </span>
+                            {% else %}
+                                <span class="badge-match badge-match-low fs-6">
+                                    <i class="fa-solid fa-circle-xmark"></i> {{ application.match_score|floatformat:0 }}% AI Match
+                                </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <span class="text-muted small d-block">Education:</span>
+                                <strong class="text-dark small">{{ applicant.education_level|default:"Not specified" }}</strong>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-muted small d-block">Experience:</span>
+                                <strong class="text-dark small">{{ applicant.experience_years|default:0 }} Years</strong>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-muted small d-block">Phone:</span>
+                                <strong class="text-dark small">{{ application.phone|default:"Not provided" }}</strong>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="text-muted small d-block">Email:</span>
+                                <strong class="text-dark small">{{ application.email }}</strong>
+                            </div>
+                        </div>
+
+                        {% if applicant.skills %}
+                            <div class="mb-3">
+                                <span class="text-muted small d-block mb-1">Skills & Competencies:</span>
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for skill in applicant.skills.split %}
+                                        <span class="badge bg-light text-dark border px-2 py-1 small">{{ skill|cut:"," }}</span>
                                     {% endfor %}
                                 </div>
                             </div>
+                        {% endif %}
+
+                        {% if application.resume_file %}
+                            <div class="mt-3 pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <span class="small fw-semibold text-dark"><i class="fa-solid fa-file-pdf text-danger me-1"></i> Applicant Resume:</span>
+                                <a href="/uploads/{{ application.resume_file }}" target="_blank" class="btn btn-sm btn-outline-primary px-3 fw-semibold" style="border-radius:6px; font-size:0.8rem;">
+                                    <i class="fa-solid fa-download me-1"></i> Download PDF
+                                </a>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    {% if status_history %}
+                        <div class="p-3.5 border rounded-3 bg-white shadow-sm">
+                            <h6 class="fw-bold text-dark mb-3 pb-2 border-bottom"><i class="fa-solid fa-timeline text-primary me-1"></i> Application Timeline</h6>
+                            <div class="d-flex flex-column gap-2.5">
+                                {% for event in status_history %}
+                                    <div class="d-flex gap-2.5 small">
+                                        <div class="text-muted" style="min-width:110px; font-size:0.75rem;">{{ event.timestamp }}</div>
+                                        <div>
+                                            <strong class="text-dark">{{ event.stage }}</strong> &bull; <span class="text-muted">{{ event.actor_name }} ({{ event.actor_role|title }})</span>
+                                            {% if event.notes %}<p class="mb-0 text-muted mt-0.5">{{ event.notes }}</p>{% endif %}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
                         </div>
-                    {% endif %}
-                {% endwith %}
-            </div>
-            
-            <div>
-                <div style="background: #f8f9fa; padding: 2rem; border-radius: 10px; margin-bottom: 2rem;">
-                    <h3 style="color: #333; margin-bottom: 1rem;">Application Details</h3>
-                    
-                    <div style="margin-bottom: 1rem;">
-                        <strong style="color: #666;">Job Applied:</strong>
-                        <p style="color: #333; margin-top: 0.25rem;">
-                            {{ application.job_title }}
-                            {% if application.company_name %}
-                                <span style="color: #999;"> - {{ application.company_name }}</span>
-                            {% endif %}
-                        </p>
-                    </div>
-                    
-                    {% if application.reviewed_by_name %}
-                    <div style="margin-bottom: 1rem;">
-                        <strong style="color: #666;">Reviewed By:</strong>
-                        <p style="color: #333; margin-top: 0.25rem;">
-                            {{ application.reviewed_by_name }}
-                        </p>
-                    </div>
-                    {% endif %}
-                    
-                    {% if application.applied_at %}
-                    <div style="margin-bottom: 1rem;">
-                        <strong style="color: #666;">Applied On:</strong>
-                        <p style="color: #333; margin-top: 0.25rem;">
-                            {{ application.applied_at|date:"F d, Y" }}
-                        </p>
-                    </div>
-                    {% endif %}
-                    
-                    {% if application.match_score %}
-                    <div style="margin-bottom: 1rem;">
-                        <strong style="color: #666;">Match Score:</strong>
-                        <p style="color: #4CAF50; font-weight: 600; margin-top: 0.25rem;">
-                            {{ application.match_score|floatformat:2 }}%
-                        </p>
-                    </div>
-                    {% endif %}
-                    
-                    <div style="margin-bottom: 1rem;">
-                        <strong style="color: #666;">Employability Score:</strong>
-                        <p style="color: #0056b3; font-weight: 600; margin-top: 0.25rem;">
-                            {{ display_score }}%
-                        </p>
-                    </div>
-                    
-                    {% if application.status %}
-                    <div style="margin-bottom: 1rem;">
-                        <strong style="color: #666;">Current Status:</strong>
-                        <p style="color: #333; margin-top: 0.25rem;">
-                            
-                            <span style="background: {{ color }}; color: white; padding: 0.25rem 0.75rem; border-radius: 15px; font-size: 0.85rem; font-weight: 600;">
-                                {{ interview.status|title }}
-                            </span>
-                        </p>
-                    </div>
                     {% endif %}
                 </div>
-                
-                {% if application.application_id %}
-                    <form method="POST" action="">
-    {% csrf_token %}
-                        <div style="margin-bottom: 1.5rem; background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                            <h4 style="color: #333; margin-bottom: 1rem; font-size: 1.1rem;">
-                                <i class="fas fa-edit"></i> Update Application Status
-                            </h4>
+
+                <!-- Right Column: Evaluation & Action Panel -->
+                <div class="col-lg-5">
+                    <div class="p-3.5 border rounded-3 bg-white shadow-sm mb-3">
+                        <h6 class="fw-bold text-dark mb-3 pb-2 border-bottom"><i class="fa-solid fa-gavel text-primary me-1"></i> Hiring Stage & Actions</h6>
+                        
+                        <form method="POST" action="" class="d-flex flex-column gap-3">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="update_status">
                             
-                            <div style="margin-bottom: 1rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">
-                                    Select New Status
-                                </label>
-                                <select name="status" style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 8px; font-size: 1rem;" required>
-                                    <option value="">-- Select Status --</option>
-                                    <option value="pending" {% if application.status == 'pending' %}selected{% endif %}>Pending</option>
-                                    <option value="reviewed" {% if application.status == 'reviewed' %}selected{% endif %}>Reviewed</option>
-                                    <option value="shortlisted" {% if application.status == 'shortlisted' %}selected{% endif %}>Shortlisted</option>
-                                    <option value="scheduled for interview" {% if application.status == 'scheduled for interview' %}selected{% endif %}>Scheduled for Interview</option>
-                                    <option value="accepted" {% if application.status == 'accepted' %}selected{% endif %}>Accepted</option>
-                                    <option value="rejected" {% if application.status == 'rejected' %}selected{% endif %}>Rejected</option>
+                            <div>
+                                <label class="form-label small fw-semibold text-dark">Update Employer Status:</label>
+                                <select name="employer_status" class="form-select-custom">
+                                    <option value="for_review" {% if application.employer_status == 'for_review' %}selected{% endif %}>For Review</option>
+                                    <option value="qualified" {% if application.employer_status == 'qualified' %}selected{% endif %}>Qualified</option>
+                                    <option value="for_interview" {% if application.employer_status == 'for_interview' %}selected{% endif %}>For Interview</option>
+                                    <option value="interview_completed" {% if application.employer_status == 'interview_completed' %}selected{% endif %}>Interview Completed</option>
+                                    <option value="hired" {% if application.employer_status == 'hired' %}selected{% endif %}>Hired / Offer Accepted</option>
+                                    <option value="not_qualified" {% if application.employer_status == 'not_qualified' %}selected{% endif %}>Not Qualified</option>
                                 </select>
                             </div>
-                            
-                            <div style="margin-bottom: 1rem;">
-                                <label style="display: block; margin-bottom: 0.5rem; color: #333; font-weight: 500;">
-                                    <i class="fas fa-comment-dots"></i> Remarks / Justification
-                                    <span style="color: #dc3545; font-size: 0.9rem;">* Required</span>
-                                </label>
-                                <textarea 
-                                    name="remarks" 
-                                    style="width: 100%; padding: 0.75rem; border: 2px solid #eee; border-radius: 8px; font-size: 1rem; min-height: 120px; font-family: inherit;" 
-                                    placeholder="Enter remarks, comments, or justification for this status change..."
-                                    required
-                                ></textarea>
-                                <p style="color: #666; font-size: 0.85rem; margin-top: 0.25rem;">
-                                    <i class="fas fa-info-circle"></i> This will be visible to the applicant.
-                                </p>
+
+                            <div>
+                                <label class="form-label small fw-semibold text-dark">Employer Feedback / Remarks:</label>
+                                <textarea name="remarks" rows="3" class="form-control-custom" placeholder="Optional comments regarding candidate qualifications or next steps..."></textarea>
                             </div>
-                            
-                            <button type="submit" name="update_status" style="width: 100%; background: linear-gradient(135deg, #0056b3 0%, #004494 100%); color: white; padding: 0.75rem; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.3s ease;">
-                                <i class="fas fa-save"></i> Update Status
+
+                            <button type="submit" class="btn btn-primary w-100 fw-semibold" style="background:#0056b3; border:none; border-radius:8px;">
+                                <i class="fa-solid fa-check-double me-1"></i> Update Candidate Status
                             </button>
-                        </div>
-                    </form>
-                {% else %}
-                    <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; border-left: 4px solid #ffc107;">
-                        <p style="color: #856404; margin: 0; font-size: 0.9rem;">
-                            <i class="fas fa-info-circle"></i> <strong>Recommended Candidate:</strong> This candidate hasn't applied yet, but has been recommended based on their chatbot assessment.
-                        </p>
+                        </form>
                     </div>
-                {% endif %}
+
+                    <!-- Interview Scheduling Card -->
+                    <div class="p-3.5 border rounded-3 bg-white shadow-sm">
+                        <h6 class="fw-bold text-dark mb-3 pb-2 border-bottom"><i class="fa-solid fa-calendar-plus text-primary me-1"></i> Schedule Interview</h6>
+                        
+                        <form method="POST" action="" class="d-flex flex-column gap-2.5">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="schedule_interview">
+
+                            <div>
+                                <label class="form-label small fw-semibold text-dark">Interview Date:</label>
+                                <input type="date" name="interview_date" required class="form-control-custom">
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold text-dark">Start Time:</label>
+                                    <input type="time" name="start_time" required class="form-control-custom">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small fw-semibold text-dark">Type:</label>
+                                    <select name="interview_type" class="form-select-custom">
+                                        <option value="Online">Online Video</option>
+                                        <option value="Onsite">Onsite / Office</option>
+                                        <option value="Phone">Phone Call</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="form-label small fw-semibold text-dark">Meeting Link / Location:</label>
+                                <input type="text" name="location_or_link" class="form-control-custom" placeholder="e.g. Google Meet URL or Office address">
+                            </div>
+
+                            <div>
+                                <label class="form-label small fw-semibold text-dark">Instructions for Candidate:</label>
+                                <textarea name="instructions" rows="2" class="form-control-custom" placeholder="e.g., Please prepare a 10-minute presentation..."></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-success w-100 fw-semibold mt-1" style="border-radius:8px;">
+                                <i class="fa-solid fa-paper-plane me-1"></i> Send Interview Invitation
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
             </div>
+
         </div>
+
     </div>
 </div>
-
-<?php 
-$conn->close();
-include '../includes/footer.php';
 {% include 'includes/footer.html' %}

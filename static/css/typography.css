@@ -330,3 +330,81 @@ footer h3, footer h4, footer h5, .footer-heading {
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
 }
+
+/* ==========================================================================
+   Hero Banners & Dark Card Typography Overrides (Standardized 1.55rem Title & Dimensions)
+   ========================================================================== */
+.employer-hero-banner,
+.employer-hero-card,
+.jobs-hero-banner,
+.cand-hero-banner,
+.applicant-hero-card,
+.pr-hero,
+.apps-hero,
+.saved-hero,
+.emp-hero,
+.chat-hero,
+.msg-page-header,
+.services-hero,
+.contact-hero,
+.careers-hero,
+.about-hero,
+.hero-content {
+    position: relative !important;
+    overflow: hidden !important;
+    padding: 1.65rem 2rem !important;
+    border-radius: 18px !important;
+    margin-bottom: 1.75rem !important;
+    background: linear-gradient(135deg, #09203f 0%, #1e40af 55%, #0284c7 100%) !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 30px rgba(10, 61, 107, 0.18) !important;
+    min-height: 96px !important;
+    box-sizing: border-box !important;
+}
+
+.employer-hero-banner h1, .employer-hero-banner h2, .employer-hero-banner h3, .employer-hero-banner h4, .employer-hero-banner h5, .employer-hero-banner h6,
+.employer-hero-card h1, .employer-hero-card h2, .employer-hero-card h3, .employer-hero-card h4, .employer-hero-card h5, .employer-hero-card h6,
+.jobs-hero-banner h1, .jobs-hero-banner h2, .jobs-hero-banner h3, .jobs-hero-banner h4, .jobs-hero-banner h5, .jobs-hero-banner h6,
+.cand-hero-banner h1, .cand-hero-banner h2, .cand-hero-banner h3, .cand-hero-banner h4, .cand-hero-banner h5, .cand-hero-banner h6,
+.applicant-hero-card h1, .applicant-hero-card h2, .applicant-hero-card h3, .applicant-hero-card h4, .applicant-hero-card h5, .applicant-hero-card h6,
+.pr-hero h1, .pr-hero h2, .pr-hero h3, .pr-hero h4, .pr-hero h5, .pr-hero h6,
+.apps-hero h1, .apps-hero h2, .apps-hero h3, .apps-hero h4, .apps-hero h5, .apps-hero h6,
+.saved-hero h1, .saved-hero h2, .saved-hero h3, .saved-hero h4, .saved-hero h5, .saved-hero h6,
+.emp-hero h1, .emp-hero h2, .emp-hero h3, .emp-hero h4, .emp-hero h5, .emp-hero h6,
+.chat-hero h1, .chat-hero h2, .chat-hero h3, .chat-hero h4, .chat-hero h5, .chat-hero h6,
+.msg-page-header h1, .msg-page-header h2, .msg-page-header h3,
+.jobs-hero-title, .cand-hero-title, .portal-name, .portal-identity h1 {
+    font-size: 1.55rem !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.02em !important;
+    color: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 0.65rem !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25) !important;
+}
+
+.employer-hero-banner p, .employer-hero-card p, .jobs-hero-banner p, .cand-hero-banner p,
+.applicant-hero-card p, .pr-hero p, .apps-hero p, .saved-hero p, .emp-hero p, .msg-page-header p,
+.portal-meta, .portal-meta span, .jobs-hero-subtitle, .cand-hero-subtitle {
+    font-size: 0.88rem !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    margin: 0.35rem 0 0 !important;
+    line-height: 1.45 !important;
+}
+
+.employer-hero-banner .breadcrumb-item, .employer-hero-banner .breadcrumb-item a,
+.employer-hero-card .breadcrumb-item, .employer-hero-card .breadcrumb-item a {
+    color: rgba(255, 255, 255, 0.9) !important;
+    font-size: 0.78rem !important;
+}
+
+.employer-hero-banner .breadcrumb-item.active, .employer-hero-card .breadcrumb-item.active {
+    color: #ffffff !important;
+    font-weight: 700 !important;
+    font-size: 0.78rem !important;
+}
+

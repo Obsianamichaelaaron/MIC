@@ -1,207 +1,315 @@
-{% include 'includes/header.html' %}
-<link rel="stylesheet" href="../css/post_job.css">
-
-<div class="container">
-    <div class="card post-job-card"style="margin-top: 10px;">
-        <div class="post-job-header">
-            <h1>
-                <i class="fas fa-edit"></i> Edit Job
-            </h1>
-            <div style="margin-top: 0.5rem;">
-                
-            </div>
-        </div>
-        
-        {% if success %}
-            <div class="post-job-alert post-job-alert-success">
-                <i class="fas fa-check-circle"></i>
-                <span>{{ success }}</span>
-            </div>
-        {% endif %}
-        
-        {% if error %}
-            <div class="post-job-alert post-job-alert-error">
-                <i class="fas fa-exclamation-circle"></i>
-                <span>{{ error }}</span>
-            </div>
-        {% endif %}
-        
-        <form method="POST" action="" class="post-job-form" id="jobForm">
-    {% csrf_token %}
-            <div class="form-group">
-                <label>Job Title *</label>
-                <input type="text" name="title" required value="{{ job.title|default:"" }}" placeholder="e.g., Senior Web Developer">
-            </div>
-            
-            <div class="form-group">
-                <label>Job Description *</label>
-                <textarea name="description" rows="6" required placeholder="Provide a detailed description of the job position...">{{ job.description|default:"" }}</textarea>
-            </div>
-            
-            <div class="form-group">
-                <label>Requirements</label>
-                <textarea name="requirements" rows="4" placeholder="List the requirements for this position...">{{ job.requirements|default:"" }}</textarea>
-            </div>
-            
-            <div class="form-group">
-                <label>Required Skills (comma-separated)</label>
-                <input type="text" name="skills_required" value="{{ job.skills_required|default:"" }}" placeholder="e.g., PHP, JavaScript, MySQL, React">
-            </div>
-            
-            <div class="post-job-form-grid">
-                <div class="form-group">
-                    <label>Location *</label>
-                    <input type="text" name="location" required value="{{ job.location|default:"" }}" placeholder="e.g., New York, NY">
-                </div>
-                
-                <div class="form-group">
-                    <label>Employment Type</label>
-                    <select name="employment_type">
-                        <option value="full-time" {% if job.employment_type == 'full-time' %}selected{% endif %}>Full-time</option>
-                        <option value="part-time" {% if job.employment_type == 'part-time' %}selected{% endif %}>Part-time</option>
-                        <option value="contract" {% if job.employment_type == 'contract' %}selected{% endif %}>Contract</option>
-                        <option value="internship" {% if job.employment_type == 'internship' %}selected{% endif %}>Internship</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label>Salary Range</label>
-                <input type="text" name="salary_range" value="{{ job.salary_range|default:"" }}" placeholder="e.g., ₱50,000 - ₱70,000">
-            </div>
-            
-            <div class="form-group">
-                <label>Target Qualifications (Select qualifications this job targets)</label>
-                <div class="post-job-qualifications">
-                    {% if qualifications %}
-                        {% for qual in qualifications %}
-                            <div class="post-job-qualification-item">
-                                <input type="checkbox" name="target_qualifications[]" value="{{ qual.qualification_id }}" 
-                                    id="qual_{{ qual.qualification_id }}"
-                                    {% if qual.qualification_id in selected_qualifications %}checked{% endif %}>
-                                <span>
-                                    <strong>{{ qual.name }}</strong>
-                                    {% if qual.description %}
-                                        <small>{{ qual.description }}</small>
-                                    {% endif %}
-                                </span>
-                            </div>
-                        {% endfor %}
-                    {% else %}
-                        <div class="post-job-empty-state">
-                            <i class="fas fa-inbox"></i>
-                            <p>No qualifications available. Please contact the administrator.</p>
-                        </div>
-                    {% endif %}
-                </div>
-                <small class="post-job-info-text">
-                    <i class="fas fa-info-circle"></i> Select qualifications that are relevant to this job posting.
-                </small>
-            </div>
-            
-            <div class="form-group">
-                <label>Status</label>
-                <select name="status">
-                    <option value="active" {% if job.status == 'active' %}selected{% endif %}>Active</option>
-                    <option value="draft" {% if job.status == 'draft' %}selected{% endif %}>Draft</option>
-                    <option value="closed" {% if job.status == 'closed' %}selected{% endif %}>Closed</option>
-                </select>
-                <small class="post-job-info-text">
-                    <i class="fas fa-info-circle"></i> 
-                    <strong>Active:</strong> Visible to applicants | 
-                    <strong>Draft:</strong> Only visible to you | 
-                    <strong>Closed:</strong> No longer accepting applications
-                </small>
-            </div>
-            
-            <div style="display: flex; gap: 1rem; margin-top: 2rem; flex-wrap: wrap;">
-                <button type="submit" class="post-job-submit-btn" style="background: linear-gradient(135deg, #FF9800 0%, #F57C00 100%);">
-                    <i class="fas fa-save"></i> Update Job
-                </button>
-                <a href="jobs.php" class="post-job-cancel-btn">
-                    <i class="fas fa-times"></i> Cancel
-                </a>
-                <button type="button" class="post-job-delete-btn" onclick="confirmDelete()">
-                    <i class="fas fa-trash"></i> Delete Job
-                </button>
-            </div>
-        </form>
-    </div>
-</div>
-
+﻿{% include 'includes/header.html' %}
 <style>
-.post-job-cancel-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 2rem;
-    background: #6c757d;
-    color: white;
-    text-decoration: none;
-    border-radius: 8px;
-    font-weight: 600;
-    transition: all 0.3s ease;
-    border: none;
-    cursor: pointer;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+.portal-dashboard {
+    min-height: 100vh;
+    padding: 1.25rem 1rem 3rem;
+    background: #c7d1dd;
+    color: #1e293b;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+}
+.portal-shell {
+    max-width: 1260px;
+    margin: 0 auto;
 }
 
-.post-job-cancel-btn:hover {
-    background: #5a6268;
-    transform: translateY(-2px);
-    text-decoration: none;
-    color: white;
+.employer-hero-card {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    padding: 1.6rem 1.8rem;
+    margin: 0 auto 1.25rem;
+    border-radius: 18px;
+    background:
+        linear-gradient(115deg, rgba(10,61,107,.98) 0%, rgba(24,102,163,.96) 58%, rgba(33,150,243,.96) 100%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 1px, transparent 1px 18px);
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(10,61,107,.2);
 }
-
-.post-job-delete-btn {
+.employer-hero-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0 65%, rgba(84,213,239,.18) 100%);
+    pointer-events: none;
+}
+.employer-hero-card::after {
+    content: '';
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    right: -100px;
+    top: -160px;
+    border: 44px solid rgba(255,255,255,.08);
+    border-radius: 50%;
+    pointer-events: none;
+}
+.portal-hero-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    width: 100%;
+}
+.portal-identity {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+}
+.employer-avatar-ring {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    padding: 3px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.employer-avatar-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 13px;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+.portal-name {
+    margin: 0;
+    color: #fff;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.portal-meta {
+    margin: .2rem 0 0;
+    color: rgba(255,255,255,.85);
+    font-size: .84rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+}
+.portal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .4rem;
+}
+.portal-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.75rem 2rem;
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-    color: white;
-    text-decoration: none;
-    border-radius: 8px;
+    gap: .3rem;
+    padding: .2rem .6rem;
+    border: 1px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.12);
+    border-radius: 999px;
+    font-size: .72rem;
     font-weight: 600;
-    transition: all 0.3s ease;
-    border: none;
-    cursor: pointer;
+    backdrop-filter: blur(4px);
+}
+.portal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
     margin-left: auto;
+    flex-shrink: 0;
 }
-
-.post-job-delete-btn:hover {
-    background: linear-gradient(135deg, #c82333 0%, #bd2130 100%);
+.portal-actions a, .portal-actions button {
+    padding: .55rem .95rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: .82rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    transition: all .2s ease;
+    border: none;
+    cursor: pointer;
+}
+.portal-actions-primary {
+    background: #0056b3;
+    color: #fff !important;
+    border: 1px solid rgba(255,255,255,.25) !important;
+    box-shadow: 0 4px 12px rgba(0,86,179,.3);
+}
+.portal-actions-primary:hover {
+    background: #004494;
+    color: #fff !important;
+    transform: translateY(-2px);
+}
+.portal-actions-secondary {
+    border: 1px solid rgba(255,255,255,.65) !important;
+    background: rgba(255,255,255,.12);
+    color: #fff !important;
+    backdrop-filter: blur(4px);
+}
+.portal-actions-secondary:hover {
+    background: rgba(255,255,255,.25);
+    color: #fff !important;
     transform: translateY(-2px);
 }
 
-@media (max-width: 768px) {
-    .post-job-delete-btn {
-        margin-left: 0;
-        width: 100%;
-        justify-content: center;
-    }
+.custom-card, .portal-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+.custom-card:hover, .portal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.09);
+}
+
+.badge-match {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.72rem;
+}
+.badge-match-excellent { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-match-good { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge-match-average { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.badge-match-low { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+.form-control-custom, .form-select-custom {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    transition: all 0.2s ease;
+    background: white;
+    color: #0f172a;
+}
+.form-control-custom:focus, .form-select-custom:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.12);
+}
+
 </style>
 
-<script>
-function confirmDelete() {
-    if (confirm('Are you sure you want to delete this job? This action cannot be undone and will also delete all associated applications and recommendations.')) {
-        // Create a separate form for delete
-        const deleteForm = document.createElement('form');
-        deleteForm.method = 'POST';
-        deleteForm.action = '';
+<div class="portal-dashboard">
+    <div class="portal-shell">
         
-        // Add delete_job hidden input
-        const deleteInput = document.createElement('input');
-        deleteInput.type = 'hidden';
-        deleteInput.name = 'delete_job';
-        deleteInput.value = '1';
-        deleteForm.appendChild(deleteInput);
-        
-        // Add to document and submit
-        document.body.appendChild(deleteForm);
-        deleteForm.submit();
-    }
-}
-</script>
+        <!-- ── Top Hero Banner ── -->
+        <div class="employer-hero-card">
+            <div class="portal-hero-content">
+                <div class="portal-identity">
+                    <div class="employer-avatar-ring">
+                        <div class="employer-avatar-inner">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-1 small text-white" style="font-size:0.78rem;">
+                                <li class="breadcrumb-item"><a href="/employer/dashboard.php" class="text-white text-decoration-none">Dashboard</a></li>
+                                <li class="breadcrumb-item"><a href="/employer/jobs.php" class="text-white text-decoration-none">Jobs</a></li>
+                                <li class="breadcrumb-item active text-white" aria-current="page">Edit #{{ job.job_id }}</li>
+                            </ol>
+                        </nav>
+                        <h1 class="portal-name" style="color: #ffffff !important;">Edit Job Requisition</h1>
+                        
+                    </div>
+                </div>
+                
+                <div class="portal-actions">
+                    <a href="/employer/jobs.php" class="portal-actions-secondary">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Jobs
+                    </a>
+                </div>
+            </div>
+        </div>
 
+        <div class="portal-card p-4">
+            
+            {% if error_msg %}
+                <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert" style="border-radius:10px; font-size:0.88rem;">
+                    <i class="fa-solid fa-circle-exclamation fs-5"></i>
+                    <div>{{ error_msg }}</div>
+                </div>
+            {% endif %}
+
+            <form method="POST" action="">
+                {% csrf_token %}
+
+                <div class="row g-3">
+                    <div class="col-md-8">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-briefcase text-primary me-1"></i> Job Title *</label>
+                        <input type="text" name="title" required value="{{ job.title }}" class="form-control-custom">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-layer-group text-primary me-1"></i> Category *</label>
+                        <input type="text" name="category" required value="{{ job.category }}" class="form-control-custom">
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-clock text-primary me-1"></i> Employment Type</label>
+                        <select name="employment_type" class="form-select-custom">
+                            <option value="full_time" {% if job.employment_type == 'full_time' %}selected{% endif %}>Full-time</option>
+                            <option value="part_time" {% if job.employment_type == 'part_time' %}selected{% endif %}>Part-time</option>
+                            <option value="contract" {% if job.employment_type == 'contract' %}selected{% endif %}>Contract</option>
+                            <option value="remote" {% if job.employment_type == 'remote' %}selected{% endif %}>Remote</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-location-dot text-primary me-1"></i> Location / Work Setup</label>
+                        <input type="text" name="location" value="{{ job.location }}" class="form-control-custom">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-money-bill-wave text-primary me-1"></i> Salary Range</label>
+                        <input type="text" name="salary_range" value="{{ job.salary_range }}" class="form-control-custom">
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-calendar text-primary me-1"></i> Minimum Experience (Years)</label>
+                        <input type="number" name="experience_years" value="{{ job.experience_years }}" min="0" max="30" class="form-control-custom">
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-wand-magic-sparkles text-primary me-1"></i> Required Skills & Tags</label>
+                        <input type="text" name="skills_required" value="{{ job.skills_required }}" class="form-control-custom">
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-align-left text-primary me-1"></i> Job Description *</label>
+                        <textarea name="description" rows="5" required class="form-control-custom">{{ job.description }}</textarea>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-list-check text-primary me-1"></i> Requirements & Qualifications</label>
+                        <textarea name="requirements" rows="4" class="form-control-custom">{{ job.requirements }}</textarea>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top">
+                    <a href="/employer/jobs.php" class="btn btn-outline-secondary px-4 fw-semibold" style="border-radius:8px;">Cancel</a>
+                    <button type="submit" class="btn btn-primary px-4 fw-semibold" style="background:#0056b3; border:none; border-radius:8px;">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+
+        </div>
+
+    </div>
+</div>
 {% include 'includes/footer.html' %}

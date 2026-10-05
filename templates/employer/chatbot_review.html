@@ -1,94 +1,269 @@
-{% include 'includes/header.html' %}
-<link rel="stylesheet" href="../css/chatbot.css">
+﻿{% include 'includes/header.html' %}
+<style>
 
-<div class="container">
-    <div style="margin-bottom: 2rem;">
-        <a href="view_candidate.php?id={{ application_id }}" style="color: #0056b3; text-decoration: none;">
-            <i class="fas fa-arrow-left"></i> Back to Candidate Details
-        </a>
-    </div>
-    
-    <div class="chatbot-container">
-        <div class="chatbot-header">
-            <div class="bot-avatar">
-                <i class="fas fa-robot"></i>
-            </div>
-            <div style="flex: 1;">
-                <h1>Applicant Assessment Review</h1>
-                <div class="status">
-                    <span class="status-dot"></span>
-                    <span>Reviewing: {{ application.first_name }} {{ application.last_name }}</span>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+
+.portal-dashboard {
+    min-height: 100vh;
+    padding: 1.25rem 1rem 3rem;
+    background: #c7d1dd;
+    color: #1e293b;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+}
+.portal-shell {
+    max-width: 1260px;
+    margin: 0 auto;
+}
+
+.employer-hero-card {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    padding: 1.6rem 1.8rem;
+    margin: 0 auto 1.25rem;
+    border-radius: 18px;
+    background:
+        linear-gradient(115deg, rgba(10,61,107,.98) 0%, rgba(24,102,163,.96) 58%, rgba(33,150,243,.96) 100%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.08) 0 1px, transparent 1px 18px);
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(10,61,107,.2);
+}
+.employer-hero-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0 65%, rgba(84,213,239,.18) 100%);
+    pointer-events: none;
+}
+.employer-hero-card::after {
+    content: '';
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    right: -100px;
+    top: -160px;
+    border: 44px solid rgba(255,255,255,.08);
+    border-radius: 50%;
+    pointer-events: none;
+}
+.portal-hero-content {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    width: 100%;
+}
+.portal-identity {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+}
+.employer-avatar-ring {
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    padding: 3px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.employer-avatar-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 13px;
+    display: grid;
+    place-items: center;
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+.portal-name {
+    margin: 0;
+    color: #fff;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.portal-meta {
+    margin: .2rem 0 0;
+    color: rgba(255,255,255,.85);
+    font-size: .84rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem;
+}
+.portal-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .4rem;
+}
+.portal-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .2rem .6rem;
+    border: 1px solid rgba(255,255,255,.28);
+    background: rgba(255,255,255,.12);
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 600;
+    backdrop-filter: blur(4px);
+}
+.portal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
+    margin-left: auto;
+    flex-shrink: 0;
+}
+.portal-actions a, .portal-actions button {
+    padding: .55rem .95rem;
+    border-radius: 8px;
+    text-decoration: none;
+    font-size: .82rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    transition: all .2s ease;
+    border: none;
+    cursor: pointer;
+}
+.portal-actions-primary {
+    background: #0056b3;
+    color: #fff !important;
+    border: 1px solid rgba(255,255,255,.25) !important;
+    box-shadow: 0 4px 12px rgba(0,86,179,.3);
+}
+.portal-actions-primary:hover {
+    background: #004494;
+    color: #fff !important;
+    transform: translateY(-2px);
+}
+.portal-actions-secondary {
+    border: 1px solid rgba(255,255,255,.65) !important;
+    background: rgba(255,255,255,.12);
+    color: #fff !important;
+    backdrop-filter: blur(4px);
+}
+.portal-actions-secondary:hover {
+    background: rgba(255,255,255,.25);
+    color: #fff !important;
+    transform: translateY(-2px);
+}
+
+.custom-card, .portal-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.custom-card:hover, .portal-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.09);
+}
+
+.badge-match {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    font-weight: 700;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.72rem;
+}
+.badge-match-excellent { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+.badge-match-good { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+.badge-match-average { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+.badge-match-low { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+
+.form-control-custom, .form-select-custom {
+    width: 100%;
+    padding: 0.65rem 0.85rem;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 8px;
+    font-size: 0.88rem;
+    transition: all 0.2s ease;
+    background: white;
+    color: #0f172a;
+}
+.form-control-custom:focus, .form-select-custom:focus {
+    outline: none;
+    border-color: #0056b3;
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.12);
+}
+
+</style>
+
+<div class="portal-dashboard">
+    <div class="portal-shell">
+        
+        <!-- ── Top Hero Banner ── -->
+        <div class="employer-hero-card">
+            <div class="portal-hero-content">
+                <div class="portal-identity">
+                    <div class="employer-avatar-ring">
+                        <div class="employer-avatar-inner">
+                            <i class="fa-solid fa-robot"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb mb-1 small text-white" style="font-size:0.78rem;">
+                                <li class="breadcrumb-item"><a href="/employer/dashboard.php" class="text-white text-decoration-none">Dashboard</a></li>
+                                <li class="breadcrumb-item active text-white" aria-current="page">AI Chatbot Review</li>
+                            </ol>
+                        </nav>
+                        <h1 class="portal-name" style="color: #ffffff !important;">Applicant AI Inquiry Review</h1>
+                        
+                    </div>
                 </div>
             </div>
         </div>
-        
-        <div class="question-section active" style="display: block;">
-            <div class="chat-messages" id="chatMessages" style="max-height: 600px; overflow-y: auto;">
-                {% if chatbot_answers %}
-                    <!-- Welcome Message -->
-                    <div class="chat-message bot">
-                        <div class="message-avatar bot">
-                            <i class="fas fa-robot"></i>
-                        </div>
-                        <div class="message-bubble bot">
-                            <p>Hello! 👋 I'm here to help you review this applicant's career assessment.</p>
-                            <p style="margin-top: 0.5rem;"><strong>Applicant:</strong> {{ application.first_name }} {{ application.last_name }}</p>
-                            <p><strong>Job Applied:</strong> {{ application.job_title }}</p>
-                            <p><strong>Employability Score:</strong> <span style="color: #0056b3; font-weight: 600;">{{ application.employability_score|floatformat:2 }}%</span></p>
-                            {% if chatbot_answers.0.qualification_name %}
-                                <p><strong>Category:</strong> {{ chatbot_answers.0.qualification_name }}</p>
-                            {% endif %}
-                            <span class="message-time">{% now "h:i A" %}</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Display all Q&A -->
-                    
-                        <div class="chat-message bot">
-                            <div class="message-avatar bot">
-                                <i class="fas fa-robot"></i>
-                            </div>
-                            <div class="message-bubble bot">
-                                <h3>Question {{ forloop.counter }}</h3>
-                                <p>{{ answer.question_text }}</p>
-                                {% if category %}
-                                    <p style="font-size: 0.85rem; color: #666; margin-top: 0.25rem;">
-                                        <i class="fas fa-tag"></i> Category: <strong>{{ ucfirst(category|title; border-radius: 15px; padding: 1.5rem; margin-top: 1rem;">
-                        <div class="message-avatar bot" style="background: rgba(255,255,255,0.2);">
-                            <i class="fas fa-star" style="color: #FFD700;"></i>
-                        </div>
-                        <div class="message-bubble bot" style="background: transparent; color: white;">
-                            <p style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; color: white;">
-                                <i class="fas fa-lightbulb"></i> AI-Generated Feedback
-                            </p>
-                            <p style="color: white; line-height: 1.8; margin-bottom: 1rem;">
-                                {{ feedback_message }}
-                            </p>
-                            {% if pending_count > 0 %}
-                                <p style="color: rgba(255,255,255,0.9); margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.3);">
-                                    <i class="fas fa-info-circle"></i> <strong>Note:</strong> This candidate has {{ pending_count }} other pending application{% if pending_count > 1 %}s{% endif %} in the system.
-                                </p>
-                            {% endif %}
-                            <span class="message-time" style="color: rgba(255,255,255,0.8);">{% now "h:i A" %}</span>
-                        </div>
-                    </div>
-                    {% endif %}
-                {% else %}
-                    <div class="chat-message bot">
-                        <div class="message-avatar bot">
-                            <i class="fas fa-robot"></i>
-                        </div>
-                        <div class="message-bubble bot">
-                            <p>No chatbot assessment data available for this applicant.</p>
-                            <p style="margin-top: 0.5rem;">The applicant may not have completed the career assessment yet.</p>
-                            <span class="message-time">{% now "h:i A" %}</span>
-                        </div>
-                    </div>
-                {% endif %}
-            </div>
+
+        <div class="portal-card p-4">
+            
+            {% if chatbot_answers %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light small text-uppercase fw-bold text-muted">
+                            <tr>
+                                <th>Applicant / User</th>
+                                <th>Inquiry Question</th>
+                                <th>Automated AI Answer</th>
+                                <th>Date & Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ans in chatbot_answers %}
+                                <tr>
+                                    <td class="fw-bold small">{{ ans.user.first_name }} {{ ans.user.last_name }}</td>
+                                    <td class="small">{{ ans.question }}</td>
+                                    <td class="small text-muted">{{ ans.answer }}</td>
+                                    <td class="small text-muted">{{ ans.created_at|date:"M d, Y h:i A" }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center py-5 text-muted small">
+                    <i class="fa-solid fa-robot fs-2 text-muted mb-2 d-block"></i>
+                    No applicant chatbot inquiries recorded for your job postings yet.
+                </div>
+            {% endif %}
+
         </div>
+
     </div>
 </div>
-
 {% include 'includes/footer.html' %}
-
