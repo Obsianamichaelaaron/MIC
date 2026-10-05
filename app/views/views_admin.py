@@ -14,6 +14,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, Avg
 from django.conf import settings
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from app.models import (
     User, Employer, Applicant, JobPosting, Application,
     JobQualificationMapping, Qualification, InterviewSchedule,
@@ -31,6 +32,15 @@ from app.services.mailer import (
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_score
 from app.services.ml_job_matching import evaluate_match_model
+from app.services.qualification import (
+    NOT_QUALIFIED_SCORE_MAX,
+    QUALIFIED_SCORE_MIN,
+    UNDER_QUALIFIED_SCORE_MAX,
+    UNDER_QUALIFIED_SCORE_MIN,
+    UNCLASSIFIED_SCORE_MAX,
+    UNCLASSIFIED_SCORE_MIN,
+    classify_match_score,
+)
 
 LANDING_CMS_DEFAULTS = {
     'hero': {
@@ -122,9 +132,9 @@ def dashboard_view(request):
     new_users_30d = User.objects.filter(created_at__gte=thirty_days_ago).count()
     new_apps_30d = Application.objects.filter(applied_at__gte=thirty_days_ago).count()
     total_admins = User.objects.filter(role='admin').count()
-    elite_matches = Application.objects.filter(match_score__gte=85).count()
+    elite_matches = Application.objects.filter(match_score__gt=QUALIFIED_SCORE_MIN, match_score__gte=85).count()
     strong_matches = Application.objects.filter(
-        match_score__gte=70,
+        match_score__gt=QUALIFIED_SCORE_MIN,
         match_score__lt=85,
     ).count()
 
@@ -169,12 +179,19 @@ def dashboard_view(request):
             JobPosting.objects.filter(employment_type='contract').count(),
             JobPosting.objects.filter(employment_type='internship').count(),
         ],
-        'match_tier_labels': ['Elite Match (85-100%)', 'Strong Fit (70-84%)', 'Moderate (50-69%)', 'Developing (<50%)'],
+        'match_tier_labels': ['Elite Qualified (85-100%)', 'Qualified (>60-<85%)', 'Under-Qualified (40-60%)', 'Unclassified (30-<40%)', 'Not Qualified (<30%)'],
         'match_tier_data': [
             Application.objects.filter(match_score__gte=85).count(),
-            Application.objects.filter(match_score__gte=70, match_score__lt=85).count(),
-            Application.objects.filter(match_score__gte=50, match_score__lt=70).count(),
-            Application.objects.filter(match_score__lt=50).count(),
+            Application.objects.filter(match_score__gt=QUALIFIED_SCORE_MIN, match_score__lt=85).count(),
+            Application.objects.filter(
+                match_score__gte=UNDER_QUALIFIED_SCORE_MIN,
+                match_score__lte=UNDER_QUALIFIED_SCORE_MAX,
+            ).count(),
+            Application.objects.filter(
+                match_score__gte=UNCLASSIFIED_SCORE_MIN,
+                match_score__lt=UNCLASSIFIED_SCORE_MAX,
+            ).count(),
+            Application.objects.filter(match_score__lt=NOT_QUALIFIED_SCORE_MAX).count(),
         ],
     }
 
@@ -1072,8 +1089,17 @@ def candidates_view(request):
         if count_all == 0:
             continue  # skip jobs with no applicants
 
-        count_qualified = apps.filter(match_score__gte=70).count()
+        count_qualified = apps.filter(match_score__gt=QUALIFIED_SCORE_MIN).count()
         count_high_match = apps.filter(match_score__gte=85).count()
+        count_under_qualified = apps.filter(
+            match_score__gte=UNDER_QUALIFIED_SCORE_MIN,
+            match_score__lte=UNDER_QUALIFIED_SCORE_MAX,
+        ).count()
+        count_unclassified = apps.filter(
+            match_score__gte=UNCLASSIFIED_SCORE_MIN,
+            match_score__lt=UNCLASSIFIED_SCORE_MAX,
+        ).count()
+        count_not_qualified = apps.filter(match_score__lt=NOT_QUALIFIED_SCORE_MAX).count()
         count_forwarded = apps.filter(forwarded_to_employer=True).count()
         count_pending = apps.filter(status='pending').count()
 
@@ -1101,6 +1127,9 @@ def candidates_view(request):
             'status': job.status,
             'count_all': count_all,
             'count_qualified': count_qualified,
+            'count_under_qualified': count_under_qualified,
+            'count_unclassified': count_unclassified,
+            'count_not_qualified': count_not_qualified,
             'count_high_match': count_high_match,
             'count_forwarded': count_forwarded,
             'count_pending': count_pending,
@@ -1397,11 +1426,21 @@ def batch_forward_candidates_api(request):
             if scope == 'all':
                 apps = Application.objects.filter(job=job)
             elif scope == 'qualified':
-                apps = Application.objects.filter(job=job).filter(Q(match_score__gte=70.0) | Q(admin_qualification='qualified'))
+                apps = Application.objects.filter(job=job, match_score__gt=QUALIFIED_SCORE_MIN)
             elif scope == 'under_qualified':
-                apps = Application.objects.filter(job=job).filter(match_score__gte=50.0, match_score__lt=70.0)
+                apps = Application.objects.filter(
+                    job=job,
+                    match_score__gte=UNDER_QUALIFIED_SCORE_MIN,
+                    match_score__lte=UNDER_QUALIFIED_SCORE_MAX,
+                )
             elif scope == 'not_qualified':
-                apps = Application.objects.filter(job=job).filter(match_score__lt=50.0)
+                apps = Application.objects.filter(job=job, match_score__lt=NOT_QUALIFIED_SCORE_MAX)
+            elif scope == 'unclassified':
+                apps = Application.objects.filter(
+                    job=job,
+                    match_score__gte=UNCLASSIFIED_SCORE_MIN,
+                    match_score__lt=UNCLASSIFIED_SCORE_MAX,
+                )
             else:
                 apps = Application.objects.filter(job=job, pk__in=app_ids)
         else:
@@ -1426,9 +1465,7 @@ def batch_forward_candidates_api(request):
             application.status = 'shortlisted'
 
         # Set qualification tier automatically if unset
-        if not application.admin_qualification:
-            score = float(application.match_score or 0.0)
-            application.admin_qualification = 'qualified' if score >= 70.0 else ('under_qualified' if score >= 50.0 else 'not_qualified')
+        application.admin_qualification = classify_match_score(application.match_score)
 
         timestamp_str = timezone.now().strftime('%Y-%m-%d %H:%M')
         entry = f"[{timestamp_str}] Forwarded to Employer by Admin."
@@ -1552,6 +1589,9 @@ def generate_candidates_excel_workbook(job=None, applications=None):
     font_qual_under = Font(name="Calibri", size=9, bold=True, color="B45309")
     fill_qual_under = PatternFill(start_color="FEF3C7", end_color="FEF3C7", fill_type="solid") # Amber
 
+    font_qual_unclassified = Font(name="Calibri", size=9, bold=True, color="475569")
+    fill_qual_unclassified = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid")
+
     font_qual_not   = Font(name="Calibri", size=9, bold=True, color="B91C1C")
     fill_qual_not   = PatternFill(start_color="FEE2E2", end_color="FEE2E2", fill_type="solid") # Red
 
@@ -1617,11 +1657,12 @@ def generate_candidates_excel_workbook(job=None, applications=None):
     total_cand = len(applications) if applications else 0
     qual_count = sum(1 for a in (applications or []) if a.get('qualification_status') == 'qualified')
     under_count = sum(1 for a in (applications or []) if a.get('qualification_status') == 'under_qualified')
+    unclassified_count = sum(1 for a in (applications or []) if a.get('qualification_status') == 'unclassified')
     not_count  = sum(1 for a in (applications or []) if a.get('qualification_status') == 'not_qualified')
 
     ws.merge_cells("A4:Q4")
     kpi_cell = ws["A4"]
-    kpi_cell.value = f"TOTAL APPLICANTS: {total_cand}   |   QUALIFIED (TOP MATCH): {qual_count}   |   UNDER-QUALIFIED: {under_count}   |   NOT QUALIFIED: {not_count}   |   ALL APPLICANT STATUSES INCLUDED"
+    kpi_cell.value = f"TOTAL APPLICANTS: {total_cand}   |   QUALIFIED (>60%): {qual_count}   |   UNDER-QUALIFIED (40-60%): {under_count}   |   UNCLASSIFIED (30-<40%): {unclassified_count}   |   NOT QUALIFIED (<30%): {not_count}   |   ALL APPLICANT STATUSES INCLUDED"
     kpi_cell.font = font_kpi_text
     kpi_cell.fill = fill_card
     kpi_cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -1678,6 +1719,10 @@ def generate_candidates_excel_workbook(job=None, applications=None):
             tier_label = "UNDER-QUALIFIED"
             tier_font = font_qual_under
             tier_fill = fill_qual_under
+        elif q_status == 'unclassified':
+            tier_label = "UNCLASSIFIED"
+            tier_font = font_qual_unclassified
+            tier_fill = fill_qual_unclassified
         else:
             tier_label = "NOT QUALIFIED"
             tier_font = font_qual_not
@@ -1784,12 +1829,7 @@ def export_candidates_excel_view(request, job_id=None):
         match_score = float(app.match_score or 0.0)
         
         # Determine qualification tier
-        if match_score >= 70.0:
-            q_status = 'qualified'
-        elif match_score >= 50.0:
-            q_status = 'under_qualified'
-        else:
-            q_status = 'not_qualified'
+        q_status = classify_match_score(match_score)
 
         # Filter by qualification tier if explicitly requested
         if qual_filter and qual_filter != 'all' and q_status != qual_filter:
@@ -1888,12 +1928,7 @@ def upload_candidates_google_drive_api(request, job_id=None):
             continue
 
         match_score = float(app.match_score or 0.0)
-        if match_score >= 70.0:
-            q_status = 'qualified'
-        elif match_score >= 50.0:
-            q_status = 'under_qualified'
-        else:
-            q_status = 'not_qualified'
+        q_status = classify_match_score(match_score)
 
         if qual_filter and qual_filter != 'all' and q_status != qual_filter:
             continue
@@ -1980,12 +2015,9 @@ def export_candidates_csv_view(request, job_id=None):
             continue
 
         match_score = float(app.match_score or 0.0)
-        if match_score >= 70.0:
-            q_status = 'QUALIFIED'
-        elif match_score >= 50.0:
+        q_status = classify_match_score(match_score).replace('_', ' ').upper()
+        if q_status == 'UNDER QUALIFIED':
             q_status = 'UNDER-QUALIFIED'
-        else:
-            q_status = 'NOT QUALIFIED'
 
         writer.writerow([
             idx,
@@ -2039,12 +2071,7 @@ def job_candidates_view(request, job_id):
             continue
 
         match_score = float(app.match_score or 0.0)
-        if match_score >= 70.0:
-            q_status = 'qualified'
-        elif match_score >= 50.0:
-            q_status = 'under_qualified'
-        else:
-            q_status = 'not_qualified'
+        q_status = classify_match_score(match_score)
 
         cand_info = {
             'application': app,
@@ -2085,6 +2112,7 @@ def job_candidates_view(request, job_id):
         'all': len(all_candidates),
         'qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'qualified'),
         'under_qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'under_qualified'),
+        'unclassified': sum(1 for c in all_candidates if c['qualification_status'] == 'unclassified'),
         'not_qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'not_qualified'),
         'forwarded': sum(1 for c in all_candidates if c['forwarded_to_employer']),
         'not_forwarded': sum(1 for c in all_candidates if not c['forwarded_to_employer']),
@@ -2131,7 +2159,7 @@ def notify_qualified_applicants_view(request, job_id):
     """Dispatches review notifications to all qualified applicants for a job."""
     admin_id = getCurrentUserId(request)
     job = get_object_or_404(JobPosting, pk=job_id)
-    apps = Application.objects.filter(job=job, match_score__gte=70.0).select_related('applicant__user')
+    apps = Application.objects.filter(job=job, match_score__gt=QUALIFIED_SCORE_MIN).select_related('applicant__user')
     count = 0
     for app in apps:
         if app.status == 'pending':
@@ -2165,7 +2193,7 @@ def forward_qualified_candidates_view(request, job_id):
 
     for app in apps:
         score = float(app.match_score or 0.0)
-        is_qual = (score >= 70.0) or (app.admin_qualification == 'qualified')
+        is_qual = score > QUALIFIED_SCORE_MIN
         if is_qual:
             app.forwarded_to_employer = True
             app.forwarded_at = now_ts
@@ -2208,21 +2236,57 @@ def forward_qualified_candidates_view(request, job_id):
 
 
 @require_role('admin')
+@require_POST
 def notify_single_applicant_view(request, application_id):
     """Dispatches a single candidate review notification."""
     admin_id = getCurrentUserId(request)
-    app = get_object_or_404(Application.objects.select_related('applicant__user', 'job'), pk=application_id)
+    app = get_object_or_404(
+        Application.objects.select_related('applicant__user', 'job', 'job__employer'),
+        pk=application_id,
+    )
     if app.status == 'pending':
         app.status = 'reviewed'
         app.save()
+    applicant_user = app.applicant.user
+    applicant_name = f"{applicant_user.first_name or ''} {applicant_user.last_name or ''}".strip() or applicant_user.email
+    company_name = app.job.employer.company_name if app.job.employer else 'MultiBiz'
+    match_score = float(app.match_score or 0)
+    qualification_status = classify_match_score(match_score)
+    qualification_label = {
+        'qualified': 'Qualified',
+        'under_qualified': 'Under-Qualified',
+        'not_qualified': 'Not Qualified',
+        'unclassified': 'Unclassified',
+    }[qualification_status]
+    notice_message = (
+        f"Your application for {app.job.title} was screened as {qualification_label} "
+        f"with an AI match score of {match_score:.0f}%. This is an initial screening result, "
+        "not a final hiring decision."
+    )
     Notification.objects.create(
-        user=app.applicant.user,
-        title=f"Application Update: {app.job.title}",
-        message=f"Your profile and qualifications for {app.job.title} have been reviewed by the recruitment team.",
+        user=applicant_user,
+        title=f"Screening Result: {qualification_label} - {app.job.title}",
+        message=notice_message,
         type='application'
     )
-    log_audit_trail(request, admin_id, 'notify_single_applicant', f"Notified applicant {app.applicant.user.email} for application #{application_id}")
-    return redirect(f'/admin/jobs/{app.job.job_id}/candidates/?notified=single')
+    email_result = send_application_status_update_email(
+        to_email=applicant_user.email,
+        applicant_name=applicant_name,
+        job_title=app.job.title,
+        company_name=company_name,
+        new_status=qualification_status,
+        match_score=match_score,
+    )
+    notice_status = 'email_sent' if email_result.get('success') else 'email_failed'
+    if not email_result.get('success'):
+        print(f"[Admin Applicant Notice] Email delivery failed for application #{application_id}: {email_result.get('error')}")
+    log_audit_trail(
+        request,
+        admin_id,
+        'notify_single_applicant',
+        f"Created dashboard notice for {applicant_user.email} for application #{application_id}; email {notice_status}",
+    )
+    return redirect(f'/admin/jobs/{app.job.job_id}/candidates/?notified={notice_status}')
 
 
 @require_role('admin')

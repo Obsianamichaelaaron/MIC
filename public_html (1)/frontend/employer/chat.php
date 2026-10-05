@@ -28,21 +28,74 @@ $conn->close();
 include '../includes/header.php';
 ?>
 
-<!-- Full Width Header Section -->
-<div style="background: url('../images/bg.jpg') center/cover no-repeat; padding: 1.5rem 0; margin: 0 -8px 1rem -8px;">
-    <div style="max-width: 1400px; margin: 0 auto; padding: 0 1rem;">
-        <div style="text-align: center; color: white;">
-            <h1 style="color: white; margin-bottom: 0.3rem; font-size: 1.5rem;">
-                <i class="fas fa-comments"></i> Messages
-            </h1>
-            <p style="color: rgba(255,255,255,0.9); font-size: 0.9rem; margin: 0;">
-                Connect with job applicants
-            </p>
-        </div>
-    </div>
-</div>
-
 <style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap');
+
+.chat-page {
+    font-family: 'DM Sans', sans-serif;
+    background: #c7d1dd;
+    min-height: 100vh;
+    padding-bottom: 3rem;
+}
+
+.chat-hero {
+    background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 55%, #2196f3 100%);
+    padding: 2.5rem 0 4.5rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.chat-hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('../images/bg.jpg') center/cover no-repeat;
+    opacity: .18;
+}
+
+.chat-hero::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0; right: 0;
+    height: 60px;
+    background: #c7d1dd;
+    clip-path: ellipse(55% 100% at 50% 100%);
+}
+
+.chat-hero-inner {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    color: #fff;
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0 1.25rem;
+}
+
+.chat-hero-inner h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    font-weight: 400;
+    margin: 0 0 .4rem;
+    letter-spacing: .3px;
+    color: #fff;
+}
+
+.chat-hero-inner p {
+    font-size: .92rem;
+    color: rgba(255,255,255,.85);
+    margin: 0;
+}
+
+.chat-shell {
+    max-width: 100%;
+    margin: -2rem auto 0;
+    padding: 0 1.25rem;
+    position: relative;
+    z-index: 2;
+}
+
 .chat-container {
     display: grid;
     grid-template-columns: 350px 1fr;
@@ -822,10 +875,18 @@ include '../includes/header.php';
 }
 </style>
 
-<div class="container" style="max-width: 1400px; padding: 0 1rem;">
-    <div class="card" style="margin-top: 0; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
-        
-        <!-- Mobile Header -->
+<div class="chat-page">
+    <div class="chat-hero">
+        <div class="chat-hero-inner">
+            <h1><i class="fas fa-comments"></i> Messages</h1>
+            <p>Connect with employers and discuss job opportunities in real-time</p>
+        </div>
+    </div>
+
+    <div class="chat-shell">
+        <div class="container" style="max-width: 1400px; padding: 0 1rem;">
+            <div class="card" style="margin-top: 0; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.08);">
+                <!-- Mobile Header -->
         <div class="mobile-header" id="mobileHeader">
             <button class="mobile-back-btn" id="mobileBackBtn" style="display: none;">
                 <i class="fas fa-arrow-left"></i>
@@ -918,9 +979,11 @@ include '../includes/header.php';
             </div>
         </div>
         
-        <!-- Mobile Floating Action Button -->
-        <div class="mobile-fab" id="mobileFab">
-            <i class="fas fa-comment"></i>
+                <!-- Mobile Floating Action Button -->
+                <div class="mobile-fab" id="mobileFab">
+                    <i class="fas fa-comment"></i>
+                </div>
+            </div>
         </div>
     </div>
 </div>

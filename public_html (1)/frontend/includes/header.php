@@ -923,11 +923,11 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                         <i class="fas fa-comments"></i> <span>Messages</span>
                     </a>
                 <?php elseif ($currentRole === 'employer'): ?>
-                    <a href="../employer/post_job.php" class="<?php echo ($currentPage == 'post_job.php') ? 'active' : ''; ?>">
-                        <i class="fas fa-plus-circle"></i> <span>Post Job</span>
-                    </a>
                     <a href="../employer/candidates.php" class="<?php echo ($currentPage == 'candidates.php') ? 'active' : ''; ?>">
                         <i class="fas fa-users"></i> <span>Candidates</span>
+                    </a>
+                    <a href="../employer/recommended_candidates.php" class="<?php echo ($currentPage == 'recommended_candidates.php') ? 'active' : ''; ?>">
+                        <i class="fas fa-wand-magic-sparkles"></i> <span>Recommended</span>
                     </a>
                     <a href="../employer/jobs.php" class="<?php echo ($currentPage == 'jobs.php') ? 'active' : ''; ?>">
                         <i class="fas fa-briefcase"></i> <span>My Jobs</span>

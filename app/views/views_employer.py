@@ -16,6 +16,7 @@ from app.models import (
 )
 from app.auth_utils import require_role, getCurrentUserId
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_score
+from app.services.qualification import classify_match_score
 from app.services.mailer import (
     send_application_status_update_email,
     send_talent_request_admin_notification,
@@ -103,6 +104,7 @@ def dashboard_view(request):
             'job_title': app.job.title if app.job else '',
             'job_id': app.job.job_id if app.job else 0,
             'match_score': float(app.match_score),
+            'qualification_status': classify_match_score(app.match_score),
             'employer_status': app.employer_status,
             'status': app.status,
             'forwarded_at': app.forwarded_at or app.applied_at,
@@ -466,7 +468,20 @@ def candidates_view(request):
     user_id = getCurrentUserId(request)
     employer, _ = Employer.objects.get_or_create(user_id=user_id)
 
-    selected_tab = request.GET.get('tab', 'for_review').strip()
+    requested_tab = request.GET.get('tab', 'review').strip()
+    tab_status_map = {
+        'all': 'all',
+        'review': 'for_review',
+        'for_review': 'for_review',
+        'qualified': 'qualified',
+        'not_qualified': 'not_qualified',
+        'interview': 'for_interview',
+        'for_interview': 'for_interview',
+        'interview_completed': 'interview_completed',
+        'hired': 'hired',
+        'rejected': 'rejected',
+    }
+    selected_tab = tab_status_map.get(requested_tab, 'for_review')
     job_id = request.GET.get('job_id', '0').strip()
     search = request.GET.get('search', '').strip()
     date_filter = request.GET.get('date_filter', '').strip()
@@ -536,6 +551,7 @@ def candidates_view(request):
             'job_title': app.job.title if app.job else '',
             'company_name': employer.company_name or '',
             'match_score': float(app.match_score),
+            'qualification_status': classify_match_score(app.match_score),
             'employer_status': app.employer_status,
             'status': app.status,
             'applied_at': app.applied_at,
@@ -564,11 +580,24 @@ def candidates_view(request):
         'current_page': 'candidates.php',
         'employer': employer,
         'candidates': candidates,
+        'applications': apps_qs.order_by('-forwarded_at', '-applied_at'),
         'selected_tab': selected_tab,
+        'current_tab': {
+            'for_review': 'review',
+            'for_interview': 'interview',
+        }.get(selected_tab, selected_tab),
         'counts': counts,
+        'all_count': counts['total'],
+        'review_count': counts['for_review'],
+        'qualified_count': counts['qualified'],
+        'interview_count': counts['for_interview'],
+        'hired_count': counts['hired'],
+        'not_qualified_count': counts['not_qualified'],
         'jobs': jobs_for_filter,
+        'jobs_list': jobs_for_filter,
         'selected_job_id': int(job_id) if (job_id and job_id.isdigit()) else 0,
         'search': search,
+        'search_query': search,
         'date_filter': date_filter,
         'total_candidates': len(candidates),
     }
@@ -819,6 +848,7 @@ def view_candidate_view(request, application_id=None):
         'page_title': f"Candidate: {candidate_user.full_name} - MultiBiz",
         'current_page': 'candidates.php',
         'application': application,
+        'qualification_status': classify_match_score(application.match_score),
         'applicant': applicant,
         'candidate_user': candidate_user,
         'job': job,

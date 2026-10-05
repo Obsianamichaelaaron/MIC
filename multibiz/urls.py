@@ -1,12 +1,19 @@
-from django.contrib import admin
+from django.http import HttpResponse
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.static import serve
 from app.views.views_public import smart_media_serve
 
+def black_admin_view(request, *args, **kwargs):
+    return HttpResponse(
+        '<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"></head>'
+        '<body style="margin:0;width:100%;min-height:100vh;background:#000"></body></html>'
+    )
+
 urlpatterns = [
-    path('django-admin/', admin.site.urls),
+    re_path(r'^django-admin(?:/.*)?$', black_admin_view),
+    path('admin/', black_admin_view),
     path('', include('app.urls')),
     # Direct media, static and asset routing
     re_path(r'^uploads/(?P<path>.*)$', smart_media_serve),

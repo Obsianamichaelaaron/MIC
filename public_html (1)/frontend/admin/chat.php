@@ -32,10 +32,20 @@ include '../includes/header.php';
 
 <link rel="stylesheet" href="../css/chat.css">
 
-<div class="container">
-    <div class="card">
-        <h1><i class="fas fa-comments"></i> Messages</h1>
-        
+<div class="messages-page">
+    <div class="messages-banner" aria-label="Messages banner">
+        <div class="messages-banner-content">
+            <div class="messages-banner-icon">
+                <i class="fas fa-comment-dots"></i>
+            </div>
+            <div class="messages-banner-text">
+                <h1>Messages</h1>
+                <p>Connect with employers and discuss job opportunities in real-time</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card chat-card">
         <div class="chat-container">
             <div class="chat-sidebar">
                 <div class="chat-sidebar-header">
@@ -99,6 +109,7 @@ include '../includes/header.php';
             </div>
         </div>
     </div>
+</div>
 </div>
 
 <script>

@@ -68,7 +68,7 @@
                     <i class="far fa-calendar"></i>
                     {% if article.news_date %}{{ article.news_date|date:"F d, Y" }}{% else %}Recent update{% endif %}
                 </p>
-                <div class="content">{{ article.content|default:article.excerpt|linebreaks }}</div>
+                <div class="content">{% if article.content %}{{ article.content|linebreaks }}{% else %}{{ article.excerpt|linebreaks }}{% endif %}</div>
             </div>
         </article>
     </main>

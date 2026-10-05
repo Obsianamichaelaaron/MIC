@@ -475,12 +475,12 @@
 .old-applications-shell { max-width: 1240px; margin: 0 auto; }
 .applications-hero { position: relative; overflow: hidden; padding: 1.4rem 1.6rem; margin-bottom: 1.25rem; border-radius: 16px; background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 58%, #2196f3 100%); color: #fff; box-shadow: 0 8px 22px rgba(10,61,107,.16); }
 .applications-hero::after { content: ''; position: absolute; width: 220px; height: 220px; right: -80px; top: -130px; border: 34px solid rgba(255,255,255,.08); border-radius: 50%; }
-.applications-hero-content { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.applications-hero-content { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 1rem; width: 100%; }
 .applications-breadcrumb { margin: 0 0 .4rem; color: rgba(255,255,255,.72); font-size: .75rem; }
 .applications-breadcrumb a { color: inherit; text-decoration: none; }
 .applications-hero h1 { margin: 0; color: #fff; font-size: 1.45rem; font-weight: 700; }
 .applications-count { display: inline-flex; align-items: center; gap: .35rem; margin-left: .55rem; padding: .25rem .55rem; border: 1px solid rgba(255,255,255,.28); border-radius: 999px; color: #fff; font-size: .7rem; vertical-align: middle; }
-.applications-explore { padding: .6rem .85rem; border-radius: 7px; background: #0056b3; color: #fff; font-size: .78rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.applications-explore { padding: .6rem 1.1rem; border-radius: 8px; background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); color: #fff !important; font-size: .82rem; font-weight: 600; text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; gap: .4rem; box-shadow: 0 2px 8px rgba(2,132,199,0.25); flex-shrink: 0; transition: all .2s ease; }
 .applications-card { padding: 1.25rem; border: 1px solid #e5eaf1; border-radius: 14px; background: #fff; box-shadow: 0 3px 14px rgba(15,23,42,.06); }
 .applications-table-wrap { overflow-x: auto; }
 .applications-table { width: 100%; border-collapse: collapse; font-size: .78rem; }
@@ -562,9 +562,41 @@
                 {% endwith %}
                 {% if interview %}
                 <div class="modal fade" id="interviewModal{{ app.application_id }}" tabindex="-1" aria-hidden="true">
-                    <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
-                        <div class="modal-header"><h5 class="modal-title">Scheduled Interview Details</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                        <div class="modal-body"><p><strong>{{ interview.interview_type|title }} Interview</strong></p><p><i class="fas fa-calendar"></i> {{ interview.interview_date }}<br><i class="fas fa-clock"></i> {{ interview.start_time|time:"g:i A" }} - {{ interview.end_time|time:"g:i A" }}</p>{% if interview.location %}<p><i class="fas fa-location-dot"></i> {{ interview.location }}</p>{% endif %}{% if interview.notes %}<p>{{ interview.notes }}</p>{% endif %}{% if interview.meeting_link %}<a href="{{ interview.meeting_link }}" target="_blank" class="applications-explore">Launch Meeting Link</a>{% endif %}</div>
+                    <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="border-radius:14px;border:none;box-shadow:0 10px 30px rgba(0,0,0,0.15);">
+                        <div class="modal-header" style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:1.1rem 1.4rem;">
+                            <h5 class="modal-title" style="font-weight:700;color:#0a3d6b;font-size:1.05rem;"><i class="fas fa-calendar-check text-primary me-2"></i>Scheduled Interview Details</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body" style="padding:1.4rem;">
+                            <div style="background:#f8fafc;padding:.9rem 1.1rem;border-radius:10px;border:1px solid #e2e8f0;margin-bottom:1rem;">
+                                <div style="font-weight:700;color:#0f172a;font-size:.95rem;">{{ app.job.title }}</div>
+                                <div style="color:#64748b;font-size:.8rem;"><i class="fas fa-building me-1"></i> {{ app.job.employer.company_name|default:"MultiBiz Partner" }}</div>
+                            </div>
+                            <div style="font-size:.88rem;color:#334155;line-height:1.6;">
+                                <p class="mb-2"><strong><i class="fas fa-video text-info me-1"></i> Mode:</strong> {{ interview.interview_type|title }} Interview</p>
+                                <p class="mb-2"><strong><i class="fas fa-calendar text-primary me-1"></i> Date:</strong> {{ interview.interview_date|date:"l, F d, Y" }}</p>
+                                <p class="mb-2"><strong><i class="fas fa-clock text-warning me-1"></i> Time:</strong> {{ interview.start_time|time:"g:i A" }} - {{ interview.end_time|time:"g:i A" }}</p>
+                                {% if interview.interviewer_name %}
+                                    <p class="mb-2"><strong><i class="fas fa-user-tie text-secondary me-1"></i> Interviewer:</strong> {{ interview.interviewer_name }}</p>
+                                {% endif %}
+                                {% if interview.location %}
+                                    <p class="mb-2"><strong><i class="fas fa-location-dot text-danger me-1"></i> Location:</strong> {{ interview.location }}</p>
+                                {% endif %}
+                                {% if interview.instructions or interview.notes %}
+                                    <div class="mt-3 p-2.5 rounded-3 bg-light border">
+                                        <strong class="d-block text-dark small mb-1"><i class="fas fa-circle-info text-primary me-1"></i> Instructions & Preparation:</strong>
+                                        <span class="small text-muted">{{ interview.instructions|default:interview.notes }}</span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            {% if interview.meeting_link %}
+                                <div class="mt-3 text-center">
+                                    <a href="{{ interview.meeting_link }}" target="_blank" class="btn btn-primary btn-sm px-4 py-2 fw-bold shadow-sm" style="border-radius:8px;">
+                                        <i class="fas fa-video me-1"></i> Launch Video Call
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
                     </div></div>
                 </div>
                 {% endif %}
@@ -579,7 +611,7 @@
     <div class="apps-hero">
         <div class="apps-hero-inner">
             <h1><i class="fas fa-file-alt"></i> My Applications</h1>
-            <p>Track, manage, and review all your submitted job applications in one place</p>
+            
         </div>
     </div>
 
@@ -597,7 +629,7 @@
         <div class="apps-toolbar">
             <div class="apps-count-info">
                 <h2>{{ total_count }} Application{% if total_count != 1 %}s{% endif %}</h2>
-                <p>Showing your application history and current statuses</p>
+                
             </div>
             <div class="apps-filters">
                 <a href="?status=" class="filter-chip {% if not status_filter %}active{% endif %}">All</a>

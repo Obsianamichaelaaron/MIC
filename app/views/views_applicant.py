@@ -450,6 +450,7 @@ def jobs_view(request):
         'total_jobs': len(jobs_list),
         # Aliases used by the supplied split-pane Applicant Jobs design.
         'scored_jobs': jobs_list,
+        'match_model_status': match_model_status,
         'query': search,
         'emp_type': employment_type,
         'min_match': min_match,

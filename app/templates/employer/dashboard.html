@@ -382,17 +382,21 @@
                                                 <h6 class="mb-0 fw-bold text-dark" style="font-size:0.98rem;">
                                                     {{ app.first_name }} {{ app.last_name }}
                                                 </h6>
-                                                {% if app.match_score >= 70 %}
+                                                {% if app.qualification_status == 'qualified' %}
                                                     <span class="badge-match badge-match-excellent">
                                                         <i class="fa-solid fa-circle-check"></i> {{ app.match_score|floatformat:0 }}% Qualified
                                                     </span>
-                                                {% elif app.match_score >= 50 %}
+                                                {% elif app.qualification_status == 'under_qualified' %}
                                                     <span class="badge-match badge-match-average">
-                                                        <i class="fa-solid fa-triangle-exclamation"></i> {{ app.match_score|floatformat:0 }}% Review
+                                                        <i class="fa-solid fa-triangle-exclamation"></i> {{ app.match_score|floatformat:0 }}% Under-Qualified
+                                                    </span>
+                                                {% elif app.qualification_status == 'unclassified' %}
+                                                    <span class="badge-match badge-match-good">
+                                                        <i class="fa-solid fa-circle-minus"></i> {{ app.match_score|floatformat:0 }}% Unclassified
                                                     </span>
                                                 {% else %}
                                                     <span class="badge-match badge-match-low">
-                                                        <i class="fa-solid fa-circle-xmark"></i> {{ app.match_score|floatformat:0 }}%
+                                                        <i class="fa-solid fa-circle-xmark"></i> {{ app.match_score|floatformat:0 }}% Not Qualified
                                                     </span>
                                                 {% endif %}
                                             </div>

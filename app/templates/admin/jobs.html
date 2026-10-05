@@ -600,15 +600,23 @@
                 <div style="display:grid;grid-template-columns:1fr;gap:.5rem;background:#f8fafc;padding:.9rem;border-radius:12px;border:1px solid #e2e8f0;">
                     <label style="display:flex;align-items:center;gap:.6rem;font-size:.86rem;color:#1e293b;cursor:pointer;font-weight:600;">
                         <input type="radio" name="jobsPageQualScope" value="all" checked style="accent-color:#0284c7;">
-                        <span><strong>All Applicants Included</strong> (Qualified + Under-Qualified + Not Qualified)</span>
+                        <span><strong>All Applicants Included</strong> (all score bands)</span>
                     </label>
                     <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#15803d;cursor:pointer;">
                         <input type="radio" name="jobsPageQualScope" value="qualified" style="accent-color:#16a34a;">
-                        <span>Qualified Candidates Only (Match Score &ge; 70%)</span>
+                        <span>Qualified Candidates Only (Match Score &gt; 60%)</span>
                     </label>
                     <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#b91c1c;cursor:pointer;">
                         <input type="radio" name="jobsPageQualScope" value="not_qualified" style="accent-color:#dc2626;">
-                        <span>Not Qualified Candidates Only (Match Score &lt; 50%)</span>
+                        <span>Not Qualified Candidates Only (Match Score &lt; 30%)</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#b45309;cursor:pointer;">
+                        <input type="radio" name="jobsPageQualScope" value="under_qualified" style="accent-color:#f59e0b;">
+                        <span>Under-Qualified Candidates Only (40% &le; Match Score &le; 60%)</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#475569;cursor:pointer;">
+                        <input type="radio" name="jobsPageQualScope" value="unclassified" style="accent-color:#64748b;">
+                        <span>Unclassified Candidates Only (30% &le; Match Score &lt; 40%)</span>
                     </label>
                 </div>
             </div>

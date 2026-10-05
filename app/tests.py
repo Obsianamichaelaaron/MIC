@@ -6,19 +6,22 @@ import types
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock, patch
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
+from django.core import mail
 from django.urls import reverse
 from app.models import (
     User, Applicant, Employer, JobPosting, Application,
     Qualification, Skill, ContactInquiry, Message, AuditTrail,
-    CmsHeroSlide, CmsBrand, CmsTestimonial
+    Notification, CmsHeroSlide, CmsBrand, CmsTestimonial
 )
 from app.auth_utils import verify_password, hash_password
+from app.services.mailer import send_application_status_update_email
 from app.services.ml_job_matching import (
     MATCH_CLASSES,
     evaluate_match_model,
     train_match_classifier,
 )
+from app.services.qualification import classify_match_score
 
 class MultiBizConversionTests(TestCase):
     def setUp(self):
@@ -86,6 +89,69 @@ class MultiBizConversionTests(TestCase):
             salary_range='PHP 80,000 - 120,000',
             status='active'
         )
+
+    def test_match_score_qualification_boundaries(self):
+        expected_statuses = [
+            (29.99, 'not_qualified'),
+            (30, 'unclassified'),
+            (39.99, 'unclassified'),
+            (40, 'under_qualified'),
+            (60, 'under_qualified'),
+            (60.01, 'qualified'),
+        ]
+        for score, expected_status in expected_statuses:
+            with self.subTest(score=score):
+                self.assertEqual(classify_match_score(score), expected_status)
+
+    def test_admin_dashboard_score_distribution_uses_qualification_bands(self):
+        for index, score in enumerate((
+            Decimal('85.00'),
+            Decimal('60.01'),
+            Decimal('60.00'),
+            Decimal('40.00'),
+            Decimal('39.99'),
+            Decimal('29.99'),
+        )):
+            user = User.objects.create(
+                email=f'dashboard-band-{index}@example.com',
+                password='test-password',
+                role='applicant',
+                status='active',
+            )
+            applicant = Applicant.objects.create(user=user)
+            Application.objects.create(
+                job=self.job,
+                applicant=applicant,
+                match_score=score,
+            )
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.get('/admin/dashboard/')
+
+        self.assertEqual(response.status_code, 200)
+        chart_data = json.loads(response.context['chart_data_json'])
+        self.assertEqual(chart_data['match_tier_data'], [1, 1, 2, 1, 1])
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_unclassified_status_email_includes_result_and_score(self):
+        result = send_application_status_update_email(
+            to_email=self.applicant_user.email,
+            applicant_name='Job Seeker',
+            job_title=self.job.title,
+            company_name=self.employer.company_name,
+            new_status='unclassified',
+            match_score=35,
+        )
+
+        self.assertTrue(result['success'])
+        self.assertIn('Unclassified', mail.outbox[0].subject)
+        self.assertIn('Unclassified', mail.outbox[0].body)
+        self.assertIn('35%', mail.outbox[0].body)
+        self.assertNotIn('Applications Page', mail.outbox[0].alternatives[0][0])
 
     def test_password_verification(self):
         """Test password verification with bcrypt compatible with PHP"""
@@ -541,6 +607,207 @@ class MultiBizConversionTests(TestCase):
         self.assertTrue(all(len(row['cells']) == 3 for row in evaluation['confusion_rows']))
         self.assertContains(response, "Cohen's Kappa")
         self.assertContains(response, 'background-color:rgba(13,110,253,')
+
+    def test_admin_job_candidates_page_renders(self):
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.get(f'/admin/jobs/{self.job.job_id}/candidates/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'No Candidates Found')
+        self.assertContains(response, self.job.title)
+        self.assertContains(response, 'AI Match &gt; 60%')
+        self.assertContains(response, 'Unclassified Only')
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_admin_dispatch_notice_route_is_rendered_and_sends_notice(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='pending',
+            match_score=Decimal('88.00'),
+        )
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        candidates_response = self.client.get(f'/admin/jobs/{self.job.job_id}/candidates/')
+
+        self.assertEqual(candidates_response.status_code, 200)
+        self.assertContains(
+            candidates_response,
+            f'data-notification-url="/admin/notify_applicant/{application.application_id}/"',
+        )
+
+        notice_response = self.client.post(f'/admin/notify_applicant/{application.application_id}/')
+
+        self.assertRedirects(
+            notice_response,
+            f'/admin/jobs/{self.job.job_id}/candidates/?notified=email_sent',
+            fetch_redirect_response=False,
+        )
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'reviewed')
+        notice = Notification.objects.get(user=self.applicant_user)
+        self.assertIn('Qualified', notice.title)
+        self.assertIn('88%', notice.message)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.applicant_user.email])
+        self.assertIn('Qualified', mail.outbox[0].body)
+        self.assertIn('88%', mail.outbox[0].body)
+        self.assertNotIn('Applications Page', mail.outbox[0].alternatives[0][0])
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_admin_dispatch_notice_email_includes_each_qualification_result(self):
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        expected_results = [
+            (Decimal('75.00'), 'Qualified'),
+            (Decimal('60.00'), 'Under-Qualified'),
+            (Decimal('35.00'), 'Unclassified'),
+            (Decimal('29.00'), 'Not Qualified'),
+        ]
+        for score, expected_result in expected_results:
+            with self.subTest(score=score):
+                application = Application.objects.create(
+                    job=self.job,
+                    applicant=self.applicant,
+                    match_score=score,
+                )
+
+                response = self.client.post(
+                    f'/admin/notify_applicant/{application.application_id}/',
+                )
+
+                self.assertEqual(response.status_code, 302)
+                sent_email = mail.outbox[-1]
+                self.assertIn(expected_result, sent_email.subject)
+                self.assertIn(expected_result, sent_email.body)
+                self.assertNotIn('Applications Page', sent_email.alternatives[0][0])
+
+    @patch('app.services.mailer.send_mail', side_effect=OSError('SMTP unavailable'))
+    def test_admin_dispatch_notice_reports_email_delivery_failure(self, _send_mail):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='pending',
+        )
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.post(f'/admin/notify_applicant/{application.application_id}/')
+
+        self.assertRedirects(
+            response,
+            f'/admin/jobs/{self.job.job_id}/candidates/?notified=email_failed',
+            fetch_redirect_response=False,
+        )
+        self.assertTrue(Notification.objects.filter(user=self.applicant_user).exists())
+        failure_page = self.client.get(response.url)
+        self.assertContains(failure_page, 'Email was not sent.')
+
+    def test_forwarded_candidate_is_visible_in_employer_candidates_page(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='pending',
+            match_score=Decimal('88.00'),
+        )
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        forward_response = self.client.post('/admin/batch_forward_candidates/', {
+            'job_id': self.job.job_id,
+            'scope': 'qualified',
+        })
+
+        self.assertEqual(forward_response.status_code, 200)
+        self.assertTrue(forward_response.json()['success'])
+        self.assertEqual(forward_response.json()['count'], 1)
+        application.refresh_from_db()
+        self.assertTrue(application.forwarded_to_employer)
+        self.assertTrue(Notification.objects.filter(
+            user=self.employer_user,
+            message__contains='Job Seeker',
+        ).exists())
+
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session.save()
+
+        candidates_response = self.client.get('/employer/candidates.php')
+
+        self.assertEqual(candidates_response.status_code, 200)
+        self.assertContains(candidates_response, 'Job Seeker')
+        self.assertContains(candidates_response, self.job.title)
+        self.assertContains(candidates_response, 'Review Dossier')
+        self.assertEqual(
+            candidates_response.context['applications'][0].application_id,
+            application.application_id,
+        )
+
+        application.employer_status = 'for_interview'
+        application.save(update_fields=['employer_status'])
+
+        interview_response = self.client.get('/employer/candidates.php?tab=interview')
+
+        self.assertEqual(interview_response.status_code, 200)
+        self.assertContains(interview_response, 'Job Seeker')
+        self.assertEqual(interview_response.context['current_tab'], 'interview')
+        self.assertEqual(
+            interview_response.context['applications'][0].application_id,
+            application.application_id,
+        )
+
+    def test_batch_forward_unclassified_includes_only_30_to_under_40_scores(self):
+        applications_by_score = {}
+        for index, score in enumerate((Decimal('29.99'), Decimal('30.00'), Decimal('39.99'), Decimal('40.00'))):
+            user = User.objects.create(
+                email=f'band-{index}@example.com',
+                password='test-password',
+                role='applicant',
+                first_name=f'Band{index}',
+                status='active',
+            )
+            applicant = Applicant.objects.create(user=user)
+            applications_by_score[score] = Application.objects.create(
+                job=self.job,
+                applicant=applicant,
+                match_score=score,
+            )
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.post('/admin/batch_forward_candidates/', {
+            'job_id': self.job.job_id,
+            'scope': 'unclassified',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['count'], 2)
+        for score, application in applications_by_score.items():
+            application.refresh_from_db()
+            self.assertEqual(
+                application.forwarded_to_employer,
+                Decimal('30.00') <= score < Decimal('40.00'),
+                msg=f'Unexpected forwarding result for score {score}',
+            )
 
     def test_employer_active_jobs_are_rendered_in_job_list(self):
         session = self.client.session

@@ -158,6 +158,11 @@
         color: #b45309;
         border: 1px solid #fde68a;
     }
+    .badge-qual-unclassified {
+        background-color: #f1f5f9;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+    }
     .badge-qual-not {
         background-color: #fef2f2;
         color: #dc2626;
@@ -225,6 +230,56 @@
         flex-wrap: wrap;
         margin-left: auto;
     }
+
+    #sendToEmployerModal {
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .send-employer-dialog {
+        display: flex;
+        flex-direction: column;
+        max-height: calc(100vh - 2rem);
+        max-height: calc(100dvh - 2rem);
+    }
+
+    .send-employer-form {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .send-employer-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    .send-employer-footer {
+        flex: 0 0 auto;
+    }
+
+    @media (max-width: 575.98px) {
+        .send-employer-dialog {
+            max-height: calc(100vh - 1rem);
+            max-height: calc(100dvh - 1rem);
+        }
+
+        .send-employer-header {
+            padding: 1rem !important;
+        }
+
+        .send-employer-body {
+            padding: 1rem !important;
+        }
+
+        .send-employer-footer {
+            padding: 0.75rem 1rem !important;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -257,7 +312,7 @@
             </div>
             <div class="ms-auto d-flex align-items-center gap-2 flex-shrink-0 flex-wrap justify-content-end">
                 <!-- Action: Send Qualified to Employer -->
-                <form method="POST" action="{% url 'admin_forward_qualified_candidates' job.id %}" class="d-inline" onsubmit="return confirm('Send all {{ counts.qualified }} qualified candidate(s) to {{ job.company_name|default:\'the employer\' }} for review?');">
+                <form method="POST" action="{% url 'admin_forward_qualified_candidates' job.id %}" class="d-inline" onsubmit="return confirm('Send all {{ counts.qualified }} qualified candidate(s) to {{ job.company_name|escapejs }} for review?');">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2">
                         <i class="fa-solid fa-paper-plane"></i>
@@ -284,6 +339,18 @@
             <strong>Candidates Successfully Sent!</strong> {{ request.GET.forwarded_qualified }} qualified candidate(s) have been sent directly to {{ job.company_name|default:'the employer' }} for hiring review.
         </div>
         <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
+    {% if request.GET.notified == 'email_sent' %}
+    <div class="alert alert-success alert-dismissible fade show rounded-4 border-0 shadow-sm mb-4" role="alert">
+        <strong>Notice sent.</strong> The applicant received an in-app notification, and the email service accepted the notice for delivery.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% elif request.GET.notified == 'email_failed' %}
+    <div class="alert alert-warning alert-dismissible fade show rounded-4 border-0 shadow-sm mb-4" role="alert">
+        <strong>Email was not sent.</strong> The applicant has an in-app notification, but email delivery failed. Please check the email service configuration and try again.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     {% endif %}
 
@@ -331,10 +398,13 @@
                         <i class="fa-solid fa-paper-plane me-1"></i> Sent to Employer <span class="badge bg-info text-white ms-1.5">{{ counts.forwarded }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?qual=under_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'under_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
-                        Under Qualified <span class="badge bg-warning text-dark ms-1.5">{{ counts.under_qualified }}</span>
+                        Under-Qualified (40-60%) <span class="badge bg-warning text-dark ms-1.5">{{ counts.under_qualified }}</span>
+                    </a>
+                    <a href="{% url 'admin_job_candidates' job.id %}?qual=unclassified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'unclassified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                        Unclassified (30% to under 40%) <span class="badge bg-secondary text-white ms-1.5">{{ counts.unclassified }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?qual=not_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'not_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
-                        Not Qualified <span class="badge bg-secondary text-white ms-1.5">{{ counts.not_qualified }}</span>
+                        Not Qualified (&lt;30%) <span class="badge bg-danger text-white ms-1.5">{{ counts.not_qualified }}</span>
                     </a>
                 </div>
             </div>
@@ -460,11 +530,15 @@
                             </div>
                         {% elif cand.qualification_status == 'under_qualified' %}
                             <div class="status-badge-pill badge-qual-under">
-                                <i class="fa-solid fa-triangle-exclamation"></i> Under Qualified
+                                <i class="fa-solid fa-triangle-exclamation"></i> Under-Qualified (40-60%)
+                            </div>
+                        {% elif cand.qualification_status == 'unclassified' %}
+                            <div class="status-badge-pill badge-qual-unclassified">
+                                <i class="fa-solid fa-circle-minus"></i> Unclassified (30% to under 40%)
                             </div>
                         {% else %}
                             <div class="status-badge-pill badge-qual-not">
-                                <i class="fa-solid fa-circle-xmark"></i> Not Qualified
+                                <i class="fa-solid fa-circle-xmark"></i> Not Qualified (&lt;30%)
                             </div>
                         {% endif %}
 
@@ -493,7 +567,7 @@
                             <i class="fa-solid fa-building-user"></i> Send to Employer
                         </button>
 
-                        <button type="button" class="candidate-action-btn btn btn-light text-muted border" data-app-id="{{ cand.application.id }}" data-app-name="{{ cand.applicant.user.full_name }}" onclick="triggerSingleNotice(this)">
+                        <button type="button" class="candidate-action-btn btn btn-light text-muted border" data-notification-url="{% url 'admin_notify_single_applicant' cand.application.pk %}" data-app-name="{{ cand.applicant.user.full_name }}" onclick="triggerSingleNotice(this)">
                             <i class="fa-solid fa-envelope"></i> Dispatch Notice
                         </button>
                     </div>
@@ -522,9 +596,9 @@
      SEND TO EMPLOYER MODAL (replaces Export)
      ========================================== -->
 <div id="sendToEmployerModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.65);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
-    <div style="background:#ffffff;border-radius:18px;max-width:580px;width:100%;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;animation:modalScale .25s ease-out;font-family:'DM Sans', sans-serif;">
+    <div class="send-employer-dialog" style="background:#ffffff;border-radius:18px;max-width:580px;width:100%;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;animation:modalScale .25s ease-out;font-family:'DM Sans', sans-serif;">
         <!-- Header -->
-        <div style="background:linear-gradient(135deg, #0a3d6b 0%, #1866a3 100%);padding:1.35rem 1.75rem;color:#fff;display:flex;align-items:center;justify-content:space-between;">
+        <div class="send-employer-header" style="background:linear-gradient(135deg, #0a3d6b 0%, #1866a3 100%);padding:1.35rem 1.75rem;color:#fff;display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:.75rem;">
                 <div style="width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,0.18);display:grid;place-items:center;font-size:1.3rem;">
                     <i class="fas fa-building-user" style="color:#93c5fd;"></i>
@@ -540,8 +614,8 @@
         </div>
 
         <!-- Body -->
-        <form id="sendToEmployerForm" onsubmit="submitSendToEmployer(event)">
-        <div style="padding:1.5rem 1.75rem;">
+        <form id="sendToEmployerForm" class="send-employer-form" onsubmit="submitSendToEmployer(event)">
+        <div class="send-employer-body" style="padding:1.5rem 1.75rem;">
             <!-- Target Job Badge -->
             <div style="margin-bottom:1.15rem;padding:.75rem 1rem;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:space-between;">
                 <div>
@@ -562,15 +636,23 @@
                 <div id="sendScopeOptions" style="display:grid;grid-template-columns:1fr;gap:.5rem;background:#f8fafc;padding:.85rem;border-radius:10px;border:1px solid #e2e8f0;">
                     <label style="display:flex;align-items:center;gap:.65rem;font-size:.86rem;color:#15803d;cursor:pointer;font-weight:600;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
                         <input type="radio" name="sendScope" value="qualified" checked style="accent-color:#16a34a;">
-                        <span><strong>Qualified Candidates Only</strong> &mdash; AI Match &ge; 70% <span class="badge bg-success ms-1">{{ counts.qualified }}</span></span>
+                        <span><strong>Qualified Candidates Only</strong> &mdash; AI Match &gt; 60% <span class="badge bg-success ms-1">{{ counts.qualified }}</span></span>
                     </label>
                     <label style="display:flex;align-items:center;gap:.65rem;font-size:.86rem;color:#1e293b;cursor:pointer;font-weight:600;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
                         <input type="radio" name="sendScope" value="all" style="accent-color:#1866a3;">
-                        <span><strong>All Applicants</strong> (Qualified + Under-Qualified + Not Qualified) <span class="badge bg-secondary ms-1">{{ counts.all }}</span></span>
+                        <span><strong>All Applicants</strong> (all score bands) <span class="badge bg-secondary ms-1">{{ counts.all }}</span></span>
                     </label>
                     <label style="display:flex;align-items:center;gap:.65rem;font-size:.84rem;color:#b45309;cursor:pointer;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
                         <input type="radio" name="sendScope" value="under_qualified" style="accent-color:#f59e0b;">
-                        <span><strong>Under-Qualified Only</strong> (50% &le; Score &lt; 70%) <span class="badge bg-warning text-dark ms-1">{{ counts.under_qualified }}</span></span>
+                        <span><strong>Under-Qualified Only</strong> (40% &le; Score &le; 60%) <span class="badge bg-warning text-dark ms-1">{{ counts.under_qualified }}</span></span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.65rem;font-size:.84rem;color:#475569;cursor:pointer;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
+                        <input type="radio" name="sendScope" value="unclassified" style="accent-color:#64748b;">
+                        <span><strong>Unclassified Only</strong> (30% &le; Score &lt; 40%) <span class="badge bg-secondary ms-1">{{ counts.unclassified }}</span></span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:.65rem;font-size:.84rem;color:#b91c1c;cursor:pointer;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
+                        <input type="radio" name="sendScope" value="not_qualified" style="accent-color:#dc2626;">
+                        <span><strong>Not Qualified Only</strong> (Score &lt; 30%) <span class="badge bg-danger ms-1">{{ counts.not_qualified }}</span></span>
                     </label>
                     <label id="sendSingleScopeRow" style="display:none;align-items:center;gap:.65rem;font-size:.84rem;color:#2563eb;cursor:pointer;font-weight:600;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
                         <input type="radio" name="sendScope" value="single" style="accent-color:#2563eb;">
@@ -596,7 +678,7 @@
         </div>
 
         <!-- Footer -->
-        <div style="background:#f8fafc;padding:1rem 1.75rem;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;">
+        <div class="send-employer-footer" style="background:#f8fafc;padding:1rem 1.75rem;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;">
             <button type="button" onclick="closeSendToEmployerModal()" style="padding:.6rem 1rem;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font-size:.85rem;font-weight:600;color:#64748b;cursor:pointer;">
                 Cancel
             </button>
@@ -704,19 +786,23 @@ function copyJobGoogleSheetsFormula() {
     });
 }
 
-function dispatchSingleNotice(appId, candidateName) {
+function dispatchSingleNotice(notificationUrl, candidateName) {
     if (confirm('Dispatch qualification status notice to ' + candidateName + '?')) {
         const form = document.getElementById('singleNoticeForm');
-        const notificationUrl = "{% url 'admin_notify_single_applicant' 0 %}";
-        form.action = notificationUrl.replace('/0/', '/' + appId + '/');
+        form.action = notificationUrl;
         form.submit();
     }
 }
 
 function triggerSingleNotice(btn) {
-    const appId = btn.getAttribute('data-app-id');
+    const notificationUrl = btn.getAttribute('data-notification-url');
     const appName = btn.getAttribute('data-app-name');
-    dispatchSingleNotice(appId, appName);
+    if (!notificationUrl) {
+        console.error('Missing applicant notification URL.');
+        alert('Unable to dispatch notice: the applicant notification URL is missing.');
+        return;
+    }
+    dispatchSingleNotice(notificationUrl, appName);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

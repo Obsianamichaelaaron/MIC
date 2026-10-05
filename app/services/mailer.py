@@ -195,6 +195,58 @@ def send_welcome_email(to_email: str, first_name: str) -> dict:
         return {'success': False, 'error': str(e)}
 
 
+def send_employer_welcome_email(to_email: str, first_name: str, company_name: str) -> dict:
+    """Send a welcome email after a new employer / corporate account is registered."""
+    site_name = 'MULTIBIZ INTERNATIONAL CORPORATION'
+    year = datetime.date.today().year
+    safe_name = html.escape(first_name or 'Hiring Manager')
+    safe_company = html.escape(company_name or 'Your Company')
+    html_content = f"""<!DOCTYPE html>
+<html lang='en'>
+<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head>
+<body style='margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;'>
+  <div style='max-width:600px;margin:32px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);'>
+    <div style='padding:28px 32px;text-align:center;background:linear-gradient(135deg,#0a1628,#1a2d4e);'>
+      <h1 style='margin:0;color:#d4af55;font-size:22px;'>Welcome to MultiBiz Global</h1>
+      <p style='margin:8px 0 0;color:#ffffff;font-size:13px;'>Corporate Talent & Recruitment Partner</p>
+    </div>
+    <div style='padding:32px;color:#333333;line-height:1.7;'>
+      <p>Hello <strong>{safe_name}</strong>,</p>
+      <p>Welcome to <strong>{site_name}</strong>. Your corporate employer account for <strong>{safe_company}</strong> has been created successfully.</p>
+      <p>As an employer partner, you can now:</p>
+      <ul style='color:#555;padding-left:20px;'>
+        <li><strong>Submit Job Requests:</strong> Post recruitment requisitions with custom salary, skills, and urgency.</li>
+        <li><strong>Review Candidate Applications:</strong> Access AI-scored, verified candidate profiles.</li>
+        <li><strong>Manage Recruitment Pipeline:</strong> Schedule video/in-person interviews, send feedback, and extend offers.</li>
+      </ul>
+      <p style='margin-top:24px;'>Our recruitment specialists are ready to help you find the right talent.</p>
+      <p style='margin-bottom:0;'>Best regards,<br><strong>The MultiBiz Enterprise Recruitment Team</strong></p>
+    </div>
+    <div style='padding:18px 32px;text-align:center;background:#f8f9fc;border-top:1px solid #e8eaf0;color:#999;font-size:12px;'>&copy; {year} {site_name}. All rights reserved.</div>
+  </div>
+</body>
+</html>"""
+    plain_text = (
+        f"Hello {first_name or 'Hiring Manager'},\n\n"
+        f"Welcome to {site_name}. Your corporate employer account for {company_name or 'Your Company'} has been created successfully.\n\n"
+        "You can now submit job requests, review AI-scored candidate profiles, and schedule interviews.\n\n"
+        "The MultiBiz Enterprise Recruitment Team"
+    )
+    try:
+        send_mail(
+            subject=f'Welcome to {site_name} - Employer Account Created',
+            message=plain_text,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[to_email],
+            html_message=html_content,
+            fail_silently=False,
+        )
+        return {'success': True, 'error': None}
+    except Exception as e:
+        print(f"[Employer Welcome Mailer] Error sending email: {e}")
+        return {'success': False, 'error': str(e)}
+
+
 def send_application_submitted_email(to_email: str, applicant_name: str, job_title: str, company_name: str) -> dict:
     """
     Sends confirmation email to applicant when their application is submitted and under review.
@@ -241,21 +293,23 @@ def send_application_submitted_email(to_email: str, applicant_name: str, job_tit
     )
 
     try:
-        send_mail(
+        sent_count = send_mail(
             subject=subject,
             message=plain_text,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[to_email],
             html_message=html_content,
-            fail_silently=True
+            fail_silently=False
         )
+        if sent_count != 1:
+            return {'success': False, 'error': 'Email backend did not send a message.'}
         return {'success': True, 'error': None}
     except Exception as e:
         print(f"[Application Submit Mailer] Error sending email: {e}")
         return {'success': False, 'error': str(e)}
 
 
-def send_application_status_update_email(to_email: str, applicant_name: str, job_title: str, company_name: str, new_status: str, remarks: str = '') -> dict:
+def send_application_status_update_email(to_email: str, applicant_name: str, job_title: str, company_name: str, new_status: str, remarks: str = '', match_score: float = 0.0) -> dict:
     """
     Sends email notification to applicant when their application is Accepted/Approved, Rejected, Shortlisted, etc.
     """
@@ -265,6 +319,7 @@ def send_application_status_update_email(to_email: str, applicant_name: str, job
     safe_job = html.escape(job_title or 'Job Position')
     safe_company = html.escape(company_name or 'Employer')
     status_clean = (new_status or '').lower().strip()
+    qualification_notice = status_clean in ['qualified', 'under_qualified', 'unclassified', 'not_qualified']
 
     remarks_block = ""
     if remarks and remarks.strip():
@@ -275,6 +330,7 @@ def send_application_status_update_email(to_email: str, applicant_name: str, job
           <p style='margin:4px 0 0;color:#333;font-size:13px;'>{safe_remarks}</p>
         </div>"""
 
+    qualification_summary = ''
     if status_clean in ['accepted', 'approved', 'hired']:
         subject = f"🎉 Congratulations! Your Application for {job_title} was Approved/Accepted"
         status_title = "Application Approved & Accepted"
@@ -316,6 +372,34 @@ def send_application_status_update_email(to_email: str, applicant_name: str, job
         <p style='font-size:15px;'>Your application for <strong>{safe_job}</strong> at <strong>{safe_company}</strong> has advanced to the <strong>Interview Stage</strong>.</p>
         <p>Please check your applicant dashboard for schedule and meeting details.</p>
         """
+    elif qualification_notice:
+        qualification_labels = {
+            'qualified': 'Qualified',
+            'under_qualified': 'Under-Qualified',
+            'unclassified': 'Unclassified',
+            'not_qualified': 'Not Qualified',
+        }
+        qualification_colors = {
+            'qualified': ('#d4edda', '#28a745', '#155724'),
+            'under_qualified': ('#fff3cd', '#ffc107', '#856404'),
+            'unclassified': ('#e2e8f0', '#64748b', '#334155'),
+            'not_qualified': ('#f8d7da', '#dc3545', '#721c24'),
+        }
+        status_title = f"Screening Result: {qualification_labels[status_clean]}"
+        status_bg, status_border, status_color = qualification_colors[status_clean]
+        subject = f"Application Screening Result: {qualification_labels[status_clean]} for {job_title}"
+        score_text = f"{float(match_score):.0f}%"
+        qualification_summary = (
+            f"Screening result: {qualification_labels[status_clean]}\n"
+            f"AI match score: {score_text}\n"
+            "This is an initial qualifications screening, not a final hiring decision. "
+            "The employer makes the final decision."
+        )
+        message_body = f"""
+        <p style='font-size:15px;'>Your application for <strong>{safe_job}</strong> at <strong>{safe_company}</strong> has been screened.</p>
+        <p><strong>Result: {qualification_labels[status_clean]}</strong><br>AI match score: <strong>{score_text}</strong></p>
+        <p>This result reflects the initial qualifications screening only and is not a final hiring decision. The employer makes the final decision.</p>
+        """
     else:
         subject = f"Application Status Update: {job_title} - {new_status.title()}"
         status_title = f"Application Status: {new_status.title()}"
@@ -343,7 +427,7 @@ def send_application_status_update_email(to_email: str, applicant_name: str, job
       </div>
       {message_body}
       {remarks_block}
-      <p style='margin-top:24px;'>You can view full details on your <a href='http://127.0.0.1:8000/applicant/applications.php' style='color:#1866a3;font-weight:600;'>Applications Page</a>.</p>
+      {'' if qualification_notice else "<p style='margin-top:24px;'>You can view full details on your <a href='http://127.0.0.1:8000/applicant/applications.php' style='color:#1866a3;font-weight:600;'>Applications Page</a>.</p>"}
       <p style='margin-top:24px;margin-bottom:0;'>Best regards,<br><strong>The MultiBiz Recruitment Team</strong></p>
     </div>
     <div style='padding:18px 32px;text-align:center;background:#f8f9fc;border-top:1px solid #e8eaf0;color:#999;font-size:12px;'>&copy; {year} {site_name}. All rights reserved.</div>
@@ -353,20 +437,23 @@ def send_application_status_update_email(to_email: str, applicant_name: str, job
 
     plain_text = (
         f"Hello {applicant_name or 'Applicant'},\n\n"
-        f"Your application status for {job_title} at {company_name} is now: {status_title}.\n\n"
+        f"Your application status for {job_title} at {company_name} is now: {status_title}.\n"
+        f"{qualification_summary}\n\n"
         f"{remarks if remarks else ''}\n\n"
         f"Best regards,\nThe MultiBiz Recruitment Team"
     )
 
     try:
-        send_mail(
+        sent_count = send_mail(
             subject=subject,
             message=plain_text,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[to_email],
             html_message=html_content,
-            fail_silently=True
+            fail_silently=False
         )
+        if sent_count != 1:
+            return {'success': False, 'error': 'Email backend did not send a message.'}
         return {'success': True, 'error': None}
     except Exception as e:
         print(f"[Status Update Mailer] Error sending email: {e}")
@@ -602,7 +689,7 @@ def send_interview_scheduled_email(
     safe_notes = html.escape(additional_notes or '').replace('\n', '<br>') if additional_notes else ''
 
     subject = f"📅 Interview Invitation: {safe_title} at {safe_company}"
-
+    
     notes_block = ''
     if safe_notes:
         notes_block = f"""
@@ -636,7 +723,7 @@ def send_interview_scheduled_email(
             <p style="margin:0 0 20px;font-size:14.5px;color:#334155;line-height:1.7;">
               Congratulations! <strong>{safe_company}</strong> has reviewed your application for <strong>{safe_title}</strong> and scheduled an interview with you.
             </p>
-
+            
             <!-- Details Card -->
             <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:22px;">
               <tr>
@@ -751,7 +838,7 @@ def send_job_request_rejected_notification(to_email: str, company_name: str, con
     <div style='padding:32px;color:#333;line-height:1.7;'>
       <p style='font-size:16px;'>Hello <strong>{safe_contact}</strong> ({safe_company}),</p>
       <p>Thank you for submitting your job request for <strong>{safe_title}</strong>.</p>
-
+      
       <div style='background:#fef2f2;border-left:4px solid #ef4444;padding:16px 20px;border-radius:6px;margin:20px 0;'>
         <p style='margin:0;font-weight:700;color:#b91c1c;font-size:15px;'>Request Status: Rejected / Needs Revision</p>
         <p style='margin:8px 0 0;color:#374151;font-size:13.5px;line-height:1.6;'>
@@ -797,7 +884,7 @@ def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str,
     safe_notes = html.escape(admin_notes or '').replace('\n', '<br>') if admin_notes else ''
 
     subject = f"🌟 New Candidate Forwarded: {applicant_name} for {job_title}"
-
+    
     notes_html = ''
     if safe_notes:
         notes_html = f"""
@@ -818,7 +905,7 @@ def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str,
     <div style='padding:32px;color:#333;line-height:1.7;'>
       <p style='font-size:16px;'>Hello <strong>{safe_company} Team</strong>,</p>
       <p>MultiBiz Admin has forwarded a candidate application for your review:</p>
-
+      
       <div style='background:#f8fafc;border:1px solid #e2e8f0;padding:18px 22px;border-radius:8px;margin:20px 0;'>
         <p style='margin:0;font-weight:700;color:#0f172a;font-size:16px;'>👤 {safe_applicant}</p>
         <p style='margin:4px 0 0;color:#0284c7;font-size:13.5px;font-weight:600;'>Position: {safe_title}</p>

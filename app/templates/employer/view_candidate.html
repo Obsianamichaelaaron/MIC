@@ -342,17 +342,21 @@
                                 <h5 class="fw-bold text-dark mb-1">{{ application.first_name }} {{ application.last_name }}</h5>
                                 <div class="text-muted small">Applicant ID: #{{ application.applicant_id }} &bull; Applied on {{ application.applied_at|date:"M d, Y" }}</div>
                             </div>
-                            {% if application.match_score >= 70 %}
+                            {% if qualification_status == 'qualified' %}
                                 <span class="badge-match badge-match-excellent fs-6">
-                                    <i class="fa-solid fa-circle-check"></i> {{ application.match_score|floatformat:0 }}% AI Match
+                                    <i class="fa-solid fa-circle-check"></i> {{ application.match_score|floatformat:0 }}% Qualified
                                 </span>
-                            {% elif application.match_score >= 50 %}
+                            {% elif qualification_status == 'under_qualified' %}
                                 <span class="badge-match badge-match-average fs-6">
-                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ application.match_score|floatformat:0 }}% AI Match
+                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ application.match_score|floatformat:0 }}% Under-Qualified
+                                </span>
+                            {% elif qualification_status == 'unclassified' %}
+                                <span class="badge-match badge-match-good fs-6">
+                                    <i class="fa-solid fa-circle-minus"></i> {{ application.match_score|floatformat:0 }}% Unclassified
                                 </span>
                             {% else %}
                                 <span class="badge-match badge-match-low fs-6">
-                                    <i class="fa-solid fa-circle-xmark"></i> {{ application.match_score|floatformat:0 }}% AI Match
+                                    <i class="fa-solid fa-circle-xmark"></i> {{ application.match_score|floatformat:0 }}% Not Qualified
                                 </span>
                             {% endif %}
                         </div>

@@ -734,7 +734,7 @@
             </div>
             <div class="cand-kpi-card kpi-accepted">
                 <div class="cand-kpi-info">
-                    <span class="cand-kpi-label">Qualified (≥70%)</span>
+                    <span class="cand-kpi-label">Qualified (&gt;60%)</span>
                     <span class="cand-kpi-value">{{ total_qualified }}</span>
                 </div>
                 <div class="cand-kpi-icon"><i class="fas fa-circle-check"></i></div>
@@ -819,7 +819,10 @@
                 <div class="cand-col-score">
                     <div class="cand-col-label">Qualified</div>
                     <div class="cand-score-val" style="color:#059669;">{{ js.count_qualified }}</div>
-                    <div class="cand-score-sub" style="color:#059669;">≥ 70%</div>
+                    <div class="cand-score-sub" style="color:#059669;">&gt; 60%</div>
+                    <div class="cand-score-sub" style="color:#b45309;">Under-Qualified: {{ js.count_under_qualified }}</div>
+                    <div class="cand-score-sub" style="color:#64748b;">Unclassified: {{ js.count_unclassified }}</div>
+                    <div class="cand-score-sub" style="color:#b91c1c;">Not Qualified: {{ js.count_not_qualified }}</div>
                 </div>
 
                 <!-- Col 4: High Match -->
