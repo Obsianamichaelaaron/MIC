@@ -5,9 +5,12 @@ import io
 import csv
 from decimal import Decimal
 from datetime import date, timedelta
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.db import IntegrityError, transaction
 from django.db.models import Q, Count, Avg
 from django.conf import settings
 from django.utils import timezone
@@ -246,7 +249,7 @@ def users_view(request):
         action = request.POST.get('action')
 
         if action == 'create_employer':
-            email = request.POST.get('email', '').strip()
+            email = request.POST.get('email', '').strip().lower()
             password = request.POST.get('password', '')
             first_name = request.POST.get('first_name', '').strip()
             last_name = request.POST.get('last_name', '').strip()
@@ -256,31 +259,52 @@ def users_view(request):
             company_address = request.POST.get('company_address', '').strip()
             company_website = request.POST.get('company_website', '').strip()
 
-            if not email or not password or not company_name:
-                error_msg = "Please provide email, password, and company name."
-            elif User.objects.filter(email=email).exists():
-                error_msg = "Email already in use."
+            if not email or not password or not company_name or not first_name or not last_name:
+                error_msg = "Please provide the contact's name, email, password, and company name."
+            elif len(password) < 6:
+                error_msg = "Password must be at least 6 characters."
             else:
-                hashed = hash_password(password)
-                new_user = User.objects.create(
-                    email=email,
-                    password=hashed,
-                    role='employer',
-                    first_name=first_name,
-                    last_name=last_name,
-                    phone=phone,
-                    status='active',
-                    created_by_admin=True
-                )
-                Employer.objects.create(
-                    user=new_user,
-                    company_name=company_name,
-                    industry=industry,
-                    company_address=company_address,
-                    company_website=company_website
-                )
-                log_audit_trail(request, admin_id, 'create_employer', f"Created employer account for {company_name} ({email})", 'employer', new_user.user_id, company_name)
-                success_msg = f"Employer account for {company_name} created successfully!"
+                try:
+                    validate_email(email)
+                except ValidationError:
+                    error_msg = "Please provide a valid email address."
+
+                if not error_msg and User.objects.filter(email__iexact=email).exists():
+                    error_msg = "Email already in use."
+
+                if not error_msg:
+                    try:
+                        with transaction.atomic():
+                            new_user = User.objects.create(
+                                email=email,
+                                password=hash_password(password),
+                                role='employer',
+                                first_name=first_name,
+                                last_name=last_name,
+                                phone=phone,
+                                status='active',
+                                created_by_admin=True
+                            )
+                            Employer.objects.create(
+                                user=new_user,
+                                company_name=company_name,
+                                industry=industry,
+                                company_address=company_address,
+                                company_website=company_website
+                            )
+                            log_audit_trail(
+                                request,
+                                admin_id,
+                                'create_employer',
+                                f"Created employer account for {company_name} ({email})",
+                                'employer',
+                                new_user.user_id,
+                                company_name
+                            )
+                    except IntegrityError:
+                        error_msg = "Email already in use."
+                    else:
+                        success_msg = f"Employer partner account for {company_name} created successfully."
 
         elif action == 'create_admin':
             email = request.POST.get('email', '').strip()
@@ -372,6 +396,7 @@ def users_view(request):
     context = {
         'page_title': 'User Management - MultiBiz',
         'current_page': 'users.php',
+        'admin_user': get_object_or_404(User, pk=admin_id),
         'users': users_qs,
         'search': search,
         'query': search,
@@ -386,6 +411,13 @@ def users_view(request):
 
 def _get_or_create_employer_company(company_name: str, admin_user: User) -> Employer:
     clean_name = company_name.strip() if company_name else 'MultiBiz Partner'
+    emp = Employer.objects.filter(
+        company_name__iexact=clean_name,
+        user__role='employer',
+    ).order_by('employer_id').first()
+    if emp:
+        return emp
+
     emp = Employer.objects.filter(company_name__iexact=clean_name).first()
     if not emp:
         emp = Employer.objects.create(
@@ -522,6 +554,13 @@ def post_job_view(request):
 
     if request.method == 'POST':
         company_name = request.POST.get('company_name', '').strip()
+        contact_first_name = request.POST.get('contact_first_name', '').strip()
+        contact_last_name = request.POST.get('contact_last_name', '').strip()
+        account_email = request.POST.get('account_email', '').strip().lower()
+        account_password = request.POST.get('account_password', '')
+        industry = request.POST.get('industry', '').strip()
+        company_address = request.POST.get('company_address', '').strip()
+        company_website = request.POST.get('company_website', '').strip()
         title = request.POST.get('title', '').strip()
         description = request.POST.get('description', '').strip()
         requirements = request.POST.get('requirements', '').strip()
@@ -532,46 +571,100 @@ def post_job_view(request):
         status = request.POST.get('status', 'active')
         qualification_ids = request.POST.getlist('qualifications')
 
-        if not title:
+        if not company_name:
+            error = "Company name is required."
+        elif not title:
             error = "Job title is required."
         else:
-            employer = _get_or_create_employer_company(company_name, admin_user)
-            target_quals_str = ','.join(qualification_ids) if qualification_ids else ''
+            employer = Employer.objects.filter(
+                company_name__iexact=company_name,
+                user__role='employer',
+            ).select_related('user').order_by('employer_id').first()
+            create_partner_account = employer is None
 
-            job = JobPosting.objects.create(
-                employer=employer,
-                title=title,
-                description=description,
-                requirements=requirements,
-                skills_required=skills_required,
-                location=location,
-                employment_type=employment_type,
-                salary_range=salary_range,
-                status=status,
-                target_qualifications=target_quals_str
-            )
+            if create_partner_account:
+                if not contact_first_name or not contact_last_name or not account_email or not account_password:
+                    error = "For a new company, provide the contact's name, login email, and temporary password."
+                elif len(account_password) < 6:
+                    error = "Temporary password must be at least 6 characters."
+                elif len(account_password.encode('utf-8')) > 72:
+                    error = "Temporary password must be no longer than 72 UTF-8 bytes."
+                else:
+                    try:
+                        validate_email(account_email)
+                    except ValidationError:
+                        error = "Please provide a valid employer login email."
 
-            for q_id in qualification_ids:
-                if str(q_id).isdigit():
-                    q_obj = Qualification.objects.filter(pk=int(q_id)).first()
-                    if q_obj:
-                        JobQualificationMapping.objects.create(job=job, qualification=q_obj)
+                    if not error and User.objects.filter(email__iexact=account_email).exists():
+                        error = "That login email is already in use. Select the existing partner company or use another email."
 
-            if initial_inquiry:
-                initial_inquiry.status = 'replied'
-                initial_inquiry.is_read = True
-                initial_inquiry.save()
-                try:
-                    ContactReply.objects.create(
-                        inquiry=initial_inquiry,
-                        admin=admin_user,
-                        reply_text=f"Job posting #{job.job_id} ('{job.title}') was created and published to portal from this request."
-                    )
-                except Exception:
-                    pass
+            if not error:
+                with transaction.atomic():
+                    if create_partner_account:
+                        try:
+                            with transaction.atomic():
+                                partner_user = User.objects.create(
+                                    email=account_email,
+                                    password=hash_password(account_password),
+                                    role='employer',
+                                    first_name=contact_first_name,
+                                    last_name=contact_last_name,
+                                    phone=request.POST.get('contact_phone', '').strip(),
+                                    status='active',
+                                    created_by_admin=True,
+                                )
+                        except IntegrityError:
+                            error = "That employer login email is already in use."
 
-            log_audit_trail(request, admin_id, 'create_job', f"Posted new job: {title} for {company_name or 'MultiBiz Partner'}", 'job', job.job_id, title)
-            return redirect('/admin/jobs.php?posted=success')
+                        if not error:
+                            employer = Employer.objects.create(
+                                user=partner_user,
+                                company_name=company_name,
+                                industry=industry,
+                                company_address=company_address,
+                                company_website=company_website,
+                            )
+
+                    if not error:
+                        JobPosting.objects.filter(
+                            employer__company_name__iexact=company_name,
+                            employer__user__role='admin',
+                        ).exclude(employer=employer).update(employer=employer)
+
+                        target_quals_str = ','.join(qualification_ids) if qualification_ids else ''
+                        job = JobPosting.objects.create(
+                            employer=employer,
+                            title=title,
+                            description=description,
+                            requirements=requirements,
+                            skills_required=skills_required,
+                            location=location,
+                            employment_type=employment_type,
+                            salary_range=salary_range,
+                            status=status,
+                            target_qualifications=target_quals_str
+                        )
+
+                        for q_id in qualification_ids:
+                            if str(q_id).isdigit():
+                                q_obj = Qualification.objects.filter(pk=int(q_id)).first()
+                                if q_obj:
+                                    JobQualificationMapping.objects.create(job=job, qualification=q_obj)
+
+                        if initial_inquiry:
+                            initial_inquiry.status = 'replied'
+                            initial_inquiry.is_read = True
+                            initial_inquiry.save()
+                            ContactReply.objects.create(
+                                inquiry=initial_inquiry,
+                                admin=admin_user,
+                                reply_text=f"Job posting #{job.job_id} ('{job.title}') was created and published to portal from this request."
+                            )
+
+                        log_audit_trail(request, admin_id, 'create_job', f"Posted new job: {title} for {company_name}", 'job', job.job_id, title)
+
+                if not error:
+                    return redirect('/admin/jobs.php?posted=success')
 
     # Initial prefill computation
     initial_company_name = request.GET.get('company_name', '')
@@ -594,14 +687,32 @@ def post_job_view(request):
         initial_salary_range = specs.get('salary_range') or ''
         initial_employment_type = specs.get('employment_type') or 'full-time'
 
+    selected_employment_type = (
+        request.POST.get('employment_type') if request.method == 'POST' else initial_employment_type
+    ) or 'full-time'
+    selected_posting_status = (request.POST.get('status') if request.method == 'POST' else 'active') or 'active'
     qualifications = Qualification.objects.filter(status='active').order_by('name')
     existing_companies = list(Employer.objects.values_list('company_name', flat=True).distinct())
+    existing_partner_companies = list(
+        Employer.objects.filter(user__role='employer')
+        .exclude(company_name__isnull=True)
+        .values_list('company_name', flat=True)
+        .distinct()
+    )
+    inquiry_name_parts = initial_inquiry.name.split(maxsplit=1) if initial_inquiry and initial_inquiry.name else []
 
     context = {
         'page_title': 'Post a Job - MultiBiz Admin',
         'current_page': 'post_job.php',
         'qualifications': qualifications,
         'existing_companies': [c for c in existing_companies if c],
+        'existing_partner_companies': [c for c in existing_partner_companies if c],
+        'initial_contact_first_name': inquiry_name_parts[0] if inquiry_name_parts else '',
+        'initial_contact_last_name': inquiry_name_parts[1] if len(inquiry_name_parts) > 1 else '',
+        'initial_contact_email': initial_inquiry.email if initial_inquiry else '',
+        'form_values': request.POST if request.method == 'POST' else {},
+        'selected_employment_type': selected_employment_type,
+        'selected_posting_status': selected_posting_status,
         'error': error,
         'initial_inquiry': initial_inquiry,
         'initial_company_name': initial_company_name,

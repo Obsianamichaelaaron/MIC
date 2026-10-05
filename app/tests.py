@@ -554,6 +554,124 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(response, self.job.title)
         self.assertNotContains(response, 'No Job Requisitions Found')
 
+    def test_admin_posted_job_creates_company_account_and_appears_only_for_that_employer(self):
+        company_name = 'Admin Managed Partner Ltd.'
+        legacy_profile = Employer.objects.create(
+            user=self.admin_user,
+            company_name=company_name,
+            industry='Recruitment Partner',
+        )
+        legacy_job = JobPosting.objects.create(
+            employer=legacy_profile,
+            title='Legacy Partner Vacancy',
+            description='Previously posted by admin.',
+            status='active',
+        )
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        post_response = self.client.post('/admin/post_job.php', {
+            'company_name': company_name,
+            'contact_first_name': 'Partner',
+            'contact_last_name': 'Contact',
+            'account_email': 'partner-login@example.com',
+            'account_password': 'temporary123',
+            'contact_phone': '555-0100',
+            'industry': 'Technology',
+            'company_website': 'https://partner.example.com',
+            'company_address': 'Manila',
+            'title': 'New Partner Vacancy',
+            'description': 'A role for the new partner company.',
+            'requirements': 'Relevant experience required.',
+            'skills_required': 'Python, Django',
+            'location': 'Manila',
+            'employment_type': 'full-time',
+            'salary_range': 'PHP 50,000',
+            'status': 'active',
+        })
+
+        self.assertEqual(post_response.status_code, 302)
+        partner_user = User.objects.get(email='partner-login@example.com')
+        partner = Employer.objects.get(user=partner_user)
+        new_job = JobPosting.objects.get(title='New Partner Vacancy')
+        legacy_job.refresh_from_db()
+        self.assertEqual(partner_user.role, 'employer')
+        self.assertTrue(partner_user.created_by_admin)
+        self.assertTrue(verify_password('temporary123', partner_user.password))
+        self.assertEqual(new_job.employer, partner)
+        self.assertEqual(legacy_job.employer, partner)
+
+        session = self.client.session
+        session['user_id'] = partner_user.user_id
+        session['role'] = 'employer'
+        session.save()
+        dashboard_response = self.client.get('/employer/dashboard.php')
+        jobs_response = self.client.get('/employer/jobs.php')
+        self.assertEqual(dashboard_response.status_code, 200)
+        self.assertContains(dashboard_response, 'New Partner Vacancy')
+        self.assertContains(dashboard_response, 'Legacy Partner Vacancy')
+        self.assertEqual(jobs_response.status_code, 200)
+        self.assertContains(jobs_response, 'New Partner Vacancy')
+        self.assertContains(jobs_response, 'Legacy Partner Vacancy')
+
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session.save()
+        other_company_response = self.client.get('/employer/jobs.php')
+        self.assertEqual(other_company_response.status_code, 200)
+        self.assertNotContains(other_company_response, 'New Partner Vacancy')
+
+    def test_admin_posted_job_reuses_existing_company_employer_account(self):
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.post('/admin/post_job.php', {
+            'company_name': self.employer.company_name,
+            'title': 'Existing Partner Vacancy',
+            'description': 'A role for an existing partner.',
+            'requirements': 'Relevant experience required.',
+            'skills_required': 'Python',
+            'location': 'Manila',
+            'employment_type': 'full-time',
+            'status': 'active',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        job = JobPosting.objects.get(title='Existing Partner Vacancy')
+        self.assertEqual(job.employer, self.employer)
+        self.assertEqual(User.objects.filter(email=self.employer_user.email).count(), 1)
+
+    def test_admin_cannot_post_for_new_company_without_employer_login_details(self):
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.post('/admin/post_job.php', {
+            'company_name': 'Unregistered Partner Ltd.',
+            'title': 'Partner Vacancy',
+            'description': 'A role for the partner.',
+            'requirements': 'Relevant experience required.',
+            'skills_required': 'Python',
+            'location': 'Manila',
+            'employment_type': 'full-time',
+            'status': 'active',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.context['error'],
+            "For a new company, provide the contact's name, login email, and temporary password.",
+        )
+        self.assertFalse(Employer.objects.filter(company_name='Unregistered Partner Ltd.').exists())
+        self.assertFalse(JobPosting.objects.filter(title='Partner Vacancy').exists())
+
     def test_job_application_flow(self):
         """Test applicant applying for a job"""
         # Log in applicant
@@ -667,10 +785,39 @@ class MultiBizConversionTests(TestCase):
             'industry': 'Finance'
         })
         self.assertEqual(create_emp_resp.status_code, 200)
-        self.assertTrue(User.objects.filter(email='newpartner@gmail.com').exists())
-        self.assertTrue(Employer.objects.filter(company_name='New Global Partner Inc.').exists())
+        partner_user = User.objects.get(email='newpartner@gmail.com')
+        partner_profile = Employer.objects.get(user=partner_user)
+        self.assertEqual(partner_user.role, 'employer')
+        self.assertEqual(partner_user.status, 'active')
+        self.assertTrue(partner_user.created_by_admin)
+        self.assertTrue(verify_password('partnerpassword123', partner_user.password))
+        self.assertEqual(partner_profile.company_name, 'New Global Partner Inc.')
+        self.assertEqual(partner_profile.industry, 'Finance')
+        self.assertContains(create_emp_resp, 'Create Employer Partner Account')
 
         # Check audit trail was logged
         audit = AuditTrail.objects.filter(action_type='create_employer').last()
         self.assertIsNotNone(audit)
         self.assertEqual(audit.target_name, 'New Global Partner Inc.')
+
+        duplicate_email_resp = self.client.post('/admin/users.php', {
+            'action': 'create_employer',
+            'email': 'NEWPARTNER@gmail.com',
+            'password': 'anotherpassword',
+            'first_name': 'Duplicate',
+            'last_name': 'Partner',
+            'company_name': 'Duplicate Company'
+        })
+        self.assertContains(duplicate_email_resp, 'Email already in use.')
+        self.assertFalse(Employer.objects.filter(company_name='Duplicate Company').exists())
+
+        short_password_resp = self.client.post('/admin/users.php', {
+            'action': 'create_employer',
+            'email': 'short-password@example.com',
+            'password': '123',
+            'first_name': 'Short',
+            'last_name': 'Password',
+            'company_name': 'Invalid Company'
+        })
+        self.assertContains(short_password_resp, 'Password must be at least 6 characters.')
+        self.assertFalse(User.objects.filter(email='short-password@example.com').exists())

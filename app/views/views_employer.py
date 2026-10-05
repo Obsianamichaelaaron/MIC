@@ -24,6 +24,16 @@ from app.services.mailer import (
 )
 
 
+def _sync_admin_postings_to_employer(employer):
+    if not employer.company_name:
+        return
+
+    JobPosting.objects.filter(
+        employer__company_name__iexact=employer.company_name,
+        employer__user__role='admin',
+    ).exclude(employer=employer).update(employer=employer)
+
+
 def log_status_history_event(application, stage_title, status_key, actor_name, actor_role, notes=''):
     """Helper to log workflow stages into structured status_history on Application."""
     history = list(application.status_history or [])
@@ -47,6 +57,7 @@ def dashboard_view(request):
     user_id = getCurrentUserId(request)
     user = get_object_or_404(User, pk=user_id)
     employer, _ = Employer.objects.get_or_create(user=user)
+    _sync_admin_postings_to_employer(employer)
 
     # Job Requests metrics
     total_job_requests = JobPosting.objects.filter(employer=employer).count()
@@ -302,6 +313,7 @@ def jobs_view(request):
     """
     user_id = getCurrentUserId(request)
     employer, _ = Employer.objects.get_or_create(user_id=user_id)
+    _sync_admin_postings_to_employer(employer)
 
     status_filter = request.GET.get('status', 'all').strip()
     search = request.GET.get('search', '').strip()
