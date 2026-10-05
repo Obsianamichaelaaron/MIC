@@ -87,6 +87,8 @@ urlpatterns = [
     re_path(r'^(?:frontend/)?employer/recommended_candidates\.php$', views_employer.recommended_candidates_view),
     re_path(r'^(?:frontend/)?employer/view_candidate\.php$', views_employer.view_candidate_view),
     re_path(r'^(?:frontend/)?employer/update_status\.php$', views_employer.update_status_api),
+    path('employer/schedule_interview_api/', views_employer.schedule_interview_api, name='employer_schedule_interview_api'),
+    re_path(r'^(?:frontend/)?employer/schedule_interview\.php$', views_employer.schedule_interview_api),
     re_path(r'^(?:frontend/)?employer/chatbot_review\.php$', views_employer.chatbot_review_view),
     re_path(r'^(?:frontend/)?employer/chat\.php$', views_chat.chat_view),
 
