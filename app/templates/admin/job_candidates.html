@@ -163,6 +163,16 @@
         color: #dc2626;
         border: 1px solid #fecaca;
     }
+    .badge-forwarded-yes {
+        background-color: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
+    .badge-forwarded-no {
+        background-color: #f8fafc;
+        color: #64748b;
+        border: 1px solid #e2e8f0;
+    }
     .badge-notice-sent {
         background-color: #f0fdf4;
         color: #16a34a;
@@ -188,6 +198,33 @@
         white-space: nowrap;
         transition: all 0.15s ease;
     }
+
+    .btn-primary-custom {
+        border: 0;
+        background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+        color: #ffffff !important;
+        font-weight: 600;
+        border-radius: 8px;
+        padding: 0.55rem 1.15rem;
+        box-shadow: 0 2px 8px rgba(2, 132, 199, 0.25);
+        transition: all 0.2s ease;
+    }
+    .btn-primary-custom:hover,
+    .btn-primary-custom:focus {
+        background: linear-gradient(135deg, #0369a1 0%, #075985 100%);
+        color: #ffffff !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(2, 132, 199, 0.35);
+    }
+
+    .candidate-hero-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+        margin-left: auto;
+    }
 </style>
 {% endblock %}
 
@@ -195,50 +232,60 @@
 <div class="container py-4 admin-candidates-page">
     <!-- Hero Header -->
     <div class="employer-hero-banner mb-4">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
-            <div>
+        <div class="d-flex align-items-center flex-wrap gap-3 position-relative" style="z-index: 1; width:100%;">
+            <div class="flex-grow-1">
                 <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-1 small text-white-50">
-                        <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-white-50 text-decoration-none">Admin</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'admin_jobs' %}" class="text-white-50 text-decoration-none">Job Postings</a></li>
+                    <ol class="breadcrumb mb-1 small text-white">
+                        <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}" class="text-white text-decoration-none">Admin</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'admin_jobs' %}" class="text-white text-decoration-none">Job Postings</a></li>
                         <li class="breadcrumb-item active text-white" aria-current="page">{{ job.title|truncatechars:28 }}</li>
                     </ol>
                 </nav>
-                <div class="d-flex align-items-center gap-2 mt-1">
-                    <h3 class="fw-extrabold text-white mb-0">
+                <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                    <h3 class="fw-extrabold text-white mb-0" style="color: #ffffff !important;">
                         <i class="fa-solid fa-users-viewfinder text-warning me-2"></i>{{ job.title }}
                     </h3>
-                    <span class="badge bg-light text-dark rounded-pill px-2.5 py-1 small fw-semibold">
+                    <span class="badge bg-light text-dark rounded-pill px-2 py-1 small fw-semibold">
                         {{ job.company_name }}
                     </span>
                 </div>
-                <p class="text-white-50 small mb-0 mt-2">
+                <p class="text-white small mb-0 mt-2">
                     <i class="fa-solid fa-location-dot me-1"></i>{{ job.location }} &bull;
                     <i class="fa-solid fa-clock me-1"></i>{{ job.get_employment_type_display }} &bull;
                     <i class="fa-solid fa-peso-sign me-1"></i>{{ job.salary_range|default:"Competitive" }}
                 </p>
             </div>
-            <div class="d-flex flex-wrap align-items-center gap-2 candidate-hero-actions">
-                <!-- Action: Notify All Qualified Applicants -->
-                <form method="POST" action="{% url 'admin_notify_qualified_applicants' job.id %}" class="d-inline" onsubmit="return confirm('Send Under Review notifications to all qualified applicants?');">
+            <div class="ms-auto d-flex align-items-center gap-2 flex-shrink-0 flex-wrap justify-content-end">
+                <!-- Action: Send Qualified to Employer -->
+                <form method="POST" action="{% url 'admin_forward_qualified_candidates' job.id %}" class="d-inline" onsubmit="return confirm('Send all {{ counts.qualified }} qualified candidate(s) to {{ job.company_name|default:\'the employer\' }} for review?');">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-warning text-dark fw-bold btn-sm px-3 py-2 shadow-sm">
-                        <i class="fa-solid fa-bell me-1"></i> Notify Qualified ({{ counts.qualified }})
+                    <button type="submit" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i>
+                        <span>Send Qualified to {{ job.company_name|default:'Employer' }} ({{ counts.qualified }})</span>
                     </button>
                 </form>
 
-                <button type="button" class="btn btn-outline-light text-white fw-bold btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-1.5" onclick="openJobExportModal()" style="border-color: rgba(255,255,255,0.4); backdrop-filter: blur(4px);">
-                    <i class="fab fa-google-drive" style="color: #6ee7b7;"></i>
-                    <span>Export via Google Drive</span>
-                </button>
-
-                <button type="button" class="btn btn-success fw-bold btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-1.5" onclick="openJobExportModal()">
-                    <i class="fa-solid fa-file-excel"></i>
-                    <span>Export to Excel (.xlsx)</span>
-                </button>
+                <!-- Action: Notify Qualified Applicants -->
+                <form method="POST" action="{% url 'admin_notify_qualified_applicants' job.id %}" class="d-inline" onsubmit="return confirm('Send Under Review notifications to all qualified applicants?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2">
+                        <i class="fa-solid fa-bell"></i>
+                        <span>Notify Qualified ({{ counts.qualified }})</span>
+                    </button>
+                </form>
             </div>
         </div>
     </div>
+
+    {% if request.GET.forwarded_qualified %}
+    <div class="alert alert-success alert-dismissible fade show rounded-4 border-0 shadow-sm mb-4 d-flex align-items-center gap-2" role="alert" style="background:#ecfdf5;color:#065f46;border-left:4px solid #10b981 !important;">
+        <i class="fa-solid fa-circle-check fs-5 text-success"></i>
+        <div>
+            <strong>Candidates Successfully Sent!</strong> {{ request.GET.forwarded_qualified }} qualified candidate(s) have been sent directly to {{ job.company_name|default:'the employer' }} for hiring review.
+        </div>
+        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
 
     <!-- Overview Counters -->
     <div class="row g-3 mb-4">
@@ -255,9 +302,9 @@
             </div>
         </div>
         <div class="col-6 col-md-3">
-            <div class="custom-card overview-card p-3 bg-white border-0 shadow-sm rounded-4 text-center border-bottom border-warning border-3">
-                <div class="text-muted small">Under Review</div>
-                <div class="fs-4 fw-bold text-warning text-dark mt-0.5">{{ counts.under_review }}</div>
+            <div class="custom-card overview-card p-3 bg-white border-0 shadow-sm rounded-4 text-center border-bottom border-info border-3">
+                <div class="text-muted small">Forwarded to Employer</div>
+                <div class="fs-4 fw-bold text-info mt-0.5">{{ counts.forwarded }}</div>
             </div>
         </div>
         <div class="col-6 col-md-3">
@@ -274,11 +321,14 @@
             <!-- Filter Pills -->
             <div class="col-12 col-xl-7">
                 <div class="d-flex flex-nowrap gap-1.5 align-items-center candidate-filter-pills">
-                    <a href="{% url 'admin_job_candidates' job.id %}{% if selected_sort %}?sort={{ selected_sort }}{% endif %}{% if query %}{% if selected_sort %}&{% else %}?{% endif %}q={{ query }}{% endif %}" class="filter-pill-btn {% if not selected_qual and not selected_status %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                    <a href="{% url 'admin_job_candidates' job.id %}{% if selected_sort %}?sort={{ selected_sort }}{% endif %}{% if query %}{% if selected_sort %}&{% else %}?{% endif %}q={{ query }}{% endif %}" class="filter-pill-btn {% if not selected_qual and not selected_status and not forwarded_filter %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         All <span class="badge bg-white text-dark ms-1.5">{{ counts.all }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?qual=qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         Qualified <span class="badge bg-success text-white ms-1.5">{{ counts.qualified }}</span>
+                    </a>
+                    <a href="{% url 'admin_job_candidates' job.id %}?forwarded=yes{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if forwarded_filter == 'yes' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                        <i class="fa-solid fa-paper-plane me-1"></i> Sent to Employer <span class="badge bg-info text-white ms-1.5">{{ counts.forwarded }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?qual=under_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'under_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         Under Qualified <span class="badge bg-warning text-dark ms-1.5">{{ counts.under_qualified }}</span>
@@ -294,12 +344,13 @@
                 <form method="GET" action="{% url 'admin_job_candidates' job.id %}" class="d-flex align-items-center justify-content-xl-end gap-2">
                     {% if selected_qual %}<input type="hidden" name="qual" value="{{ selected_qual }}">{% endif %}
                     {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}
+                    {% if forwarded_filter %}<input type="hidden" name="forwarded" value="{{ forwarded_filter }}">{% endif %}
                     
                     <div class="input-group input-group-sm" style="min-width: 180px; max-width: 240px;">
                         <input type="text" name="q" class="form-control" placeholder="Search candidate..." value="{{ query }}">
                         <button class="btn btn-primary" type="submit" title="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
                     </div>
-                    {% if selected_qual or selected_status or query or selected_sort != 'score' %}
+                    {% if selected_qual or selected_status or forwarded_filter or query or selected_sort != 'score' %}
                         <a href="{% url 'admin_job_candidates' job.id %}" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center" title="Reset Filters" style="height: 31px; width: 31px; padding: 0; flex-shrink: 0;">
                             <i class="fa-solid fa-xmark"></i>
                         </a>
@@ -309,24 +360,8 @@
         </div>
 
         {% if candidates %}
-        <div class="d-flex flex-wrap align-items-center justify-content-between pt-3 mt-3 border-top gap-2">
-            <div class="d-flex align-items-center gap-3">
-                <div class="form-check mb-0">
-                    <input class="form-check-input" type="checkbox" id="selectAllCandidates" onchange="toggleSelectAllCandidates(this)">
-                    <label class="form-check-label small fw-semibold text-muted" for="selectAllCandidates">
-                        Select All (<span id="selectedCountDisplay">0</span> selected)
-                    </label>
-                </div>
-                <button type="button" class="btn btn-sm btn-outline-success fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs" onclick="openJobExportModal('selected')">
-                    <i class="fa-solid fa-file-excel"></i> Export Selected (.xlsx)
-                </button>
-                <button type="button" class="btn btn-sm btn-outline-info text-dark fw-semibold d-inline-flex align-items-center gap-1.5 shadow-xs" onclick="openJobExportModal('selected', true)">
-                    <i class="fab fa-google-drive text-primary"></i> Drive Export Selected
-                </button>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-                <span class="text-muted small">Showing {{ candidates|length }} candidates</span>
-            </div>
+        <div class="d-flex align-items-center justify-content-end pt-3 mt-3 border-top">
+            <span class="text-muted small">Showing {{ candidates|length }} candidate{{ candidates|length|pluralize }}</span>
         </div>
         {% endif %}
     </div>
@@ -336,13 +371,9 @@
         {% for cand in candidates %}
         <div class="custom-card p-3.5 p-md-4 bg-white border-0 shadow-sm rounded-4 candidate-card-hover position-relative {% if cand.is_top_match and cand.qualification_status == 'qualified' %}border-start border-warning border-4{% endif %}">
             <div class="row align-items-center g-3">
-                <!-- Checkbox & Avatar & Profile Info -->
+                <!-- Avatar & Profile Info -->
                 <div class="col-xl-4 col-lg-4 col-md-12">
                     <div class="d-flex align-items-center">
-                        <div class="form-check me-2.5 mb-0">
-                            <input class="form-check-input candidate-checkbox" type="checkbox" name="selected_candidates" value="{{ cand.application.id }}" onchange="updateSelectedCount()">
-                        </div>
-
                         <div class="position-relative me-3" style="flex-shrink: 0; width: 50px; height: 50px;">
                             {% if cand.applicant.user.profile_picture %}
                                 <img src="{{ cand.applicant.user.profile_picture.url }}" alt="{{ cand.applicant.user.full_name }}" class="rounded-circle object-fit-cover shadow-sm" style="width: 50px; height: 50px;">
@@ -358,7 +389,7 @@
                                 </span>
                             {% else %}
                                 <span class="position-absolute badge rounded-pill bg-light text-dark border shadow-xs" style="top: -6px; right: -8px; font-size: 0.62rem; font-weight: 600; padding: 2px 5px; z-index: 2;">
-                                    #{{ cand.radar_rank }}
+                                    #{{ forloop.counter }}
                                 </span>
                             {% endif %}
                         </div>
@@ -394,33 +425,30 @@
 
                         <div class="row g-1 text-center" style="font-size: 0.72rem;">
                             <div class="col-4">
-                                <div class="text-muted">Skills</div>
-                                <strong class="text-dark">{{ cand.skills_match_score|floatformat:0 }}%</strong>
+                                <div class="text-muted">Experience</div>
+                                <strong class="text-dark">{{ cand.applicant.experience_years|default:0 }} Yrs</strong>
                             </div>
                             <div class="col-4 border-start border-end">
-                                <div class="text-muted">Experience</div>
-                                <strong class="text-dark">{{ cand.exp_match_score|floatformat:0 }}%</strong>
+                                <div class="text-muted">Employability</div>
+                                <strong class="text-dark">{{ cand.applicant.employability_score|floatformat:0 }}%</strong>
                             </div>
                             <div class="col-4">
                                 <div class="text-muted">Education</div>
-                                <strong class="text-dark">{{ cand.edu_match_score|floatformat:0 }}%</strong>
+                                <strong class="text-dark">{{ cand.applicant.education_level|default:"Bachelor"|truncatechars:8 }}</strong>
                             </div>
                         </div>
                     </div>
 
                     <!-- Skills preview -->
+                    {% if cand.applicant.skills %}
                     <div class="d-flex flex-wrap gap-1 mt-2">
-                        {% for ms in cand.matched_skills|slice:":3" %}
-                            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 0.7rem;">
-                                &check; {{ ms }}
-                            </span>
-                        {% endfor %}
-                        {% for mis in cand.missing_skills|slice:":2" %}
-                            <span class="badge bg-secondary bg-opacity-10 text-secondary border" style="font-size: 0.7rem;">
-                                &times; {{ mis }}
+                        {% for sk in cand.applicant.skills.split|slice:":3" %}
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25" style="font-size: 0.7rem;">
+                                &check; {{ sk|cut:"," }}
                             </span>
                         {% endfor %}
                     </div>
+                    {% endif %}
                 </div>
 
                 <!-- Status & Qualification Badges -->
@@ -440,13 +468,14 @@
                             </div>
                         {% endif %}
 
-                        {% if cand.notification_sent %}
-                            <div class="status-badge-pill badge-notice-sent" title="Dispatched: {{ cand.notification_sent_at|date:'M d, Y H:i'|default:'Recently' }}">
-                                <i class="fa-solid fa-envelope-circle-check"></i> Notified
+                        <!-- Sent to Employer Badge -->
+                        {% if cand.forwarded_to_employer %}
+                            <div class="status-badge-pill badge-forwarded-yes" title="Sent to Employer on {{ cand.forwarded_at|date:'M d, Y' }}">
+                                <i class="fa-solid fa-building-user"></i> Sent to Employer
                             </div>
                         {% else %}
-                            <div class="status-badge-pill badge-notice-pending">
-                                <i class="fa-regular fa-clock"></i> Pending Notice
+                            <div class="status-badge-pill badge-forwarded-no">
+                                <i class="fa-regular fa-clock"></i> Not Yet Sent
                             </div>
                         {% endif %}
                     </div>
@@ -456,20 +485,25 @@
                 <div class="col-xl-2 col-lg-2 col-md-3">
                     <div class="d-flex flex-column gap-2 align-items-center justify-content-center">
                         <a href="{% url 'admin_view_candidate' cand.application.pk %}" class="candidate-action-btn btn btn-outline-primary shadow-xs">
-                            <i class="fa-solid fa-file-lines"></i> View Resume / Dossier
+                            <i class="fa-solid fa-file-lines"></i> View Dossier
                         </a>
 
-                        <button type="button" class="candidate-action-btn btn {% if cand.notification_sent %}btn-light text-muted border{% else %}btn-primary-custom text-white shadow-xs{% endif %}" data-app-id="{{ cand.application.id }}" data-app-name="{{ cand.applicant.user.full_name }}" onclick="triggerSingleNotice(this)">
-                            <i class="fa-solid fa-envelope"></i> {% if cand.notification_sent %}Re-dispatch{% else %}Dispatch Notice{% endif %}
+                        <!-- Send to Employer -->
+                        <button type="button" class="candidate-action-btn btn btn-primary-custom shadow-xs" onclick="openSendToEmployerModal('single', '{{ cand.application.id }}', '{{ cand.applicant.user.full_name|escapejs }}')">
+                            <i class="fa-solid fa-building-user"></i> Send to Employer
+                        </button>
+
+                        <button type="button" class="candidate-action-btn btn btn-light text-muted border" data-app-id="{{ cand.application.id }}" data-app-name="{{ cand.applicant.user.full_name }}" onclick="triggerSingleNotice(this)">
+                            <i class="fa-solid fa-envelope"></i> Dispatch Notice
                         </button>
                     </div>
                 </div>
             </div>
 
-            {% if cand.qualification_reason %}
+            {% if cand.admin_notes %}
             <div class="mt-3 pt-2.5 border-top text-muted small d-flex align-items-start gap-1.5" style="font-size: 0.78rem;">
-                <span class="text-primary fw-bold text-nowrap"><i class="fa-solid fa-clipboard-check me-1"></i>Evaluation Notes:</span>
-                <span>{{ cand.qualification_reason }}</span>
+                <span class="text-primary fw-bold text-nowrap"><i class="fa-solid fa-paper-plane me-1"></i>Admin Notes:</span>
+                <span>{{ cand.admin_notes }}</span>
             </div>
             {% endif %}
         </div>
@@ -477,109 +511,100 @@
         <div class="custom-card p-5 bg-white border-0 shadow-sm rounded-4 text-center">
             <i class="fa-solid fa-user-slash text-muted fs-1 mb-3"></i>
             <h5 class="fw-bold text-dark">No Candidates Found</h5>
-            <p class="text-muted small mb-0">No applicant records match the selected qualification or search filters.</p>
+            <p class="text-muted small mb-0">No applicant records match the selected qualification, sent status, or search filters.</p>
         </div>
         {% endfor %}
     </div>
 </div>
 
+
 <!-- ==========================================
-     JOB-SPECIFIC GOOGLE DRIVE & EXCEL EXPORT MODAL
+     SEND TO EMPLOYER MODAL (replaces Export)
      ========================================== -->
-<div id="jobExportModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.65);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
+<div id="sendToEmployerModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.65);z-index:9999;align-items:center;justify-content:center;padding:1rem;">
     <div style="background:#ffffff;border-radius:18px;max-width:580px;width:100%;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);overflow:hidden;animation:modalScale .25s ease-out;font-family:'DM Sans', sans-serif;">
         <!-- Header -->
         <div style="background:linear-gradient(135deg, #0a3d6b 0%, #1866a3 100%);padding:1.35rem 1.75rem;color:#fff;display:flex;align-items:center;justify-content:space-between;">
             <div style="display:flex;align-items:center;gap:.75rem;">
                 <div style="width:42px;height:42px;border-radius:10px;background:rgba(255,255,255,0.18);display:grid;place-items:center;font-size:1.3rem;">
-                    <i class="fas fa-file-excel" style="color:#86efac;"></i>
+                    <i class="fas fa-building-user" style="color:#93c5fd;"></i>
                 </div>
                 <div>
-                    <h4 style="margin:0;font-size:1.15rem;font-weight:800;letter-spacing:-0.3px;">Export Candidates: {{ job.title|truncatechars:30 }}</h4>
-                    <p style="margin:2px 0 0;font-size:.78rem;opacity:.9;">Download full roster with Qualified &amp; Not Qualified applicants</p>
+                    <h4 style="margin:0;font-size:1.15rem;font-weight:800;letter-spacing:-0.3px;">Send Candidates to Employer</h4>
+                    <p style="margin:2px 0 0;font-size:.78rem;opacity:.9;">Employer portal for <strong>{{ job.company_name }}</strong> will receive these applicants</p>
                 </div>
             </div>
-            <button type="button" onclick="closeJobExportModal()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;opacity:.8;padding:4px;" title="Close">
+            <button type="button" onclick="closeSendToEmployerModal()" style="background:none;border:none;color:#fff;font-size:1.3rem;cursor:pointer;opacity:.8;padding:4px;" title="Close">
                 <i class="fas fa-xmark"></i>
             </button>
         </div>
 
         <!-- Body -->
+        <form id="sendToEmployerForm" onsubmit="submitSendToEmployer(event)">
         <div style="padding:1.5rem 1.75rem;">
             <!-- Target Job Badge -->
-            <div style="margin-bottom:1.15rem;padding:.75rem 1rem;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
+            <div style="margin-bottom:1.15rem;padding:.75rem 1rem;background:#eff6ff;border-radius:10px;border:1px solid #bfdbfe;display:flex;align-items:center;justify-content:space-between;">
                 <div>
-                    <span style="font-size:.72rem;font-weight:700;color:#64748b;text-transform:uppercase;">Job Opening:</span>
+                    <span style="font-size:.72rem;font-weight:700;color:#1d4ed8;text-transform:uppercase;">Job Opening:</span>
                     <div style="font-weight:700;color:#0f172a;font-size:.9rem;">{{ job.title }}</div>
+                    <div style="font-size:.78rem;color:#64748b;margin-top:2px;"><i class="fas fa-building me-1"></i>{{ job.company_name }}</div>
                 </div>
                 <span class="badge bg-primary rounded-pill px-2.5 py-1.5" style="font-size:.75rem;">
-                    {{ counts.all }} Total Candidates
+                    {{ counts.all }} Total Applicants
                 </span>
             </div>
 
-            <!-- Qualification Pool Scope -->
+            <!-- Scope Selection -->
             <div style="margin-bottom:1.25rem;">
-                <label style="display:block;font-size:.8rem;font-weight:700;color:#334155;margin-bottom:.4rem;text-transform:uppercase;letter-spacing:0.04em;">
-                    <i class="fas fa-filter" style="color:#1866a3;margin-right:4px;"></i> Select Candidate Pool
+                <label style="display:block;font-size:.8rem;font-weight:700;color:#334155;margin-bottom:.5rem;text-transform:uppercase;letter-spacing:0.04em;">
+                    <i class="fas fa-users-gear" style="color:#1866a3;margin-right:4px;"></i> Who to Send?
                 </label>
-                <div style="display:grid;grid-template-columns:1fr;gap:.5rem;background:#f8fafc;padding:.85rem;border-radius:10px;border:1px solid #e2e8f0;">
-                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.86rem;color:#1e293b;cursor:pointer;font-weight:600;">
-                        <input type="radio" name="jobExportQualScope" value="all" checked style="accent-color:#1866a3;">
-                        <span><strong>All Candidates</strong> (Qualified + Under-Qualified + Not Qualified) <span class="badge bg-secondary ms-1">{{ counts.all }}</span></span>
+                <div id="sendScopeOptions" style="display:grid;grid-template-columns:1fr;gap:.5rem;background:#f8fafc;padding:.85rem;border-radius:10px;border:1px solid #e2e8f0;">
+                    <label style="display:flex;align-items:center;gap:.65rem;font-size:.86rem;color:#15803d;cursor:pointer;font-weight:600;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
+                        <input type="radio" name="sendScope" value="qualified" checked style="accent-color:#16a34a;">
+                        <span><strong>Qualified Candidates Only</strong> &mdash; AI Match &ge; 70% <span class="badge bg-success ms-1">{{ counts.qualified }}</span></span>
                     </label>
-                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#15803d;cursor:pointer;">
-                        <input type="radio" name="jobExportQualScope" value="qualified" style="accent-color:#16a34a;">
-                        <span><strong>Qualified Only</strong> (Match Score &ge; 70%) <span class="badge bg-success ms-1">{{ counts.qualified }}</span></span>
+                    <label style="display:flex;align-items:center;gap:.65rem;font-size:.86rem;color:#1e293b;cursor:pointer;font-weight:600;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
+                        <input type="radio" name="sendScope" value="all" style="accent-color:#1866a3;">
+                        <span><strong>All Applicants</strong> (Qualified + Under-Qualified + Not Qualified) <span class="badge bg-secondary ms-1">{{ counts.all }}</span></span>
                     </label>
-                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#b45309;cursor:pointer;">
-                        <input type="radio" name="jobExportQualScope" value="under_qualified" style="accent-color:#f59e0b;">
+                    <label style="display:flex;align-items:center;gap:.65rem;font-size:.84rem;color:#b45309;cursor:pointer;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
+                        <input type="radio" name="sendScope" value="under_qualified" style="accent-color:#f59e0b;">
                         <span><strong>Under-Qualified Only</strong> (50% &le; Score &lt; 70%) <span class="badge bg-warning text-dark ms-1">{{ counts.under_qualified }}</span></span>
                     </label>
-                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#dc2626;cursor:pointer;">
-                        <input type="radio" name="jobExportQualScope" value="not_qualified" style="accent-color:#dc2626;">
-                        <span><strong>Not Qualified Only</strong> (Score &lt; 50%) <span class="badge bg-danger ms-1">{{ counts.not_qualified }}</span></span>
-                    </label>
-                    <label id="selectedOnlyRadioRow" style="display:none;align-items:center;gap:.6rem;font-size:.84rem;color:#2563eb;cursor:pointer;font-weight:600;">
-                        <input type="radio" name="jobExportQualScope" value="selected_only" style="accent-color:#2563eb;">
-                        <span><strong>Only Checked Candidates</strong> (<span id="modalSelectedCount">0</span> selected)</span>
+                    <label id="sendSingleScopeRow" style="display:none;align-items:center;gap:.65rem;font-size:.84rem;color:#2563eb;cursor:pointer;font-weight:600;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
+                        <input type="radio" name="sendScope" value="single" style="accent-color:#2563eb;">
+                        <span><strong>This Candidate:</strong> <span id="sendModalCandidateName">Selected Candidate</span></span>
                     </label>
                 </div>
             </div>
 
-            <!-- Google Drive Banner -->
-            <div style="background:#f0fdf4;border:1.5px dashed #86efac;border-radius:12px;padding:1rem 1.15rem;margin-bottom:1.25rem;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-                    <div style="display:flex;align-items:center;gap:.5rem;font-size:.86rem;font-weight:700;color:#15803d;">
-                        <i class="fab fa-google-drive" style="font-size:1.15rem;color:#059669;"></i> Google Drive &amp; Sheets Direct Integration
-                    </div>
-                    <span style="font-size:.72rem;background:#dcfce7;color:#166534;padding:2px 8px;border-radius:999px;font-weight:700;">Live Sync Ready</span>
-                </div>
-                <div style="font-size:.78rem;color:#334155;line-height:1.45;margin-bottom:.5rem;">
-                    Clicking <strong>Open via Google Drive</strong> downloads your pre-styled <code>.xlsx</code> workbook and opens Google Drive / Sheets in a new tab for 1-click drag &amp; drop cloud editing.
-                </div>
-                <div style="display:flex;align-items:center;gap:.5rem;">
-                    <button type="button" onclick="copyJobGoogleSheetsFormula()" style="background:#fff;border:1px solid #86efac;color:#15803d;padding:.3rem .6rem;border-radius:6px;font-size:.74rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">
-                        <i class="fas fa-copy"></i> Copy Google Sheets =IMPORTDATA Formula
-                    </button>
-                    <span id="jobCopyConfirmNote" style="font-size:.74rem;color:#16a34a;font-weight:600;display:none;">Copied!</span>
-                </div>
+            <!-- Notes to Employer -->
+            <div style="margin-bottom:1rem;">
+                <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">
+                    Admin Notes for Employer <span style="color:#94a3b8;font-weight:400;">(optional)</span>
+                </label>
+                <textarea id="sendToEmployerNotes" name="admin_notes" rows="3" class="form-control form-control-sm" placeholder="Add optional notes for {{ job.company_name }} review..." style="border-radius:8px;font-size:0.85rem;"></textarea>
+                <small class="text-muted" style="font-size:.74rem;">These notes will appear on the Employer's candidate review dashboard.</small>
+            </div>
+
+            <!-- Info Note -->
+            <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:.65rem .9rem;display:flex;align-items:flex-start;gap:.5rem;font-size:.8rem;color:#92400e;">
+                <i class="fas fa-circle-info" style="margin-top:1px;flex-shrink:0;"></i>
+                <span>Interview scheduling and hiring decisions are handled exclusively by <strong>{{ job.company_name }}</strong> from their Employer Portal.</span>
             </div>
         </div>
 
         <!-- Footer -->
         <div style="background:#f8fafc;padding:1rem 1.75rem;border-top:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;">
-            <button type="button" onclick="closeJobExportModal()" style="padding:.6rem 1rem;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font-size:.85rem;font-weight:600;color:#64748b;cursor:pointer;">
+            <button type="button" onclick="closeSendToEmployerModal()" style="padding:.6rem 1rem;border:1px solid #cbd5e1;background:#fff;border-radius:8px;font-size:.85rem;font-weight:600;color:#64748b;cursor:pointer;">
                 Cancel
             </button>
-            <div style="display:flex;gap:.6rem;">
-                <button type="button" onclick="executeJobGoogleDriveExport()" style="padding:.65rem 1.15rem;background:linear-gradient(135deg,#0284c7 0%,#0369a1 100%);color:#fff;border:none;border-radius:9px;font-size:.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.45rem;box-shadow:0 3px 10px rgba(2,132,199,0.3);">
-                    <i class="fab fa-google-drive"></i> Open via Google Drive
-                </button>
-                <button type="button" onclick="executeJobDirectExcelExport()" style="padding:.65rem 1.25rem;background:linear-gradient(135deg,#16a34a 0%,#15803d 100%);color:#fff;border:none;border-radius:9px;font-size:.85rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.45rem;box-shadow:0 3px 10px rgba(22,163,74,0.3);">
-                    <i class="fas fa-file-excel"></i> Download Excel (.xlsx)
-                </button>
-            </div>
+            <button type="submit" id="submitSendToEmployerBtn" style="padding:.65rem 1.35rem;background:linear-gradient(135deg,#1866a3 0%,#0a3d6b 100%);color:#fff;border:none;border-radius:9px;font-size:.88rem;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.5rem;box-shadow:0 3px 10px rgba(24,102,163,0.3);">
+                <i class="fas fa-paper-plane"></i> Send to Employer
+            </button>
         </div>
+        </form>
     </div>
 </div>
 
@@ -589,127 +614,81 @@
 </form>
 
 <script>
-function toggleSelectAllCandidates(masterCb) {
-    const checkboxes = document.querySelectorAll('.candidate-checkbox');
-    checkboxes.forEach(cb => {
-        cb.checked = masterCb.checked;
-    });
-    updateSelectedCount();
+let currentTargetAppId = null;
+
+// Send to Employer Modal
+function openSendToEmployerModal(scopeType = 'qualified', singleAppId = null, singleCandName = '') {
+    currentTargetAppId = singleAppId || null;
+    const singleRow = document.getElementById('sendSingleScopeRow');
+    const candNameSpan = document.getElementById('sendModalCandidateName');
+
+    if (singleAppId) {
+        if (singleRow) singleRow.style.display = 'flex';
+        if (candNameSpan) candNameSpan.textContent = singleCandName || 'Selected Candidate';
+        const singleRadio = document.querySelector('input[name="sendScope"][value="single"]');
+        if (singleRadio) singleRadio.checked = true;
+    } else {
+        if (singleRow) singleRow.style.display = 'none';
+        const qualRadio = document.querySelector('input[name="sendScope"][value="qualified"]');
+        if (qualRadio) qualRadio.checked = true;
+    }
+
+    const modal = document.getElementById('sendToEmployerModal');
+    if (modal) modal.style.display = 'flex';
 }
 
-function updateSelectedCount() {
-    const checked = document.querySelectorAll('.candidate-checkbox:checked');
-    const display = document.getElementById('selectedCountDisplay');
-    const modalSelectedDisplay = document.getElementById('modalSelectedCount');
-    const selectedRadioRow = document.getElementById('selectedOnlyRadioRow');
-    
-    if (display) display.textContent = checked.length;
-    if (modalSelectedDisplay) modalSelectedDisplay.textContent = checked.length;
-    if (selectedRadioRow) {
-        if (checked.length > 0) {
-            selectedRadioRow.style.display = 'flex';
+function closeSendToEmployerModal() {
+    currentTargetAppId = null;
+    const modal = document.getElementById('sendToEmployerModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function submitSendToEmployer(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitSendToEmployerBtn');
+    const origHtml = btn.innerHTML;
+    const scope = document.querySelector('input[name="sendScope"]:checked')?.value || 'qualified';
+    const adminNotes = document.getElementById('sendToEmployerNotes').value;
+
+    let appIds = [];
+    if (scope === 'single' && currentTargetAppId) {
+        appIds = [currentTargetAppId];
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Sending to Employer...';
+
+    const formData = new FormData();
+    formData.append('job_id', '{{ job.id }}');
+    formData.append('scope', scope === 'selected' ? 'selected' : scope);
+    formData.append('admin_notes', adminNotes);
+    if (appIds.length > 0) {
+        formData.append('application_ids', JSON.stringify(appIds));
+    }
+
+    fetch('/admin/batch_forward_candidates/', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            closeSendToEmployerModal();
+            alert('\u2705 ' + data.message + '\n\nThe employer will now see these candidates in their portal.');
+            window.location.reload();
         } else {
-            selectedRadioRow.style.display = 'none';
+            alert('\u26a0\ufe0f ' + (data.message || 'Failed to send candidates to employer.'));
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
         }
-    }
-}
-
-function openJobExportModal(presetScope = null, triggerDrive = false) {
-    updateSelectedCount();
-    const modal = document.getElementById('jobExportModal');
-    if (presetScope === 'selected') {
-        const checked = document.querySelectorAll('.candidate-checkbox:checked');
-        if (checked.length > 0) {
-            const selectedRadio = document.querySelector('input[name="jobExportQualScope"][value="selected_only"]');
-            if (selectedRadio) selectedRadio.checked = true;
-        }
-    }
-    if (modal) {
-        modal.style.display = 'flex';
-    }
-    if (triggerDrive && presetScope === 'selected') {
-        // Ready for user to click or immediately trigger
-    }
-}
-
-function closeJobExportModal() {
-    const modal = document.getElementById('jobExportModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
-}
-
-function getJobExportUrl() {
-    const qualScope = document.querySelector('input[name="jobExportQualScope"]:checked')?.value || 'all';
-    let url = "{% url 'admin_export_candidates_excel' job.id %}";
-    const params = new URLSearchParams();
-
-    if (qualScope === 'selected_only') {
-        const checked = document.querySelectorAll('.candidate-checkbox:checked');
-        checked.forEach(cb => params.append('selected_candidates', cb.value));
-    } else if (qualScope !== 'all') {
-        params.append('qual', qualScope);
-    }
-    
-    const queryString = params.toString();
-    return queryString ? (url + '?' + queryString) : url;
-}
-
-function executeJobDirectExcelExport() {
-    const exportUrl = getJobExportUrl();
-    window.location.href = exportUrl;
-    setTimeout(() => {
-        closeJobExportModal();
-    }, 800);
-}
-
-function executeJobGoogleDriveExport(btnElement) {
-    const btn = btnElement || document.querySelector('button[onclick*="executeJobGoogleDriveExport"]');
-    const origHtml = btn ? btn.innerHTML : '';
-    if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Exporting to Drive...';
-    }
-
-    const qualScope = document.querySelector('input[name="jobExportQualScope"]:checked')?.value || 'all';
-    const params = new URLSearchParams();
-    params.append('job_id', '{{ job.id }}');
-
-    if (qualScope === 'selected_only') {
-        const checked = document.querySelectorAll('.candidate-checkbox:checked');
-        checked.forEach(cb => params.append('selected_candidates', cb.value));
-    } else if (qualScope !== 'all') {
-        params.append('qual', qualScope);
-    }
-
-    fetch('/admin/upload_candidates_google_drive/?' + params.toString())
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                alert('✅ Successfully exported directly to Google Drive!\n\nFile: ' + data.file_name);
-                window.open(data.folder_url, '_blank');
-                closeJobExportModal();
-            } else if (data.error === 'no_credentials') {
-                window.open(data.folder_url || 'https://drive.google.com/drive/folders/1pDIHRWfljyosJ0mJtVSL9zvSsYl2CjZv?usp=sharing', '_blank');
-                alert('ℹ️ Google Drive opened!\n\nTo enable 100% automated direct server upload without downloading, place your service_account.json in the project root or configure GOOGLE_DRIVE_WEBHOOK_URL.');
-                closeJobExportModal();
-            } else {
-                alert('⚠️ Google Drive notice: ' + (data.message || data.error));
-                window.open('https://drive.google.com/drive/folders/1pDIHRWfljyosJ0mJtVSL9zvSsYl2CjZv?usp=sharing', '_blank');
-                closeJobExportModal();
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            window.open('https://drive.google.com/drive/folders/1pDIHRWfljyosJ0mJtVSL9zvSsYl2CjZv?usp=sharing', '_blank');
-            closeJobExportModal();
-        })
-        .finally(() => {
-            if (btn) {
-                btn.disabled = false;
-                btn.innerHTML = origHtml;
-            }
-        });
+    })
+    .catch(err => {
+        console.error(err);
+        alert('\u26a0\ufe0f An error occurred while sending candidates to employer.');
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+    });
 }
 
 function copyJobGoogleSheetsFormula() {
@@ -748,10 +727,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Close on Escape or outside click
 window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeJobExportModal();
+    if (e.key === 'Escape') {
+        closeSendToEmployerModal();
+    }
 });
-document.getElementById('jobExportModal')?.addEventListener('click', (e) => {
-    if (e.target.id === 'jobExportModal') closeJobExportModal();
+document.getElementById('sendToEmployerModal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'sendToEmployerModal') closeSendToEmployerModal();
 });
 </script>
 {% endblock %}

@@ -6,16 +6,18 @@
 {% block content %}
 <div class="container py-4">
     <div class="employer-hero-banner mb-4">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
-            <div>
-                <h3 class="fw-extrabold text-white mb-1">
+        <div class="d-flex align-items-center flex-wrap gap-3 position-relative" style="z-index: 1; width:100%;">
+            <div class="flex-grow-1">
+                <h3 class="fw-extrabold text-white mb-0" style="color: #ffffff !important;">
                     <i class="fa-solid fa-users text-warning me-2"></i>User Account Management
                 </h3>
-                <p class="text-white-50 small mb-0">Create new accounts, edit credentials, adjust roles, and manage account statuses.</p>
             </div>
-            <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createUserModal">
-                <i class="fa-solid fa-user-plus me-1"></i> Create User Account
-            </button>
+            <div class="ms-auto d-flex align-items-center gap-2 flex-shrink-0">
+                <button class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2"
+                    data-bs-toggle="modal" data-bs-target="#createUserModal">
+                    <i class="fa-solid fa-user-plus"></i> Create User Account
+                </button>
+            </div>
         </div>
     </div>
 
@@ -24,30 +26,35 @@
         <form method="GET" action="{% url 'admin_users' %}">
             <div class="row g-2 align-items-center">
                 <div class="col-md-5">
-                    <input type="text" name="q" value="{{ query }}" class="form-control bg-light" placeholder="Search by name, email, or keyword...">
+                    <input type="text" name="q" value="{{ query }}" class="form-control bg-light"
+                        placeholder="Search by name, email, or keyword...">
                 </div>
                 <div class="col-md-3">
                     <select name="role" class="form-select bg-light" onchange="this.form.submit()">
                         <option value="">All Account Roles</option>
-                        <option value="applicant" {% if role_filter == 'applicant' %}selected{% endif %}>Candidate / Applicant</option>
-                        <option value="employer" {% if role_filter == 'employer' %}selected{% endif %}>Employer</option>
-                        <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Administrator</option>
+                        <option value="applicant" {% if role_filter=='applicant' %}selected{% endif %}>Candidate /
+                            Applicant</option>
+                        <option value="employer" {% if role_filter=='employer' %}selected{% endif %}>Employer</option>
+                        <option value="admin" {% if role_filter=='admin' %}selected{% endif %}>Administrator</option>
                     </select>
                 </div>
                 <div class="col-md-2">
                     <select name="status" class="form-select bg-light" onchange="this.form.submit()">
                         <option value="">All Statuses</option>
-                        <option value="active" {% if status_filter == 'active' %}selected{% endif %}>Active</option>
-                        <option value="inactive" {% if status_filter == 'inactive' %}selected{% endif %}>Inactive</option>
-                        <option value="suspended" {% if status_filter == 'suspended' %}selected{% endif %}>Suspended</option>
+                        <option value="active" {% if status_filter=='active' %}selected{% endif %}>Active</option>
+                        <option value="inactive" {% if status_filter=='inactive' %}selected{% endif %}>Inactive</option>
+                        <option value="suspended" {% if status_filter=='suspended' %}selected{% endif %}>Suspended
+                        </option>
                     </select>
                 </div>
                 <div class="col-md-2 d-flex gap-1">
                     <button type="submit" class="btn btn-primary-custom flex-grow-1">Filter Users</button>
                     {% if query or role_filter or status_filter %}
-                        <a href="{% url 'admin_users' %}" class="btn btn-outline-secondary d-flex align-items-center justify-content-center" title="Reset Filters">
-                            <i class="fa-solid fa-xmark"></i>
-                        </a>
+                    <a href="{% url 'admin_users' %}"
+                        class="btn btn-outline-secondary d-flex align-items-center justify-content-center"
+                        title="Reset Filters">
+                        <i class="fa-solid fa-xmark"></i>
+                    </a>
                     {% endif %}
                 </div>
             </div>
@@ -70,52 +77,61 @@
                 </thead>
                 <tbody>
                     {% for u in users %}
-                        <tr>
-                            <td>
-                                <div class="fw-bold text-dark">{{ u.full_name }}</div>
-                                <div class="text-muted small">{{ u.email }}</div>
-                            </td>
-                            <td>
-                                <span class="badge {% if u.role == 'admin' %}bg-danger{% else %}bg-success{% endif %} text-capitalize">
-                                    {{ u.role }}
-                                </span>
-                            </td>
-                            <td class="small text-secondary">{{ u.phone|default:"-" }}</td>
-                            <td>
-                                <span class="badge {% if u.status == 'active' %}bg-success{% elif u.status == 'inactive' %}bg-warning text-dark{% else %}bg-danger{% endif %} text-capitalize">
-                                    {{ u.status }}
-                                </span>
-                            </td>
-                            <td class="text-muted small">{{ u.created_at|date:"M d, Y" }}</td>
-                            <td>
-                                <div class="d-flex gap-2">
-                                    <!-- Change Status Dropdown -->
-                                    <form method="POST" action="{% url 'admin_users' %}" class="d-inline">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="action" value="toggle_status">
-                                        <input type="hidden" name="user_id" value="{{ u.user_id }}">
-                                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
-                                            <option value="active" {% if u.status == 'active' %}selected{% endif %}>Active</option>
-                                            <option value="inactive" {% if u.status == 'inactive' %}selected{% endif %}>Inactive</option>
-                                            <option value="suspended" {% if u.status == 'suspended' %}selected{% endif %}>Suspend</option>
-                                        </select>
-                                    </form>
+                    <tr>
+                        <td>
+                            <div class="fw-bold text-dark">{{ u.full_name }}</div>
+                            <div class="text-muted small">{{ u.email }}</div>
+                        </td>
+                        <td>
+                            <span
+                                class="badge {% if u.role == 'admin' %}bg-danger{% else %}bg-success{% endif %} text-capitalize">
+                                {{ u.role }}
+                            </span>
+                        </td>
+                        <td class="small text-secondary">{{ u.phone|default:"-" }}</td>
+                        <td>
+                            <span
+                                class="badge {% if u.status == 'active' %}bg-success{% elif u.status == 'inactive' %}bg-warning text-dark{% else %}bg-danger{% endif %} text-capitalize">
+                                {{ u.status }}
+                            </span>
+                        </td>
+                        <td class="text-muted small">{{ u.created_at|date:"M d, Y" }}</td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                <!-- Change Status Dropdown -->
+                                <form method="POST" action="{% url 'admin_users' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="toggle_status">
+                                    <input type="hidden" name="user_id" value="{{ u.user_id }}">
+                                    <select name="status" class="form-select form-select-sm"
+                                        onchange="this.form.submit()">
+                                        <option value="active" {% if u.status=='active' %}selected{% endif %}>Active
+                                        </option>
+                                        <option value="inactive" {% if u.status=='inactive' %}selected{% endif %}>
+                                            Inactive</option>
+                                        <option value="suspended" {% if u.status=='suspended' %}selected{% endif %}>
+                                            Suspend</option>
+                                    </select>
+                                </form>
 
-                                    {% if u.user_id != admin_user.user_id %}
-                                        <form method="POST" action="{% url 'admin_users' %}" class="d-inline" onsubmit="return confirm('Permanently delete account for {{ u.email }}?');">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="action" value="delete_user">
-                                            <input type="hidden" name="user_id" value="{{ u.user_id }}">
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Account">
-                                                <i class="fa-solid fa-trash-can"></i>
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                </div>
-                            </td>
-                        </tr>
+                                {% if u.user_id != admin_user.user_id %}
+                                <form method="POST" action="{% url 'admin_users' %}" class="d-inline"
+                                    onsubmit="return confirm('Permanently delete account for {{ u.email }}?');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="delete_user">
+                                    <input type="hidden" name="user_id" value="{{ u.user_id }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Account">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
                     {% empty %}
-                        <tr><td colspan="6" class="text-center py-4 text-muted small">No users found.</td></tr>
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted small">No users found.</td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>

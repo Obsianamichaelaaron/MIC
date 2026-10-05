@@ -178,8 +178,30 @@
     {% endif %}
 
     <div class="job-form-card">
+        {% if initial_inquiry %}
+            <div style="background:#eff6ff;border:1.5px solid #93c5fd;color:#1e40af;padding:1rem 1.25rem;border-radius:12px;margin-bottom:1.75rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+                <div style="display:flex;align-items:center;gap:.75rem;">
+                    <div style="width:38px;height:38px;border-radius:10px;background:#dbeafe;color:#2563eb;display:grid;place-items:center;font-size:1.15rem;">
+                        <i class="fas fa-file-import"></i>
+                    </div>
+                    <div>
+                        <strong style="font-size:.95rem;">Reviewing Client Inquiry #{{ initial_inquiry.id }}: {{ initial_inquiry.subject }}</strong>
+                        <div style="font-size:.8rem;color:#3b82f6;margin-top:2px;">
+                            From: <strong>{{ initial_inquiry.name }}</strong> ({{ initial_inquiry.email }}) &bull; Received {{ initial_inquiry.created_at|date:"M d, Y" }}
+                        </div>
+                    </div>
+                </div>
+                <span style="font-size:.78rem;background:#dbeafe;color:#1d4ed8;padding:.35rem .75rem;border-radius:20px;font-weight:700;">
+                    <i class="fas fa-wand-magic-sparkles me-1"></i> Pre-filled from Request
+                </span>
+            </div>
+        {% endif %}
+
         <form method="POST" action="">
             {% csrf_token %}
+            {% if initial_inquiry %}
+                <input type="hidden" name="inquiry_id" value="{{ initial_inquiry.id }}">
+            {% endif %}
 
             <h3 class="form-section-heading">
                 <i class="fas fa-building"></i> 1. Hiring Client Company &amp; Job Identity
@@ -190,7 +212,7 @@
                     <label class="form-field-label">
                         Client / Partner Company Name <span class="req">*</span>
                     </label>
-                    <input type="text" name="company_name" list="company_list" class="form-control-custom" placeholder="e.g. Acme Logistics, Ayala Corp, San Miguel" required>
+                    <input type="text" name="company_name" list="company_list" class="form-control-custom" value="{{ initial_company_name|default:'' }}" placeholder="e.g. Acme Logistics, Ayala Corp, San Miguel" required>
                     <datalist id="company_list">
                         {% for comp in existing_companies %}
                             <option value="{{ comp }}">
@@ -203,7 +225,7 @@
                     <label class="form-field-label">
                         Job Title <span class="req">*</span>
                     </label>
-                    <input type="text" name="title" class="form-control-custom" placeholder="e.g. Senior Software Engineer, Operations Supervisor" required>
+                    <input type="text" name="title" class="form-control-custom" value="{{ initial_title|default:'' }}" placeholder="e.g. Senior Software Engineer, Operations Supervisor" required>
                 </div>
 
                 <div>
@@ -211,10 +233,10 @@
                         Employment Type <span class="req">*</span>
                     </label>
                     <select name="employment_type" class="form-control-custom">
-                        <option value="full-time">Full-Time</option>
-                        <option value="part-time">Part-Time</option>
-                        <option value="contract">Contract / Project-based</option>
-                        <option value="internship">Internship / Trainee</option>
+                        <option value="full-time" {% if initial_employment_type == 'full-time' or not initial_employment_type %}selected{% endif %}>Full-Time</option>
+                        <option value="part-time" {% if initial_employment_type == 'part-time' %}selected{% endif %}>Part-Time</option>
+                        <option value="contract" {% if initial_employment_type == 'contract' %}selected{% endif %}>Contract / Project-based</option>
+                        <option value="internship" {% if initial_employment_type == 'internship' %}selected{% endif %}>Internship / Trainee</option>
                     </select>
                 </div>
 
@@ -222,14 +244,14 @@
                     <label class="form-field-label">
                         Job Location / Site <span class="req">*</span>
                     </label>
-                    <input type="text" name="location" class="form-control-custom" placeholder="e.g. Makati City, Taguig / BGC, Remote, Hybrid" required>
+                    <input type="text" name="location" class="form-control-custom" value="{{ initial_location|default:'Metro Manila, Philippines' }}" placeholder="e.g. Makati City, Taguig / BGC, Remote, Hybrid" required>
                 </div>
 
                 <div>
                     <label class="form-field-label">
                         Salary Range / Budget
                     </label>
-                    <input type="text" name="salary_range" class="form-control-custom" placeholder="e.g. ₱45,000 - ₱65,000 / month, Competitive">
+                    <input type="text" name="salary_range" class="form-control-custom" value="{{ initial_salary_range|default:'' }}" placeholder="e.g. ₱45,000 - ₱65,000 / month, Competitive">
                 </div>
 
                 <div>
@@ -252,22 +274,8 @@
                 <label class="form-field-label">
                     Required Skills (Comma-separated) <span class="req">*</span>
                 </label>
-                <textarea name="skills_required" rows="2" class="form-control-custom" placeholder="e.g. Python, Django, SQL, PostgreSQL, Docker, Git, Problem Solving" required></textarea>
+                <textarea name="skills_required" rows="2" class="form-control-custom" placeholder="e.g. Python, Django, SQL, PostgreSQL, Docker, Git, Problem Solving" required>{{ initial_skills|default:'' }}</textarea>
                 <small style="color:#64748b;font-size:0.76rem;margin-top:0.25rem;display:block;">Our AI Matching Algorithm evaluates and ranks candidate resumes against these exact keywords.</small>
-            </div>
-
-            <div style="margin-bottom:1.5rem;">
-                <label class="form-field-label">
-                    Target Qualifications / Degree Programs
-                </label>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.6rem;max-height:160px;overflow-y:auto;padding:.9rem;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:10px;">
-                    {% for q in qualifications %}
-                        <label style="display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:#334155;cursor:pointer;">
-                            <input type="checkbox" name="qualifications" value="{{ q.qualification_id }}" style="accent-color:#0284c7;">
-                            <span>{{ q.name }}</span>
-                        </label>
-                    {% endfor %}
-                </div>
             </div>
 
             <h3 class="form-section-heading">
@@ -279,13 +287,13 @@
                     <label class="form-field-label">
                         Job Description <span class="req">*</span>
                     </label>
-                    <textarea name="description" rows="6" class="form-control-custom" placeholder="Provide overview of the role, team, and day-to-day work..." required></textarea>
+                    <textarea name="description" rows="6" class="form-control-custom" placeholder="Provide overview of the role, team, and day-to-day work..." required>{{ initial_description|default:'' }}</textarea>
                 </div>
                 <div>
                     <label class="form-field-label">
                         Requirements &amp; Responsibilities <span class="req">*</span>
                     </label>
-                    <textarea name="requirements" rows="6" class="form-control-custom" placeholder="List qualifications, key responsibilities, experience needed..." required></textarea>
+                    <textarea name="requirements" rows="6" class="form-control-custom" placeholder="List qualifications, key responsibilities, experience needed..." required>{{ initial_requirements|default:'' }}</textarea>
                 </div>
             </div>
 
@@ -300,3 +308,4 @@
 </div>
 
 {% include 'includes/footer.html' %}
+

@@ -279,20 +279,6 @@
                 <small style="color:#64748b;font-size:0.76rem;margin-top:0.25rem;display:block;">Our AI Matching Algorithm evaluates and ranks candidate resumes against these exact keywords.</small>
             </div>
 
-            <div style="margin-bottom:1.5rem;">
-                <label class="form-field-label">
-                    Target Qualifications / Degree Programs
-                </label>
-                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.6rem;max-height:160px;overflow-y:auto;padding:.9rem;background:#f8fafc;border:1.5px solid #cbd5e1;border-radius:10px;">
-                    {% for q in qualifications %}
-                        <label style="display:flex;align-items:center;gap:.5rem;font-size:.84rem;color:#334155;cursor:pointer;">
-                            <input type="checkbox" name="qualifications" value="{{ q.qualification_id }}" {% if q.qualification_id in selected_qual_ids %}checked{% endif %} style="accent-color:#0284c7;">
-                            <span>{{ q.name }}</span>
-                        </label>
-                    {% endfor %}
-                </div>
-            </div>
-
             <h3 class="form-section-heading">
                 <i class="fas fa-file-lines"></i> 3. Detailed Description &amp; Requirements
             </h3>
@@ -323,3 +309,4 @@
 </div>
 
 {% include 'includes/footer.html' %}
+

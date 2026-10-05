@@ -17,7 +17,7 @@
                     </ol>
                 </nav>
                 <div class="d-flex align-items-center gap-2 mt-1">
-                    <h3 class="fw-extrabold text-white mb-0">
+                    <h3 class="fw-extrabold text-white mb-0" style="color: #ffffff !important;">
                         <i class="fa-solid fa-plus text-warning me-2"></i>Create New Job Posting
                     </h3>
                 </div>
@@ -95,12 +95,6 @@
                             <label class="form-label fw-bold small text-dark">Required Certifications</label>
                             {{ form.required_certifications }}
                             {% if form.required_certifications.errors %}<div class="text-danger small">{{ form.required_certifications.errors }}</div>{% endif %}
-                        </div>
-
-                        <div class="col-md-12">
-                            <label class="form-label fw-bold small text-dark">Target Degree Majors / Qualifications</label>
-                            {{ form.target_qualifications }}
-                            {% if form.target_qualifications.errors %}<div class="text-danger small">{{ form.target_qualifications.errors }}</div>{% endif %}
                         </div>
                     </div>
 

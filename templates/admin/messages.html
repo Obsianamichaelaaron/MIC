@@ -1,7 +1,7 @@
 {% include 'includes/header.html' %}
 <style>
-.msg-container { max-width:1400px; margin:0 auto; padding:1.5rem 1rem 3rem; }
-.msg-page-header { background:url('/images/bg.jpg') center/cover no-repeat; padding:1.75rem 0; margin:0 -1rem 1.5rem; text-align:center; color:white; border-radius:0 0 16px 16px; }
+.msg-container { max-width:100%; margin:0 auto; padding:1.5rem 1rem 3rem; }
+.msg-page-header { background:linear-gradient(135deg, #09203f 0%, #1e40af 60%, #0284c7 100%); padding:1.85rem 1.5rem; margin:0 -1rem 1.5rem; text-align:center; color:#ffffff; border-radius:0 0 18px 18px; box-shadow:0 8px 24px rgba(10,61,107,0.18); }
 .msg-page-header h1 { margin:0; font-size:clamp(1.3rem,4vw,1.6rem); font-weight:800; letter-spacing:-0.5px; color:#fff !important; }
 .msg-page-header p  { margin:.35rem 0 0; opacity:1; font-size:.92rem; color:#fff !important; }
 .filter-tabs { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1.25rem; }
@@ -98,7 +98,7 @@
 
 <div class="msg-page-header">
     <h1><i class="fas fa-inbox"></i> Inquiries &amp; Talent Requests Inbox</h1>
-    <p>Categorized dashboard for company hiring requests, applicant inquiries, and general corporate communications</p>
+    
 </div>
 
 <div class="msg-container">
@@ -211,13 +211,6 @@
                 <textarea id="modalRequirements" rows="3" style="width:100%;padding:.6rem;border:1.5px solid #cbd5e1;border-radius:8px;font-size:.88rem;resize:vertical;box-sizing:border-box;"></textarea>
             </div>
 
-            <!-- Target Qualifications -->
-            <div>
-                <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.3rem;text-transform:uppercase;">Target Qualifications</label>
-                <div id="modalQualificationsContainer" style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;max-height:120px;overflow-y:auto;background:#f8fafc;padding:.6rem;border-radius:8px;border:1px solid #e2e8f0;">
-                    <!-- checkboxes loaded dynamically -->
-                </div>
-            </div>
 
             <!-- Status -->
             <div>
@@ -397,9 +390,9 @@ async function openInquiry(id) {
                 <div style="font-weight:700;color:#0a3d6b;font-size:.95rem;">
                     <i class="fas fa-building" style="color:#8b5cf6;margin-right:4px;"></i> Company Staffing &amp; Talent Requirement
                 </div>
-                <button class="btn btn-sm btn-primary" onclick="openJobReviewModal()">
-                    <i class="fas fa-rocket"></i> Review &amp; Post Job
-                </button>
+                <a href="/admin/post_job.php?inquiry_id=${inq.id}" class="btn btn-sm btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;">
+                    <i class="fas fa-plus-circle"></i> Review &amp; Post Job
+                </a>
             </div>
             <div class="job-spec-grid">
                 <div>
@@ -533,10 +526,10 @@ async function openInquiry(id) {
                 </p>
             </div>
             <div class="conv-header-actions">
-                ${sender_meta.type === 'company' ? `
-                    <button class="btn btn-sm btn-primary" onclick="openJobReviewModal()">
-                        <i class="fas fa-rocket"></i> Review &amp; Post Job
-                    </button>
+                ${sender_meta.type === 'company' || (specs && specs.is_staffing_request) ? `
+                    <a href="/admin/post_job.php?inquiry_id=${inq.id}" class="btn btn-sm btn-primary" style="text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;">
+                        <i class="fas fa-plus-circle"></i> Review &amp; Post Job
+                    </a>
                 ` : ''}
                 ${sender_meta.type === 'applicant' && sender_meta.applicant_id ? `
                     <a href="/admin/candidates.php?search=${encodeURIComponent(inq.email)}" target="_blank" class="btn btn-sm btn-outline">
@@ -611,14 +604,16 @@ function openJobReviewModal() {
         </option>
     `).join('');
 
-    // Populate qualifications checklist
+    // Populate qualifications checklist if present
     const qualContainer = document.getElementById('modalQualificationsContainer');
-    qualContainer.innerHTML = qualifications.map(q => `
-        <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:#334155;cursor:pointer;">
-            <input type="checkbox" name="qualifications" value="${q.qualification_id}">
-            ${escHtml(q.name)}
-        </label>
-    `).join('');
+    if (qualContainer) {
+        qualContainer.innerHTML = qualifications.map(q => `
+            <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:#334155;cursor:pointer;">
+                <input type="checkbox" name="qualifications" value="${q.qualification_id}">
+                ${escHtml(q.name)}
+            </label>
+        `).join('');
+    }
 
     document.getElementById('jobModalBackdrop').style.display = 'flex';
 }

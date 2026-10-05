@@ -119,25 +119,25 @@
 <div class="container py-4">
     <!-- Top Hero Header Banner (Dark Enterprise Palette) -->
     <div class="employer-hero-banner mb-4">
-        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 position-relative portal-hero-content">
-            <div>
+        <div class="d-flex align-items-center flex-wrap gap-3 position-relative portal-hero-content" style="z-index:1; width:100%;">
+            <div class="flex-grow-1">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-1 small text-white-50">
                         <li class="breadcrumb-item text-white-50">Administration</li>
                         <li class="breadcrumb-item active text-white" aria-current="page">Operations</li>
                     </ol>
                 </nav>
-                <div class="d-flex flex-column align-items-start gap-2 mt-1">
-                    <h3 class="fw-extrabold text-white mb-0">
+                <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                    <h3 class="fw-extrabold text-white mb-0" style="color: #ffffff !important;">
                         <i class="fa-solid fa-shield-halved text-danger me-2"></i>Operations Center
                     </h3>
-                    <span class="badge bg-danger bg-opacity-25 text-white border border-danger border-opacity-50 rounded-pill px-2.5 py-1 small fw-semibold">
+                    <span class="badge bg-danger bg-opacity-25 text-white border border-danger border-opacity-50 rounded-pill px-2 py-1 small fw-semibold">
                         <i class="fa-solid fa-server me-1"></i> Root Console
                     </span>
                 </div>
             </div>
-            <div class="portal-hero-actions justify-content-lg-end">
-                <a href="{% url 'admin_users' %}" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm">
+            <div class="ms-auto d-flex align-items-center gap-2 flex-shrink-0">
+                <a href="{% url 'admin_users' %}" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2">
                     <i class="fa-solid fa-users-gear"></i> Manage Users
                 </a>
             </div>

@@ -725,3 +725,133 @@ MultiBiz Team"""
     except Exception as e:
         print(f"[Interview Mailer] Error: {e}")
         return {'success': False, 'error': str(e)}
+
+
+def send_job_request_rejected_notification(to_email: str, company_name: str, contact_name: str, job_title: str, rejection_reason: str = '') -> dict:
+    """
+    Sends notification to employer when admin reviews and rejects their job request with reason.
+    """
+    site_name = 'MULTIBIZ INTERNATIONAL CORPORATION'
+    year = datetime.date.today().year
+    safe_company = html.escape(company_name or 'Company')
+    safe_contact = html.escape(contact_name or 'Hiring Partner')
+    safe_title = html.escape(job_title or 'Job Position')
+    safe_reason = html.escape(rejection_reason or 'Specification adjustment required.').replace('\n', '<br>')
+
+    subject = f"Job Request Status Update: {job_title} - MultiBiz Global"
+    html_content = f"""<!DOCTYPE html>
+<html lang='en'>
+<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head>
+<body style='margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;'>
+  <div style='max-width:600px;margin:30px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);'>
+    <div style='padding:26px 32px;text-align:center;background:linear-gradient(135deg,#0a1628,#991b1b);'>
+      <h1 style='margin:0;color:#ffffff;font-size:22px;'>Job Request Update</h1>
+      <p style='margin:6px 0 0;color:rgba(255,255,255,.8);font-size:13px;'>MultiBiz Recruitment Operations</p>
+    </div>
+    <div style='padding:32px;color:#333;line-height:1.7;'>
+      <p style='font-size:16px;'>Hello <strong>{safe_contact}</strong> ({safe_company}),</p>
+      <p>Thank you for submitting your job request for <strong>{safe_title}</strong>.</p>
+
+      <div style='background:#fef2f2;border-left:4px solid #ef4444;padding:16px 20px;border-radius:6px;margin:20px 0;'>
+        <p style='margin:0;font-weight:700;color:#b91c1c;font-size:15px;'>Request Status: Rejected / Needs Revision</p>
+        <p style='margin:8px 0 0;color:#374151;font-size:13.5px;line-height:1.6;'>
+          <strong>Reason / Feedback from Admin:</strong><br>
+          {safe_reason}
+        </p>
+      </div>
+
+      <p style="font-size:13.5px;color:#4b5563;">You can review, revise, and resubmit this job request from your Employer Portal anytime.</p>
+
+      <p style='margin-top:24px;margin-bottom:0;'>Best regards,<br><strong>The MultiBiz Recruitment Team</strong></p>
+    </div>
+    <div style='padding:16px 30px;text-align:center;background:#f8f9fc;border-top:1px solid #e8eaf0;color:#999;font-size:12px;'>&copy; {year} {site_name}. All rights reserved.</div>
+  </div>
+</body>
+</html>"""
+
+    plain_text = f"Hello {contact_name},\n\nYour job request for {job_title} was reviewed by Admin and requires revisions.\nReason: {rejection_reason}\n\nBest regards,\nMultiBiz Team"
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_text,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[to_email],
+            html_message=html_content,
+            fail_silently=True
+        )
+        return {'success': True, 'error': None}
+    except Exception as e:
+        print(f"[Job Rejection Mailer] Error: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str, applicant_name: str, job_title: str, match_score: float = 0.0, admin_notes: str = '') -> dict:
+    """
+    Sends notification to employer when admin forwards a candidate to them.
+    """
+    site_name = 'MULTIBIZ INTERNATIONAL CORPORATION'
+    year = datetime.date.today().year
+    safe_company = html.escape(company_name or 'Company')
+    safe_applicant = html.escape(applicant_name or 'Candidate')
+    safe_title = html.escape(job_title or 'Job Position')
+    safe_notes = html.escape(admin_notes or '').replace('\n', '<br>') if admin_notes else ''
+
+    subject = f"🌟 New Candidate Forwarded: {applicant_name} for {job_title}"
+
+    notes_html = ''
+    if safe_notes:
+        notes_html = f"""
+        <div style="margin-top:16px;padding:12px 16px;background:#f0fdf4;border-left:3px solid #16a34a;border-radius:6px;font-size:13px;color:#15803d;">
+            <strong>Admin Notes:</strong><br>{safe_notes}
+        </div>
+        """
+
+    html_content = f"""<!DOCTYPE html>
+<html lang='en'>
+<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head>
+<body style='margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;'>
+  <div style='max-width:600px;margin:30px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);'>
+    <div style='padding:26px 32px;text-align:center;background:linear-gradient(135deg,#0a1628,#0284c7);'>
+      <h1 style='margin:0;color:#ffffff;font-size:22px;'>New Candidate Received</h1>
+      <p style='margin:6px 0 0;color:rgba(255,255,255,.85);font-size:13px;'>MultiBiz Recruitment Operations</p>
+    </div>
+    <div style='padding:32px;color:#333;line-height:1.7;'>
+      <p style='font-size:16px;'>Hello <strong>{safe_company} Team</strong>,</p>
+      <p>MultiBiz Admin has forwarded a candidate application for your review:</p>
+
+      <div style='background:#f8fafc;border:1px solid #e2e8f0;padding:18px 22px;border-radius:8px;margin:20px 0;'>
+        <p style='margin:0;font-weight:700;color:#0f172a;font-size:16px;'>👤 {safe_applicant}</p>
+        <p style='margin:4px 0 0;color:#0284c7;font-size:13.5px;font-weight:600;'>Position: {safe_title}</p>
+        <p style='margin:4px 0 0;color:#64748b;font-size:13px;'>AI Match Score: <strong>{match_score:.0f}%</strong></p>
+        {notes_html}
+      </div>
+
+      <p style="font-size:13.5px;color:#4b5563;">You can now review their complete resume dossier, mark them as Qualified/Not Qualified, or schedule an interview directly from your Employer Portal.</p>
+
+      <div style='text-align:center;margin:26px 0 10px;'>
+        <a href='http://127.0.0.1:8000/employer/candidates/' style='background:#0284c7;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;'>
+          Review Candidate in Portal
+        </a>
+      </div>
+
+      <p style='margin-top:24px;margin-bottom:0;'>Best regards,<br><strong>The MultiBiz Recruitment Team</strong></p>
+    </div>
+    <div style='padding:16px 30px;text-align:center;background:#f8f9fc;border-top:1px solid #e8eaf0;color:#999;font-size:12px;'>&copy; {year} {site_name}. All rights reserved.</div>
+  </div>
+</body>
+</html>"""
+
+    plain_text = f"Hello {company_name},\n\nMultiBiz Admin has forwarded candidate {applicant_name}'s application for your job opening: {job_title}.\n\nPlease review their application in your Employer Portal.\n\nBest regards,\nMultiBiz Team"
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_text,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[to_email],
+            html_message=html_content,
+            fail_silently=True
+        )
+        return {'success': True, 'error': None}
+    except Exception as e:
+        print(f"[Candidate Forwarded Mailer] Error: {e}")
+        return {'success': False, 'error': str(e)}

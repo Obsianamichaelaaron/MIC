@@ -23,7 +23,8 @@ from app.auth_utils import require_role, getCurrentUserId, hash_password
 from app.services.audit_trail import log_audit_trail
 from app.services.mailer import (
     send_contact_reply, send_application_status_update_email,
-    send_job_posted_live_notification
+    send_job_posted_live_notification, send_job_request_rejected_notification,
+    send_applicant_forwarded_to_employer_email, send_interview_scheduled_email
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_score
 from app.services.ml_job_matching import evaluate_match_model
@@ -395,16 +396,130 @@ def _get_or_create_employer_company(company_name: str, admin_user: User) -> Empl
     return emp
 
 
+def _parse_inquiry_job_specs(message_text: str, subject_text: str = '') -> dict:
+    """Extracts structured job specification fields from inquiry message."""
+    specs = {
+        'is_staffing_request': False,
+        'title': '',
+        'company_name': '',
+        'employer_id': None,
+        'headcount': 1,
+        'employment_type': 'full-time',
+        'location': 'Metro Manila, Philippines',
+        'salary_range': '',
+        'skills_required': '',
+        'urgency': 'Normal',
+        'description': '',
+        'requirements': '',
+        'special_notes': '',
+    }
+    if not message_text and not subject_text:
+        return specs
+
+    msg_str = str(message_text or '')
+    sub_str = str(subject_text or '')
+
+    if '[Staffing Request]' in sub_str or 'TALENT REQUEST' in msg_str or '<!-- JSON:' in msg_str or 'position needed:' in msg_str.lower() or 'job description' in msg_str.lower() or 'staffing request' in sub_str.lower():
+        specs['is_staffing_request'] = True
+
+    # Check for embedded JSON payload
+    if '<!-- JSON:' in msg_str:
+        try:
+            json_part = msg_str.split('<!-- JSON:')[1].split('-->')[0].strip()
+            parsed = json.loads(json_part)
+            specs.update(parsed)
+            specs['is_staffing_request'] = True
+            return specs
+        except Exception:
+            pass
+
+    # Text parsing fallback
+    lines = msg_str.splitlines()
+    current_section = None
+    desc_lines, req_lines, note_lines = [], [], []
+
+    for line in lines:
+        line_str = line.strip()
+        if not line_str:
+            continue
+        line_lower = line_str.lower()
+        if 'job description' in line_lower and '---' in line_str:
+            current_section = 'desc'
+            continue
+        elif ('requirements' in line_lower or 'credentials' in line_lower) and '---' in line_str:
+            current_section = 'req'
+            continue
+        elif ('special notes' in line_lower or 'notes' in line_lower) and '---' in line_str:
+            current_section = 'notes'
+            continue
+
+        if current_section == 'desc':
+            desc_lines.append(line)
+        elif current_section == 'req':
+            req_lines.append(line)
+        elif current_section == 'notes':
+            note_lines.append(line)
+        else:
+            if ':' in line_str:
+                k, v = line_str.split(':', 1)
+                k_lower = k.lower().strip()
+                v_clean = v.strip()
+                if 'position' in k_lower or 'job title' in k_lower or k_lower == 'title':
+                    specs['title'] = v_clean
+                elif 'company' in k_lower:
+                    specs['company_name'] = v_clean
+                elif 'headcount' in k_lower:
+                    specs['headcount'] = int(v_clean) if v_clean.isdigit() else 1
+                elif 'employment' in k_lower:
+                    specs['employment_type'] = v_clean.lower()
+                elif 'location' in k_lower:
+                    specs['location'] = v_clean
+                elif 'salary' in k_lower:
+                    specs['salary_range'] = v_clean
+                elif 'urgency' in k_lower:
+                    specs['urgency'] = v_clean
+                elif 'skill' in k_lower:
+                    specs['skills_required'] = v_clean
+
+    if desc_lines:
+        specs['description'] = '\n'.join(desc_lines).strip()
+    elif not specs['is_staffing_request']:
+        specs['description'] = msg_str
+    else:
+        clean_desc = re.sub(r'<!--\s*JSON:[\s\S]*?-->', '', msg_str).strip()
+        specs['description'] = clean_desc
+
+    if req_lines:
+        specs['requirements'] = '\n'.join(req_lines).strip()
+    if note_lines:
+        specs['special_notes'] = '\n'.join(note_lines).strip()
+
+    if not specs['title'] and sub_str:
+        sub_clean = sub_str.replace('[Staffing Request]', '').replace('[Company Request]', '').replace('General Inquiry', '').strip()
+        if '-' in sub_clean:
+            specs['title'] = sub_clean.split('-')[0].strip()
+        elif sub_clean:
+            specs['title'] = sub_clean
+
+    return specs
+
+
 @require_role('admin')
 def post_job_view(request):
     """
     Admin Post Job matching admin/post_job.php.
     Allows admin to post job vacancies on behalf of client companies.
+    Supports 1-click prefill when reviewing from inquiries (?inquiry_id=123).
     """
     admin_id = getCurrentUserId(request)
     admin_user = get_object_or_404(User, pk=admin_id)
 
     error = None
+    inquiry_id = request.GET.get('inquiry_id') or request.POST.get('inquiry_id')
+    initial_inquiry = None
+    if inquiry_id and str(inquiry_id).isdigit():
+        initial_inquiry = ContactInquiry.objects.filter(pk=int(inquiry_id)).first()
+
     if request.method == 'POST':
         company_name = request.POST.get('company_name', '').strip()
         title = request.POST.get('title', '').strip()
@@ -442,8 +557,42 @@ def post_job_view(request):
                     if q_obj:
                         JobQualificationMapping.objects.create(job=job, qualification=q_obj)
 
+            if initial_inquiry:
+                initial_inquiry.status = 'replied'
+                initial_inquiry.is_read = True
+                initial_inquiry.save()
+                try:
+                    ContactReply.objects.create(
+                        inquiry=initial_inquiry,
+                        admin=admin_user,
+                        reply_text=f"Job posting #{job.job_id} ('{job.title}') was created and published to portal from this request."
+                    )
+                except Exception:
+                    pass
+
             log_audit_trail(request, admin_id, 'create_job', f"Posted new job: {title} for {company_name or 'MultiBiz Partner'}", 'job', job.job_id, title)
             return redirect('/admin/jobs.php?posted=success')
+
+    # Initial prefill computation
+    initial_company_name = request.GET.get('company_name', '')
+    initial_title = request.GET.get('title', '')
+    initial_description = request.GET.get('description', '')
+    initial_requirements = request.GET.get('requirements', '')
+    initial_skills = request.GET.get('skills_required', '')
+    initial_location = request.GET.get('location', '')
+    initial_salary_range = request.GET.get('salary_range', '')
+    initial_employment_type = request.GET.get('employment_type', 'full-time')
+
+    if initial_inquiry:
+        specs = _parse_inquiry_job_specs(initial_inquiry.message, initial_inquiry.subject)
+        initial_company_name = specs.get('company_name') or initial_inquiry.name
+        initial_title = specs.get('title') or (initial_inquiry.subject.replace('[Staffing Request]', '').strip() if initial_inquiry.subject else '')
+        initial_description = specs.get('description') or initial_inquiry.message
+        initial_requirements = specs.get('requirements') or ''
+        initial_skills = specs.get('skills_required') or ''
+        initial_location = specs.get('location') or 'Metro Manila, Philippines'
+        initial_salary_range = specs.get('salary_range') or ''
+        initial_employment_type = specs.get('employment_type') or 'full-time'
 
     qualifications = Qualification.objects.filter(status='active').order_by('name')
     existing_companies = list(Employer.objects.values_list('company_name', flat=True).distinct())
@@ -454,6 +603,15 @@ def post_job_view(request):
         'qualifications': qualifications,
         'existing_companies': [c for c in existing_companies if c],
         'error': error,
+        'initial_inquiry': initial_inquiry,
+        'initial_company_name': initial_company_name,
+        'initial_title': initial_title,
+        'initial_description': initial_description,
+        'initial_requirements': initial_requirements,
+        'initial_skills': initial_skills,
+        'initial_location': initial_location,
+        'initial_salary_range': initial_salary_range,
+        'initial_employment_type': initial_employment_type,
     }
     return render(request, 'admin/post_job.html', context)
 
@@ -528,29 +686,126 @@ def edit_job_view(request, job_id=None):
 def jobs_view(request):
     """
     All Jobs Moderation & Management matching admin/jobs.php.
+    Allows admin to:
+    - View all job requests submitted by companies
+    - Review complete job information
+    - Approve or reject job requests (with rejection reason)
+    - Post/Publish approved job requests live to applicant-facing job listings
+    - Filter by Pending, Approved, Active/Posted, Rejected, Closed
     """
     admin_id = getCurrentUserId(request)
+    admin_user = get_object_or_404(User, pk=admin_id)
     search = request.GET.get('search', '').strip()
-    status_filter = request.GET.get('status', '')
+    status_filter = request.GET.get('status', '').strip()
 
     if request.method == 'POST':
         action = request.POST.get('action')
         job_id = request.POST.get('job_id')
-        job = get_object_or_404(JobPosting, pk=job_id)
+        job = get_object_or_404(JobPosting.objects.select_related('employer', 'employer__user'), pk=job_id)
+        employer = job.employer
+        emp_user = employer.user if employer else None
+        company_name = employer.company_name if employer else 'MultiBiz Partner'
 
-        if action == 'toggle_status':
+        if action == 'approve':
+            job.status = 'approved'
+            job.approved_at = timezone.now()
+            job.reviewed_by_admin = admin_user
+            job.admin_notes = request.POST.get('admin_notes', '').strip() or job.admin_notes
+            job.save()
+
+            if emp_user:
+                Notification.objects.create(
+                    user=emp_user,
+                    title=f"Job Request Approved: {job.title}",
+                    message=f"Your job vacancy request for '{job.title}' has been reviewed and approved by Admin. It is ready for publication.",
+                    type='job'
+                )
+            log_audit_trail(request, admin_id, 'approve_job_request', f"Approved job request #{job.job_id} ({job.title}) for {company_name}", 'job', job.job_id, job.title)
+            return redirect('/admin/jobs.php?approved=success')
+
+        elif action in ['post_live', 'publish']:
+            job.status = 'active'
+            if not job.approved_at:
+                job.approved_at = timezone.now()
+            job.posted_at = timezone.now()
+            job.reviewed_by_admin = admin_user
+            job.save()
+
+            if emp_user:
+                Notification.objects.create(
+                    user=emp_user,
+                    title=f"Job Published Live: {job.title}",
+                    message=f"Great news! Your job opening '{job.title}' is now live and accepting applicant submissions.",
+                    type='job'
+                )
+                try:
+                    send_job_posted_live_notification(
+                        employer_email=emp_user.email,
+                        employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                        job_title=job.title,
+                        company_name=company_name,
+                        job_id=job.job_id
+                    )
+                except Exception as e:
+                    print(f"[Admin Post Live Notification Error]: {e}")
+
+            log_audit_trail(request, admin_id, 'post_job_live', f"Published job #{job.job_id} ({job.title}) live for {company_name}", 'job', job.job_id, job.title)
+            return redirect('/admin/jobs.php?posted=success')
+
+        elif action == 'reject':
+            reason = request.POST.get('rejection_reason', '').strip() or "Job request details did not meet criteria."
+            job.status = 'rejected'
+            job.rejection_reason = reason
+            job.reviewed_by_admin = admin_user
+            job.save()
+
+            if emp_user:
+                Notification.objects.create(
+                    user=emp_user,
+                    title=f"Job Request Rejected: {job.title}",
+                    message=f"Your job vacancy request for '{job.title}' was rejected. Reason: {reason}",
+                    type='job'
+                )
+                try:
+                    send_job_request_rejected_notification(
+                        employer_email=emp_user.email,
+                        employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                        job_title=job.title,
+                        company_name=company_name,
+                        rejection_reason=reason
+                    )
+                except Exception as e:
+                    print(f"[Admin Reject Notification Error]: {e}")
+
+            log_audit_trail(request, admin_id, 'reject_job_request', f"Rejected job request #{job.job_id} ({job.title}) for {company_name}. Reason: {reason}", 'job', job.job_id, job.title)
+            return redirect('/admin/jobs.php?rejected=success')
+
+        elif action == 'toggle_status':
             job.status = 'closed' if job.status == 'active' else 'active'
             job.save()
             log_audit_trail(request, admin_id, 'toggle_job_status', f"Changed status of job {job.title} to {job.status}", 'job', job.job_id, job.title)
+            return redirect('/admin/jobs.php')
+
         elif action == 'delete_job':
             title = job.title
             job.delete()
             log_audit_trail(request, admin_id, 'delete_job', f"Deleted job {title}", 'job', int(job_id), title)
-        return redirect('/admin/jobs.php')
+            return redirect('/admin/jobs.php')
 
-    jobs_qs = JobPosting.objects.select_related('employer').annotate(
+    jobs_base_qs = JobPosting.objects.select_related('employer', 'employer__user').annotate(
         applicant_count=Count('applications')
-    ).order_by('-posted_at')
+    )
+
+    counts = {
+        'all': jobs_base_qs.count(),
+        'pending': jobs_base_qs.filter(status='pending').count(),
+        'approved': jobs_base_qs.filter(status='approved').count(),
+        'active': jobs_base_qs.filter(status='active').count(),
+        'rejected': jobs_base_qs.filter(status='rejected').count(),
+        'closed': jobs_base_qs.filter(status='closed').count(),
+    }
+
+    jobs_qs = jobs_base_qs.order_by('-posted_at')
 
     if search:
         jobs_qs = jobs_qs.filter(
@@ -564,105 +819,199 @@ def jobs_view(request):
         jobs_qs = jobs_qs.filter(status=status_filter)
 
     context = {
-        'page_title': 'All Jobs - MultiBiz',
+        'page_title': 'All Jobs & Requests - MultiBiz Admin',
         'current_page': 'jobs.php',
         'jobs': jobs_qs,
+        'counts': counts,
         'search': search,
         'status_filter': status_filter,
         'posted_success': request.GET.get('posted') == 'success',
+        'approved_success': request.GET.get('approved') == 'success',
+        'rejected_success': request.GET.get('rejected') == 'success',
         'updated_success': request.GET.get('updated') == 'success',
     }
     return render(request, 'admin/jobs.html', context)
 
 
+@csrf_exempt
+@require_role('admin')
+def job_request_action_api(request):
+    """
+    AJAX endpoint for admin job request moderation actions (approve, post_live, reject).
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'POST method required'})
+
+    admin_id = getCurrentUserId(request)
+    admin_user = get_object_or_404(User, pk=admin_id)
+    job_id = request.POST.get('job_id')
+    action = request.POST.get('action')
+    reason = request.POST.get('reason', '').strip()
+    admin_notes = request.POST.get('admin_notes', '').strip()
+
+    job = get_object_or_404(JobPosting.objects.select_related('employer', 'employer__user'), pk=job_id)
+    emp_user = job.employer.user if job.employer else None
+    company_name = job.employer.company_name if job.employer else 'MultiBiz Partner'
+
+    if action == 'approve':
+        job.status = 'approved'
+        job.approved_at = timezone.now()
+        job.reviewed_by_admin = admin_user
+        if admin_notes:
+            job.admin_notes = admin_notes
+        job.save()
+
+        if emp_user:
+            Notification.objects.create(
+                user=emp_user,
+                title=f"Job Request Approved: {job.title}",
+                message=f"Your job vacancy request for '{job.title}' has been approved by Admin.",
+                type='job'
+            )
+        log_audit_trail(request, admin_id, 'approve_job_request', f"Approved job request #{job.job_id} ({job.title})", 'job', job.job_id, job.title)
+        return JsonResponse({'success': True, 'message': f"Job '{job.title}' approved successfully.", 'status': 'approved'})
+
+    elif action in ['post_live', 'publish']:
+        job.status = 'active'
+        if not job.approved_at:
+            job.approved_at = timezone.now()
+        job.posted_at = timezone.now()
+        job.reviewed_by_admin = admin_user
+        job.save()
+
+        if emp_user:
+            Notification.objects.create(
+                user=emp_user,
+                title=f"Job Published Live: {job.title}",
+                message=f"Your job '{job.title}' is now live and accepting applications.",
+                type='job'
+            )
+            try:
+                send_job_posted_live_notification(
+                    employer_email=emp_user.email,
+                    employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                    job_title=job.title,
+                    company_name=company_name,
+                    job_id=job.job_id
+                )
+            except Exception as e:
+                print(f"[Admin Post Live Error]: {e}")
+
+        log_audit_trail(request, admin_id, 'post_job_live', f"Published job #{job.job_id} ({job.title}) live", 'job', job.job_id, job.title)
+        return JsonResponse({'success': True, 'message': f"Job '{job.title}' is now active and posted live!", 'status': 'active'})
+
+    elif action == 'reject':
+        if not reason:
+            return JsonResponse({'success': False, 'message': 'Please provide a rejection reason.'})
+        job.status = 'rejected'
+        job.rejection_reason = reason
+        job.reviewed_by_admin = admin_user
+        job.save()
+
+        if emp_user:
+            Notification.objects.create(
+                user=emp_user,
+                title=f"Job Request Rejected: {job.title}",
+                message=f"Your job request for '{job.title}' was rejected. Reason: {reason}",
+                type='job'
+            )
+            try:
+                send_job_request_rejected_notification(
+                    employer_email=emp_user.email,
+                    employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                    job_title=job.title,
+                    company_name=company_name,
+                    rejection_reason=reason
+                )
+            except Exception as e:
+                print(f"[Admin Reject Error]: {e}")
+
+        log_audit_trail(request, admin_id, 'reject_job_request', f"Rejected job #{job.job_id} ({job.title}). Reason: {reason}", 'job', job.job_id, job.title)
+        return JsonResponse({'success': True, 'message': f"Job request rejected. Employer has been notified.", 'status': 'rejected'})
+
+    return JsonResponse({'success': False, 'message': 'Unknown action'})
+
+
 @require_role('admin')
 def candidates_view(request):
     """
-    AI-Ranked Candidates Pipeline & Kanban Board matching admin/candidates.php.
-    Allows admin to review applicant resumes, match scores, and submissions across all jobs.
+    Job-centric Candidates Pipeline.
+    Each row = one job posting, showing total applicants + qualified/high-match counts.
     """
-    job_id = request.GET.get('job_id', '0')
     search = request.GET.get('search', '').strip()
-    status_filter = request.GET.get('status', '')
 
-    apps_qs = Application.objects.select_related(
-        'applicant', 'applicant__user', 'job', 'job__employer'
-    ).order_by('-applied_at')
-
-    if job_id and job_id.isdigit() and int(job_id) > 0:
-        apps_qs = apps_qs.filter(job_id=int(job_id))
+    jobs_qs = JobPosting.objects.select_related('employer').order_by('-posted_at')
 
     if search:
-        apps_qs = apps_qs.filter(
-            Q(applicant__user__first_name__icontains=search) |
-            Q(applicant__user__last_name__icontains=search) |
-            Q(applicant__user__email__icontains=search) |
-            Q(job__title__icontains=search) |
-            Q(job__employer__company_name__icontains=search)
+        jobs_qs = jobs_qs.filter(
+            Q(title__icontains=search) |
+            Q(employer__company_name__icontains=search) |
+            Q(location__icontains=search)
         )
 
-    if status_filter:
-        apps_qs = apps_qs.filter(status=status_filter)
+    job_summaries = []
+    total_applicants = 0
+    total_qualified = 0
+    total_high_match = 0
+    total_forwarded = 0
 
-    candidates = []
-    for app in apps_qs:
-        applicant = app.applicant
-        user_obj = applicant.user if applicant else None
-        if not user_obj:
-            continue
+    for job in jobs_qs:
+        apps = Application.objects.filter(job=job)
+        count_all = apps.count()
+        if count_all == 0:
+            continue  # skip jobs with no applicants
 
-        cand_dict = {
-            'application_id': app.application_id,
-            'status': app.status,
-            'match_score': float(app.match_score),
-            'applied_at': app.applied_at,
-            'applicant_id': applicant.applicant_id,
-            'employability_score': float(applicant.employability_score),
-            'experience_years': applicant.experience_years,
-            'education_level': applicant.education_level or 'Not specified',
-            'first_name': user_obj.first_name or '',
-            'last_name': user_obj.last_name or '',
-            'email': user_obj.email,
-            'phone': user_obj.phone or '',
-            'job_id': app.job.job_id if app.job else 0,
-            'job_title': app.job.title if app.job else '',
-            'company_name': (app.job.employer.company_name if (app.job and app.job.employer) else '') or 'MultiBiz Partner',
-            'resume_file': app.resume_file or applicant.resume_file or '',
-        }
+        count_qualified = apps.filter(match_score__gte=70).count()
+        count_high_match = apps.filter(match_score__gte=85).count()
+        count_forwarded = apps.filter(forwarded_to_employer=True).count()
+        count_pending = apps.filter(status='pending').count()
 
-        score_info = calculate_candidate_ml_score(cand_dict)
-        cand_dict['ml_ranking_score'] = score_info['ml_ranking_score']
-        cand_dict['ranking_category'] = score_info['ranking_category']
-        candidates.append(cand_dict)
+        total_applicants += count_all
+        total_qualified += count_qualified
+        total_high_match += count_high_match
+        total_forwarded += count_forwarded
 
-    candidates.sort(key=lambda x: x['ml_ranking_score'], reverse=True)
+        employment_type = ''
+        if hasattr(job, 'get_employment_type_display'):
+            try:
+                employment_type = job.get_employment_type_display()
+            except Exception:
+                employment_type = job.employment_type or ''
+        else:
+            employment_type = job.employment_type or ''
 
-    excellent_candidates = [c for c in candidates if c['ranking_category'] == 'excellent']
-    good_candidates = [c for c in candidates if c['ranking_category'] == 'good']
-    average_candidates = [c for c in candidates if c['ranking_category'] == 'average']
-    poor_candidates = [c for c in candidates if c['ranking_category'] == 'poor']
+        job_summaries.append({
+            'job': job,
+            'job_id': job.job_id,
+            'job_title': job.title,
+            'company_name': job.employer.company_name if job.employer else 'MultiBiz Partner',
+            'location': job.location or '',
+            'employment_type': employment_type,
+            'status': job.status,
+            'count_all': count_all,
+            'count_qualified': count_qualified,
+            'count_high_match': count_high_match,
+            'count_forwarded': count_forwarded,
+            'count_pending': count_pending,
+            'posted_at': job.posted_at,
+        })
 
-    jobs_for_filter = JobPosting.objects.select_related('employer').order_by('-posted_at')
+    # Sort: most qualified applicants first
+    job_summaries.sort(key=lambda x: x['count_qualified'], reverse=True)
 
     context = {
         'page_title': 'Candidate Pipeline - MultiBiz Admin',
         'current_page': 'candidates.php',
-        'candidates': candidates,
-        'excellent_candidates': excellent_candidates,
-        'good_candidates': good_candidates,
-        'average_candidates': average_candidates,
-        'poor_candidates': poor_candidates,
-        'jobs': jobs_for_filter,
-        'selected_job_id': int(job_id) if job_id.isdigit() else 0,
+        'job_summaries': job_summaries,
         'search': search,
-        'status_filter': status_filter,
-        'total_candidates': len(candidates),
-        'pending_count': sum(1 for c in candidates if c['status'] == 'pending'),
-        'accepted_count': sum(1 for c in candidates if c['status'] == 'accepted'),
-        'rejected_count': sum(1 for c in candidates if c['status'] == 'rejected'),
-        'interviewed_count': sum(1 for c in candidates if c['status'] == 'interviewed'),
+        'total_applicants': total_applicants,
+        'total_qualified': total_qualified,
+        'total_high_match': total_high_match,
+        'total_forwarded': total_forwarded,
+        'total_jobs': len(job_summaries),
     }
     return render(request, 'admin/candidates.html', context)
+
 
 
 @require_role('admin')
@@ -699,12 +1048,12 @@ def view_candidate_view(request, application_id=None):
             new_status = request.POST.get('status')
             remarks = request.POST.get('remarks', '').strip()
 
-            if new_status in ['pending', 'reviewed', 'shortlisted', 'interviewed', 'accepted', 'rejected']:
+            if new_status in ['pending', 'reviewed', 'shortlisted', 'rejected']:
                 application.status = new_status
                 application.reviewed_by_name = f"MultiBiz Admin ({admin_user.first_name})"
 
                 timestamp_str = timezone.now().strftime('%Y-%m-%d %H:%M')
-                new_entry = f"[{timestamp_str}] Status changed to {new_status.title()} by Admin."
+                new_entry = f"[{timestamp_str}] Admin screening status changed to {new_status.title()}."
                 if remarks:
                     new_entry += f" Remarks: {remarks}"
 
@@ -734,59 +1083,11 @@ def view_candidate_view(request, application_id=None):
                 except Exception as e:
                     print(f"[Admin Status Update Mailer] Error: {e}")
 
-                log_audit_trail(request, admin_id, 'update_application_status', f"Updated application status for {candidate_user.email} on {job.title} to {new_status}", 'application', application.application_id, candidate_user.email)
-                success_msg = f"Candidate application status updated to {new_status.title()}! Notification email sent to candidate."
+                log_audit_trail(request, admin_id, 'update_application_status', f"Updated application screening status for {candidate_user.email} on {job.title} to {new_status}", 'application', application.application_id, candidate_user.email)
+                success_msg = f"Candidate screening status updated to {new_status.title()}! Notification email sent to candidate."
 
         elif action == 'schedule_interview':
-            interview_date = request.POST.get('interview_date')
-            start_time = request.POST.get('start_time')
-            end_time = request.POST.get('end_time')
-            interview_type = request.POST.get('interview_type', 'video')
-            location = request.POST.get('location', '').strip()
-            meeting_link = request.POST.get('meeting_link', '').strip()
-            notes = request.POST.get('notes', '').strip()
-
-            if not interview_date or not start_time or not end_time:
-                error_msg = "Please provide interview date, start time, and end time."
-            else:
-                emp_obj = job.employer if job.employer else _get_or_create_employer_company(company_name, admin_user)
-                InterviewSchedule.objects.create(
-                    application=application,
-                    employer=emp_obj,
-                    interview_date=interview_date,
-                    start_time=start_time,
-                    end_time=end_time,
-                    interview_type=interview_type,
-                    location=location,
-                    meeting_link=meeting_link,
-                    notes=notes,
-                    status='scheduled'
-                )
-
-                application.status = 'interviewed'
-                application.save()
-
-                Notification.objects.create(
-                    user=candidate_user,
-                    title=f"Interview Scheduled: {job.title}",
-                    message=f"An interview has been scheduled on {interview_date} at {start_time} for {job.title}.",
-                    type='application'
-                )
-
-                try:
-                    send_application_status_update_email(
-                        to_email=candidate_user.email,
-                        applicant_name=f"{candidate_user.first_name} {candidate_user.last_name}".strip() or candidate_user.email,
-                        job_title=job.title,
-                        company_name=company_name,
-                        new_status='interviewed',
-                        remarks=f"Interview scheduled on {interview_date} ({start_time} - {end_time})." + (f" Location/Link: {meeting_link or location}" if (meeting_link or location) else "")
-                    )
-                except Exception as e:
-                    print(f"[Admin Interview Scheduled Mailer] Error: {e}")
-
-                log_audit_trail(request, admin_id, 'schedule_interview', f"Scheduled interview for {candidate_user.email} on {job.title} for {interview_date}", 'application', application.application_id, candidate_user.email)
-                success_msg = "Interview scheduled successfully and email invitation sent to candidate!"
+            error_msg = "Interview scheduling and hiring approvals are managed directly by the employer from their portal."
 
         elif action == 'submit_feedback':
             feedback_text = request.POST.get('feedback_text', '').strip()
@@ -801,6 +1102,57 @@ def view_candidate_view(request, application_id=None):
                     feedback_type='manual'
                 )
                 success_msg = "Candidate remarks & feedback submitted!"
+
+        elif action == 'forward_to_employer':
+            admin_notes = request.POST.get('admin_notes', '').strip()
+            admin_qualification = request.POST.get('admin_qualification', 'qualified')
+            
+            application.forwarded_to_employer = True
+            application.forwarded_at = timezone.now()
+            application.forwarded_by_admin = admin_user
+            application.admin_notes = admin_notes
+            application.admin_qualification = admin_qualification
+            if not application.employer_status or application.employer_status == 'for_review':
+                application.employer_status = 'for_review'
+            if application.status in ['pending', 'reviewed']:
+                application.status = 'shortlisted'
+
+            timestamp_str = timezone.now().strftime('%Y-%m-%d %H:%M')
+            entry = f"[{timestamp_str}] Candidate forwarded to Employer by Admin."
+            if admin_notes:
+                entry += f" Notes: {admin_notes}"
+            if application.remarks_history:
+                application.remarks_history = f"{application.remarks_history}\n{entry}"
+            else:
+                application.remarks_history = entry
+
+            application.save()
+
+            # Notify employer
+            emp_user = job.employer.user if (job.employer and job.employer.user) else None
+            candidate_name = f"{candidate_user.first_name} {candidate_user.last_name}".strip() or candidate_user.email
+            if emp_user:
+                Notification.objects.create(
+                    user=emp_user,
+                    title=f"New Candidate Forwarded: {candidate_name}",
+                    message=f"Admin has forwarded candidate {candidate_name} for '{job.title}'. Check your Applicants dashboard to review their profile.",
+                    type='application'
+                )
+                try:
+                    send_applicant_forwarded_to_employer_email(
+                        employer_email=emp_user.email,
+                        employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                        candidate_name=candidate_name,
+                        job_title=job.title,
+                        company_name=company_name,
+                        match_score=float(application.match_score or 0.0),
+                        admin_notes=admin_notes
+                    )
+                except Exception as e:
+                    print(f"[Admin Forward Candidate Mailer Error]: {e}")
+
+            log_audit_trail(request, admin_id, 'forward_candidate_to_employer', f"Forwarded candidate {candidate_name} ({candidate_user.email}) for {job.title} to {company_name}", 'application', application.application_id, candidate_name)
+            success_msg = f"Candidate {candidate_name} has been successfully forwarded to {company_name}!"
 
     interviews = InterviewSchedule.objects.filter(application=application).order_by('-interview_date')
     chatbot_answers = ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number')
@@ -832,6 +1184,168 @@ def view_candidate_view(request, application_id=None):
         'error_msg': error_msg,
     }
     return render(request, 'admin/view_candidate.html', context)
+
+
+@csrf_exempt
+@require_role('admin')
+def forward_candidate_api(request):
+    """
+    Admin AJAX endpoint to forward an individual applicant to the employer.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'POST method required'})
+
+    admin_id = getCurrentUserId(request)
+    admin_user = get_object_or_404(User, pk=admin_id)
+    app_id = request.POST.get('application_id')
+    admin_notes = request.POST.get('admin_notes', '').strip()
+    admin_qualification = request.POST.get('admin_qualification', 'qualified')
+
+    application = get_object_or_404(
+        Application.objects.select_related('applicant', 'applicant__user', 'job', 'job__employer', 'job__employer__user'),
+        pk=app_id
+    )
+
+    application.forwarded_to_employer = True
+    application.forwarded_at = timezone.now()
+    application.forwarded_by_admin = admin_user
+    application.admin_notes = admin_notes
+    application.admin_qualification = admin_qualification
+    if not application.employer_status or application.employer_status == 'for_review':
+        application.employer_status = 'for_review'
+    if application.status in ['pending', 'reviewed']:
+        application.status = 'shortlisted'
+
+    timestamp_str = timezone.now().strftime('%Y-%m-%d %H:%M')
+    entry = f"[{timestamp_str}] Candidate forwarded to Employer by Admin."
+    if admin_notes:
+        entry += f" Notes: {admin_notes}"
+    if application.remarks_history:
+        application.remarks_history = f"{application.remarks_history}\n{entry}"
+    else:
+        application.remarks_history = entry
+
+    application.save()
+
+    emp_user = application.job.employer.user if (application.job and application.job.employer and application.job.employer.user) else None
+    cand_user = application.applicant.user if (application.applicant and application.applicant.user) else None
+    candidate_name = f"{cand_user.first_name} {cand_user.last_name}".strip() if cand_user else "Candidate"
+    company_name = application.job.employer.company_name if (application.job and application.job.employer) else "MultiBiz Partner"
+    job_title = application.job.title if application.job else "Position"
+
+    if emp_user:
+        Notification.objects.create(
+            user=emp_user,
+            title=f"New Candidate Forwarded: {candidate_name}",
+            message=f"Admin has forwarded {candidate_name} for '{job_title}'. Review their application in your Employer Dashboard.",
+            type='application'
+        )
+        try:
+            send_applicant_forwarded_to_employer_email(
+                employer_email=emp_user.email,
+                employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                candidate_name=candidate_name,
+                job_title=job_title,
+                company_name=company_name,
+                match_score=float(application.match_score or 0.0),
+                admin_notes=admin_notes
+            )
+        except Exception as e:
+            print(f"[forward_candidate_api Mailer Error]: {e}")
+
+    log_audit_trail(request, admin_id, 'forward_candidate_to_employer', f"Forwarded candidate {candidate_name} for {job_title} to {company_name}", 'application', application.application_id, candidate_name)
+    return JsonResponse({'success': True, 'message': f"Candidate {candidate_name} forwarded to {company_name}!"})
+
+
+@csrf_exempt
+@require_role('admin')
+def batch_forward_candidates_api(request):
+    """
+    Admin AJAX endpoint to forward multiple selected applicants to their respective employer.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'POST method required'})
+
+    admin_id = getCurrentUserId(request)
+    admin_user = get_object_or_404(User, pk=admin_id)
+    raw_ids = request.POST.get('application_ids', '')
+    job_id = request.POST.get('job_id', '')
+    scope = request.POST.get('scope', 'selected')
+    admin_notes = request.POST.get('admin_notes', '').strip()
+
+    app_ids = []
+    if raw_ids:
+        try:
+            app_ids = json.loads(raw_ids) if raw_ids.startswith('[') else [int(x) for x in raw_ids.split(',') if x.strip().isdigit()]
+        except Exception:
+            app_ids = []
+
+    if job_id and str(job_id).isdigit():
+        job = JobPosting.objects.filter(pk=int(job_id)).first()
+        if job:
+            if scope == 'all':
+                apps = Application.objects.filter(job=job)
+            elif scope == 'qualified':
+                apps = Application.objects.filter(job=job).filter(Q(match_score__gte=70.0) | Q(admin_qualification='qualified'))
+            elif scope == 'under_qualified':
+                apps = Application.objects.filter(job=job).filter(match_score__gte=50.0, match_score__lt=70.0)
+            elif scope == 'not_qualified':
+                apps = Application.objects.filter(job=job).filter(match_score__lt=50.0)
+            else:
+                apps = Application.objects.filter(job=job, pk__in=app_ids)
+        else:
+            apps = Application.objects.filter(pk__in=app_ids)
+    else:
+        apps = Application.objects.filter(pk__in=app_ids)
+
+    apps = apps.select_related('applicant', 'applicant__user', 'job', 'job__employer', 'job__employer__user')
+
+    if not apps.exists():
+        return JsonResponse({'success': False, 'message': 'No candidates found for the selected scope'})
+    count = 0
+    for application in apps:
+        application.forwarded_to_employer = True
+        application.forwarded_at = timezone.now()
+        application.forwarded_by_admin = admin_user
+        if admin_notes:
+            application.admin_notes = admin_notes
+        if not application.employer_status or application.employer_status == 'for_review':
+            application.employer_status = 'for_review'
+        if application.status in ['pending', 'reviewed']:
+            application.status = 'shortlisted'
+
+        # Set qualification tier automatically if unset
+        if not application.admin_qualification:
+            score = float(application.match_score or 0.0)
+            application.admin_qualification = 'qualified' if score >= 70.0 else ('under_qualified' if score >= 50.0 else 'not_qualified')
+
+        timestamp_str = timezone.now().strftime('%Y-%m-%d %H:%M')
+        entry = f"[{timestamp_str}] Forwarded to Employer by Admin."
+        if admin_notes:
+            entry += f" Notes: {admin_notes}"
+        if application.remarks_history:
+            application.remarks_history = f"{application.remarks_history}\n{entry}"
+        else:
+            application.remarks_history = entry
+
+        application.save()
+        count += 1
+
+        # Notify employer
+        emp_user = application.job.employer.user if (application.job and application.job.employer and application.job.employer.user) else None
+        cand_user = application.applicant.user if (application.applicant and application.applicant.user) else None
+        if emp_user and cand_user:
+            candidate_name = f"{cand_user.first_name} {cand_user.last_name}".strip() or cand_user.email
+            job_title = application.job.title if application.job else "Job"
+            Notification.objects.create(
+                user=emp_user,
+                title=f"New Candidate Forwarded: {candidate_name}",
+                message=f"Admin has forwarded {candidate_name} for '{job_title}'.",
+                type='application'
+            )
+
+    log_audit_trail(request, admin_id, 'batch_forward_candidates', f"Batch forwarded {count} candidates to employers")
+    return JsonResponse({'success': True, 'message': f"Successfully forwarded {count} candidate(s) to employer(s)!", 'count': count})
 
 
 @csrf_exempt
@@ -1429,6 +1943,11 @@ def job_candidates_view(request, job_id):
             'qualification_status': q_status,
             'is_top_match': False,
             'notice_sent': bool(app.status in ['reviewed', 'shortlisted', 'accepted', 'interviewed']),
+            'forwarded_to_employer': app.forwarded_to_employer,
+            'forwarded_at': app.forwarded_at,
+            'employer_status': app.employer_status or 'for_review',
+            'admin_notes': app.admin_notes or '',
+            'admin_qualification': app.admin_qualification or q_status,
         }
         all_candidates.append(cand_info)
 
@@ -1448,12 +1967,16 @@ def job_candidates_view(request, job_id):
             if qual_count <= 3:
                 c['is_top_match'] = True
 
+    forwarded_filter = request.GET.get('forwarded', '').strip()
+
     # Compute KPI overview counters
     counts = {
         'all': len(all_candidates),
         'qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'qualified'),
         'under_qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'under_qualified'),
         'not_qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'not_qualified'),
+        'forwarded': sum(1 for c in all_candidates if c['forwarded_to_employer']),
+        'not_forwarded': sum(1 for c in all_candidates if not c['forwarded_to_employer']),
         'under_review': sum(1 for c in all_candidates if c['application'].status in ['pending', 'reviewed']),
         'shortlisted': sum(1 for c in all_candidates if c['application'].status == 'shortlisted'),
     }
@@ -1464,6 +1987,11 @@ def job_candidates_view(request, job_id):
         displayed = [c for c in displayed if c['qualification_status'] == selected_qual]
     if selected_status:
         displayed = [c for c in displayed if c['application'].status == selected_status]
+    if forwarded_filter == 'yes':
+        displayed = [c for c in displayed if c['forwarded_to_employer']]
+    elif forwarded_filter == 'no':
+        displayed = [c for c in displayed if not c['forwarded_to_employer']]
+
     if query:
         q_low = query.lower()
         displayed = [
@@ -1479,6 +2007,7 @@ def job_candidates_view(request, job_id):
         'counts': counts,
         'selected_qual': selected_qual,
         'selected_status': selected_status,
+        'forwarded_filter': forwarded_filter,
         'query': query,
         'selected_sort': selected_sort,
         'current_page': 'candidates.php',
@@ -1506,6 +2035,65 @@ def notify_qualified_applicants_view(request, job_id):
             )
     log_audit_trail(request, admin_id, 'notify_qualified_applicants', f"Notified {count} qualified applicants for job #{job_id}")
     return redirect(f'/admin/jobs/{job_id}/candidates/?notified=success')
+
+
+@require_role('admin')
+def forward_qualified_candidates_view(request, job_id):
+    """
+    Forwards all qualified candidates for a specific job posting to the employer company.
+    """
+    admin_id = getCurrentUserId(request)
+    admin_user = get_object_or_404(User, pk=admin_id)
+    job = get_object_or_404(JobPosting.objects.select_related('employer', 'employer__user'), pk=job_id)
+
+    apps = Application.objects.filter(job=job).select_related('applicant', 'applicant__user', 'job', 'job__employer')
+
+    count = 0
+    now_ts = timezone.now()
+    timestamp_str = now_ts.strftime('%Y-%m-%d %H:%M')
+
+    for app in apps:
+        score = float(app.match_score or 0.0)
+        is_qual = (score >= 70.0) or (app.admin_qualification == 'qualified')
+        if is_qual:
+            app.forwarded_to_employer = True
+            app.forwarded_at = now_ts
+            app.forwarded_by_admin = admin_user
+            app.admin_qualification = 'qualified'
+            if not app.employer_status or app.employer_status == 'for_review':
+                app.employer_status = 'for_review'
+            if app.status in ['pending', 'reviewed']:
+                app.status = 'shortlisted'
+
+            entry = f"[{timestamp_str}] Qualified candidate forwarded to Employer by Admin."
+            if app.remarks_history:
+                app.remarks_history = f"{app.remarks_history}\n{entry}"
+            else:
+                app.remarks_history = entry
+            app.save()
+            count += 1
+
+    emp_user = job.employer.user if (job.employer and job.employer.user) else None
+    company_name = job.employer.company_name if job.employer else "Employer"
+
+    if emp_user and count > 0:
+        Notification.objects.create(
+            user=emp_user,
+            title=f"Qualified Candidates Forwarded ({count}): {job.title}",
+            message=f"Admin has forwarded {count} qualified applicant(s) for '{job.title}' to your portal for review.",
+            type='application'
+        )
+
+    log_audit_trail(request, admin_id, 'forward_qualified_candidates', f"Forwarded {count} qualified candidates for {job.title} to {company_name}")
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({
+            'success': True,
+            'message': f"Successfully forwarded {count} qualified candidate(s) to {company_name}!",
+            'count': count
+        })
+
+    return redirect(f'/admin/jobs/{job_id}/candidates/?forwarded_qualified={count}')
 
 
 @require_role('admin')

@@ -6,16 +6,17 @@
 {% block content %}
 <div class="container py-4">
     <div class="employer-hero-banner mb-4">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 position-relative" style="z-index: 1;">
-            <div>
-                <h3 class="fw-extrabold text-white mb-1">
+        <div class="d-flex align-items-center flex-wrap gap-3 position-relative" style="z-index: 1; width:100%;">
+            <div class="flex-grow-1">
+                <h3 class="fw-extrabold text-white mb-0" style="color: #ffffff !important;">
                     <i class="fa-solid fa-users text-warning me-2"></i>User Account Management
                 </h3>
-                <p class="text-white-50 small mb-0">Create new accounts, edit credentials, adjust roles, and manage account statuses.</p>
             </div>
-            <button class="btn btn-primary-custom" data-bs-toggle="modal" data-bs-target="#createUserModal">
-                <i class="fa-solid fa-user-plus me-1"></i> Create User Account
-            </button>
+            <div class="ms-auto d-flex align-items-center gap-2 flex-shrink-0">
+                <button class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#createUserModal">
+                    <i class="fa-solid fa-user-plus"></i> Create User Account
+                </button>
+            </div>
         </div>
     </div>
 
