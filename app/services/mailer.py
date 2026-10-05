@@ -571,3 +571,157 @@ def send_job_posted_live_notification(to_email: str, company_name: str, contact_
         print(f"[Job Live Mailer] Error sending live notification: {e}")
         return {'success': False, 'error': str(e)}
 
+
+def send_interview_scheduled_email(
+    to_email: str,
+    applicant_name: str,
+    company_name: str,
+    job_title: str,
+    interview_date: str,
+    interview_time: str,
+    interview_type: str = 'Online',
+    location_or_link: str = '',
+    interviewer_name: str = '',
+    instructions: str = '',
+    additional_notes: str = ''
+) -> dict:
+    """
+    Sends automated interview schedule email to the applicant containing all required details.
+    """
+    site_name = 'MULTIBIZ INTERNATIONAL CORPORATION'
+    year = datetime.date.today().year
+    safe_applicant = html.escape(applicant_name or 'Candidate')
+    safe_company = html.escape(company_name or 'Hiring Partner')
+    safe_title = html.escape(job_title or 'Job Position')
+    safe_date = html.escape(str(interview_date))
+    safe_time = html.escape(str(interview_time))
+    safe_type = html.escape(interview_type or 'Online')
+    safe_loc_link = html.escape(location_or_link or 'Details to follow')
+    safe_interviewer = html.escape(interviewer_name or 'Recruitment Team')
+    safe_instructions = html.escape(instructions or 'Please ensure you are prepared 10 minutes prior to the scheduled time.').replace('\n', '<br>')
+    safe_notes = html.escape(additional_notes or '').replace('\n', '<br>') if additional_notes else ''
+
+    subject = f"📅 Interview Invitation: {safe_title} at {safe_company}"
+
+    notes_block = ''
+    if safe_notes:
+        notes_block = f"""
+        <div style="margin-top:16px;padding:12px 16px;background:#f8fafc;border-left:3px solid #3b82f6;border-radius:6px;font-size:13px;color:#475569;">
+            <strong style="color:#1e293b;">Additional Employer Notes:</strong><br>{safe_notes}
+        </div>
+        """
+
+    loc_link_html = safe_loc_link
+    if 'http://' in safe_loc_link or 'https://' in safe_loc_link:
+        loc_link_html = f'<a href="{safe_loc_link}" target="_blank" style="color:#0284c7;font-weight:700;word-break:break-all;">{safe_loc_link}</a>'
+
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:'Segoe UI',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:32px 0;">
+    <tr><td align="center">
+      <table width="620" cellpadding="0" cellspacing="0"
+             style="background:#ffffff;border-radius:14px;overflow:hidden;
+                    box-shadow:0 6px 24px rgba(0,0,0,.09);max-width:620px;width:100%;">
+        <tr>
+          <td style="background:linear-gradient(135deg,#09203f 0%,#1e40af 60%,#0284c7 100%);padding:30px 36px;text-align:center;">
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Interview Scheduled</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,.85);font-size:13px;">{safe_company} &bull; MultiBiz Talent Network</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:36px;">
+            <p style="margin:0 0 16px;font-size:15px;color:#1e293b;">Hello <strong>{safe_applicant}</strong>,</p>
+            <p style="margin:0 0 20px;font-size:14.5px;color:#334155;line-height:1.7;">
+              Congratulations! <strong>{safe_company}</strong> has reviewed your application for <strong>{safe_title}</strong> and scheduled an interview with you.
+            </p>
+
+            <!-- Details Card -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin-bottom:22px;">
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:13.5px;color:#64748b;width:38%;">Company / Employer:</td>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:14px;color:#0f172a;font-weight:700;">{safe_company}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:13.5px;color:#64748b;">Job Position:</td>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:14px;color:#0284c7;font-weight:700;">{safe_title}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:13.5px;color:#64748b;">Interview Date:</td>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:14px;color:#0f172a;font-weight:700;">📅 {safe_date}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:13.5px;color:#64748b;">Interview Time:</td>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:14px;color:#0f172a;font-weight:700;">⏰ {safe_time}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:13.5px;color:#64748b;">Interview Type:</td>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:14px;color:#0f172a;font-weight:600;">{safe_type}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:13.5px;color:#64748b;">Location / Meeting Link:</td>
+                <td style="padding:8px 0;border-bottom:1px solid #edf2f7;font-size:13.5px;color:#0f172a;">{loc_link_html}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0;font-size:13.5px;color:#64748b;">Interviewer / Contact:</td>
+                <td style="padding:8px 0;font-size:14px;color:#0f172a;font-weight:600;">{safe_interviewer}</td>
+              </tr>
+            </table>
+
+            <!-- Instructions -->
+            <div style="background:#eff6ff;border-left:4px solid #3b82f6;padding:16px 20px;border-radius:6px;margin-bottom:20px;">
+              <p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:.5px;">Instructions for Candidate:</p>
+              <p style="margin:0;font-size:13.5px;color:#1e3a8a;line-height:1.6;">{safe_instructions}</p>
+            </div>
+
+            {notes_block}
+
+            <p style="margin:24px 0 0;font-size:13px;color:#64748b;line-height:1.6;">
+              You can also view this interview schedule and manage your application anytime inside your <a href="http://127.0.0.1:8000/applicant/dashboard/" style="color:#0284c7;font-weight:600;">Applicant Dashboard</a>.
+            </p>
+
+            <p style="margin-top:24px;margin-bottom:0;color:#334155;font-size:14px;">Best of luck with your interview!<br><strong>The MultiBiz Talent Team</strong></p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f8fafc;padding:20px 36px;text-align:center;border-top:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; {year} {site_name}. All rights reserved.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    plain_message = f"""Hello {applicant_name},
+
+You have been invited for an interview with {company_name} for the position of {job_title}.
+
+Interview Details:
+- Date: {interview_date}
+- Time: {interview_time}
+- Type: {interview_type}
+- Location / Link: {location_or_link}
+- Interviewer: {interviewer_name}
+- Instructions: {instructions}
+
+Best regards,
+MultiBiz Team"""
+
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[to_email],
+            html_message=html_content,
+            fail_silently=True
+        )
+        return {'success': True, 'error': None}
+    except Exception as e:
+        print(f"[Interview Mailer] Error: {e}")
+        return {'success': False, 'error': str(e)}
