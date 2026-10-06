@@ -20,6 +20,7 @@ from app.services.mailer import send_application_status_update_email
 from app.services.ml_job_matching import (
     MATCH_CLASSES,
     build_match_text,
+    estimate_job_text_similarity,
     evaluate_match_model,
     predict_match_score,
     train_match_classifier,
@@ -576,6 +577,17 @@ class MultiBizConversionTests(TestCase):
             expected_score,
         )
 
+    def test_text_similarity_is_available_without_a_trained_classifier(self):
+        score = estimate_job_text_similarity(
+            self.applicant,
+            self.job,
+            'Python Django application development',
+        )
+
+        self.assertIsNotNone(score)
+        self.assertGreater(score, 0)
+        self.assertLessEqual(score, 100)
+
     def test_candidate_ml_ranking_adds_no_hand_weighted_bonuses(self):
         base = calculate_candidate_ml_score({'ml_match_score': 42})
         with_profile_bonuses = calculate_candidate_ml_score({
@@ -657,6 +669,36 @@ class MultiBizConversionTests(TestCase):
         self.assertIn(response.context['jobs'][0]['ml_match_class'], MATCH_CLASSES)
         self.assertIsInstance(response.context['jobs'][0]['match_score'], float)
         self.assertContains(response, 'ML ')
+
+    def test_job_list_shows_labeled_similarity_when_model_is_unavailable(self):
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        with patch(
+            'app.views.views_applicant.get_match_classifier',
+            return_value=(None, {
+                'ready': False,
+                'reason': 'Match classes need more admin-reviewed examples.',
+            }),
+        ):
+            response = self.client.get('/applicant/jobs.php?min_match=80')
+
+        self.assertEqual(response.status_code, 200)
+        job_result = next(
+            result for result in response.context['jobs']
+            if result['job_id'] == self.job.job_id
+        )
+        self.assertEqual(job_result['match_score_type'], 'similarity')
+        self.assertIsInstance(job_result['match_score'], float)
+        self.assertIsNone(job_result['ml_match_class'])
+        self.assertEqual(response.context['min_match'], '')
+        self.assertEqual(len(response.context['jobs']), 1)
+        self.assertContains(response, 'Text similarity preview')
+        self.assertContains(response, 'not trained-model predictions or probabilities')
+        self.assertContains(response, '% text similarity')
+        self.assertContains(response, 'Match filter unavailable for text similarity')
 
     def test_admin_analytics_renders_logistic_regression_evaluation_status(self):
         session = self.client.session

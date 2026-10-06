@@ -1,4 +1,9 @@
 <span id="jobsCount">{{ jobs|length }}</span>
+{% if not match_model_status.ready %}
+    <div class="small text-muted mb-2" role="status">
+        {{ match_model_status.reason }} Any percentages shown are TF-IDF text similarity only, not trained-model predictions or probabilities.
+    </div>
+{% endif %}
 <div id="activeFilters">
     {% if employment_type and employment_type != 'all' or remote_option and remote_option != 'all' or salary_range and salary_range != 'any' %}
         <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 6px;">
@@ -68,7 +73,7 @@
                                 </p>
                             {% endif %}
                             
-                            {% if job.match_score != None %}
+                            {% if job.match_score != None and job.match_score_type == 'model' %}
                                 <button type="button" 
                                         class="btn-match-score match-score-pill {% if job.match_score >= 80 %}score-badge-green{% elif job.match_score >= 60 %}score-badge-yellow{% elif job.match_score >= 40 %}score-badge-orange{% else %}score-badge-red{% endif %}"
                                         data-job-id="{{ job.job_id }}"
@@ -76,8 +81,12 @@
                                         data-match-score="{{ job.match_score }}">
                                     <i class="fas fa-star"></i> {{ job.match_score|floatformat:1 }}% ML estimate
                                 </button>
+                            {% elif job.match_score != None and job.match_score_type == 'similarity' %}
+                                <span class="small text-muted">{{ job.match_score|floatformat:1 }}% text similarity</span>
                             {% elif match_model_status.ready %}
-                                <span class="small text-muted">Upload a resume to get an ML estimate.</span>
+                                <span class="small text-muted">Add profile skills or a resume to get an ML estimate.</span>
+                            {% else %}
+                                <span class="small text-muted">Add profile skills or a resume for text similarity.</span>
                             {% endif %}
                         </div>
                     </div>

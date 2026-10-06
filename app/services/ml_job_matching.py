@@ -12,6 +12,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
+from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
@@ -44,6 +45,47 @@ def build_match_text(applicant, job, resume_text=''):
         f'{applicant.experience_years or 0} years experience',
     )
     return ' '.join(str(part).strip() for part in parts if part and str(part).strip())
+
+
+def estimate_job_text_similarity(applicant, job, resume_text=''):
+    """Return TF-IDF text similarity, not a trained match probability."""
+    applicant_parts = (
+        resume_text,
+        applicant.skills,
+        applicant.qualifications,
+        applicant.education_level,
+        (
+            f'{applicant.experience_years} years experience'
+            if applicant.experience_years else ''
+        ),
+    )
+    applicant_text = ' '.join(
+        str(part).strip()
+        for part in applicant_parts
+        if part and str(part).strip()
+    )
+    job_text = ' '.join(
+        str(part).strip()
+        for part in (
+            job.title,
+            job.description,
+            job.requirements,
+            job.skills_required,
+        )
+        if part and str(part).strip()
+    )
+    if not applicant_text.strip() or not job_text.strip():
+        return None
+
+    vectorizer = TfidfVectorizer(
+        lowercase=True,
+        strip_accents='unicode',
+        ngram_range=(1, 2),
+        max_features=30000,
+        sublinear_tf=True,
+    )
+    vectors = vectorizer.fit_transform([applicant_text, job_text])
+    return round(float(cosine_similarity(vectors[0], vectors[1])[0, 0]) * 100, 2)
 
 
 def load_reviewed_match_samples():

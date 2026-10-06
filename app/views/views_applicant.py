@@ -24,6 +24,7 @@ from app.services.resume_storage import (
 )
 from app.services.ml_ranking import compute_job_match_result, compute_job_match_score
 from app.services.ml_job_matching import (
+    estimate_job_text_similarity,
     get_match_classifier,
     predict_match_class,
     predict_match_score,
@@ -380,10 +381,20 @@ def jobs_view(request):
         }
         resume_text = ''
     for job in all_jobs:
-        score = (
-            predict_match_score(match_classifier, applicant, job, resume_text)
-            if applicant and applicant.resume_file and match_classifier else None
-        )
+        score_type = None
+        if applicant and match_classifier:
+            score = (
+                predict_match_score(match_classifier, applicant, job, resume_text)
+                if applicant.resume_file else None
+            )
+            if score is not None:
+                score_type = 'model'
+        elif applicant:
+            score = estimate_job_text_similarity(applicant, job, resume_text)
+            if score is not None:
+                score_type = 'similarity'
+        else:
+            score = None
         ml_match_class = (
             predict_match_class(match_classifier, applicant, job, resume_text)
             if match_classifier and applicant else None
@@ -436,6 +447,7 @@ def jobs_view(request):
             'posted_at': job.posted_at,
             'time_ago': time_ago,
             'match_score': score,
+            'match_score_type': score_type,
             'ml_match_class': ml_match_class,
             'score_color': score_color,
             'qualification_matches': qual_match,
@@ -444,7 +456,7 @@ def jobs_view(request):
             'has_applied': job.job_id in applied_job_ids,
         })
 
-    if min_match:
+    if min_match and match_model_status['ready']:
         try:
             jobs_list = [
                 job_item for job_item in jobs_list
@@ -453,6 +465,8 @@ def jobs_view(request):
             ]
         except ValueError:
             min_match = ''
+    elif not match_model_status['ready']:
+        min_match = ''
 
     # Prioritize qualification matches first if applicant has selected qualification, otherwise sort by match score
     if selected_qualification_id:
