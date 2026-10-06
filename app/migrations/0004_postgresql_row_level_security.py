@@ -825,6 +825,10 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('app', '0003_application_admin_notes_and_more'),
+        ('admin', '0003_logentry_add_action_flag_choices'),
+        ('auth', '0012_alter_user_first_name_max_length'),
+        ('contenttypes', '0002_remove_content_type_name'),
+        ('sessions', '0001_initial'),
     ]
 
     operations = [

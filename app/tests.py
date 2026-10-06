@@ -6,7 +6,8 @@ import types
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock, patch
-from django.test import TestCase, Client, override_settings
+from django.db import connection, transaction
+from django.test import TestCase, Client, TransactionTestCase, override_settings
 from django.core import mail
 from django.urls import reverse
 from app.models import (
@@ -22,6 +23,7 @@ from app.services.ml_job_matching import (
     train_match_classifier,
 )
 from app.services.qualification import classify_match_score
+from app.services.database_rls import set_authenticated_rls_context
 
 class MultiBizConversionTests(TestCase):
     def setUp(self):
@@ -135,6 +137,7 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         chart_data = json.loads(response.context['chart_data_json'])
         self.assertEqual(chart_data['match_tier_data'], [1, 1, 2, 1, 1])
+
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_unclassified_status_email_includes_result_and_score(self):
@@ -328,12 +331,12 @@ class MultiBizConversionTests(TestCase):
             'password': 'jobseeker123'
         })
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(self.client.session.get('role'), 'applicant')
 
         # Access applicant dashboard
         dash_response = self.client.get('/applicant/dashboard.php')
         self.assertEqual(dash_response.status_code, 200)
         self.assertContains(dash_response, 'Job')
+        self.assertEqual(self.client.session.get('role'), 'applicant')
 
     def test_login_switches_to_the_new_applicant_dashboard(self):
         second_user = User.objects.create(
@@ -962,6 +965,7 @@ class MultiBizConversionTests(TestCase):
         self.assertIsNotNone(app)
         self.assertEqual(app.status, 'pending')
 
+
     def test_employer_candidate_review_and_status_update(self):
         """Test employer viewing candidate and updating status"""
         # Create an application
@@ -1088,3 +1092,81 @@ class MultiBizConversionTests(TestCase):
         })
         self.assertContains(short_password_resp, 'Password must be at least 6 characters.')
         self.assertFalse(User.objects.filter(email='short-password@example.com').exists())
+
+
+class PostgreSQLRLSContextTests(TransactionTestCase):
+    def test_session_role_is_reloaded_from_account_record(self):
+        if connection.vendor != 'postgresql':
+            self.skipTest('PostgreSQL row-level security is only available on PostgreSQL.')
+
+        applicant = User.objects.create(
+            email='rls-session-applicant@example.com',
+            password='not-a-real-account',
+            role='applicant',
+            status='active',
+        )
+        client = Client()
+        session = client.session
+        session['user_id'] = applicant.pk
+        session['role'] = 'admin'
+        session['email'] = applicant.email
+        session.save()
+
+        response = client.get('/admin/dashboard.php')
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('error=unauthorized', response['Location'])
+
+    def test_forged_rls_identity_settings_are_rejected(self):
+        if connection.vendor != 'postgresql':
+            self.skipTest('PostgreSQL row-level security is only available on PostgreSQL.')
+
+        applicant = User.objects.create(
+            email='rls-context-applicant@example.com',
+            password='not-a-real-account',
+            role='applicant',
+            status='active',
+        )
+
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute('SET LOCAL ROLE mic_app_rls')
+                cursor.execute(
+                    "SELECT set_config('app.session_key', 'rls-test-session', true)"
+                )
+
+            set_authenticated_rls_context(applicant)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT public.mic_rls_context_valid(),
+                           public.mic_rls_user_id(),
+                           public.mic_rls_user_role()
+                    """
+                )
+                valid, user_id, role = cursor.fetchone()
+
+            self.assertTrue(valid)
+            self.assertEqual(user_id, applicant.pk)
+            self.assertEqual(role, 'applicant')
+
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT set_config('app.user_id', %s, true), "
+                    "set_config('app.user_role', 'admin', true)",
+                    [str(applicant.pk + 1000000)],
+                )
+                cursor.execute(
+                    """
+                    SELECT public.mic_rls_context_valid(),
+                           public.mic_rls_user_id(),
+                           public.mic_rls_user_role(),
+                           public.mic_rls_is_admin()
+                    """
+                )
+                valid, user_id, role, is_admin = cursor.fetchone()
+
+            self.assertFalse(valid)
+            self.assertIsNone(user_id)
+            self.assertEqual(role, '')
+            self.assertFalse(is_admin)

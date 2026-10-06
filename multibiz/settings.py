@@ -1,4 +1,5 @@
 import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -70,7 +71,58 @@ ASGI_APPLICATION = 'multibiz.asgi.application'
 
 # Use Supabase/PostgreSQL when DATABASE_URL is configured; retain SQLite locally.
 database_url = os.environ.get('DATABASE_URL')
-if database_url:
+RLS_CONTEXT_SECRET = os.environ.get('RLS_CONTEXT_SECRET', '')
+RLS_DATABASE_ROLE = 'mic_app_rls'
+rls_management_commands = {
+    'migrate',
+    'makemigrations',
+    'showmigrations',
+    'test',
+    'check',
+    'dbshell',
+    'dumpdata',
+    'loaddata',
+    'shell',
+    'createsuperuser',
+    'inspectdb',
+}
+is_rls_management_command = (
+    len(sys.argv) > 1 and sys.argv[1] in rls_management_commands
+)
+if (
+    len(sys.argv) > 1
+    and sys.argv[1] == 'test'
+    and not RLS_CONTEXT_SECRET
+):
+    RLS_CONTEXT_SECRET = secrets.token_hex(32)
+    os.environ['RLS_CONTEXT_SECRET'] = RLS_CONTEXT_SECRET
+
+if database_url and not is_rls_management_command:
+    rls_database_url = os.environ.get('RLS_DATABASE_URL')
+    if not rls_database_url:
+        raise RuntimeError(
+            'RLS_DATABASE_URL must point to a dedicated non-bypass PostgreSQL '
+            'login for the web runtime. DATABASE_URL is reserved for privileged '
+            'management commands.'
+        )
+    if len(RLS_CONTEXT_SECRET) < 32:
+        raise RuntimeError(
+            'RLS_CONTEXT_SECRET must be configured with at least 32 characters '
+            'for PostgreSQL web requests.'
+        )
+
+    import dj_database_url
+
+    DATABASES = {
+        'default': dj_database_url.parse(
+            rls_database_url,
+            conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '600')),
+            conn_health_checks=True,
+            ssl_require=True,
+        )
+    }
+    RLS_USE_RESTRICTED_ROLE = True
+elif database_url:
     import dj_database_url
 
     DATABASES = {
@@ -81,23 +133,7 @@ if database_url:
             ssl_require=True,
         )
     }
-    rls_management_commands = {
-        'migrate',
-        'makemigrations',
-        'showmigrations',
-        'test',
-        'check',
-        'dbshell',
-        'dumpdata',
-        'loaddata',
-        'shell',
-        'createsuperuser',
-        'inspectdb',
-    }
-    RLS_DATABASE_ROLE = 'mic_app_rls'
-    RLS_USE_RESTRICTED_ROLE = (
-        len(sys.argv) < 2 or sys.argv[1] not in rls_management_commands
-    )
+    RLS_USE_RESTRICTED_ROLE = False
 else:
     RLS_USE_RESTRICTED_ROLE = False
     # In Vercel serverless environments (/var/task is read-only), copy SQLite to /tmp.

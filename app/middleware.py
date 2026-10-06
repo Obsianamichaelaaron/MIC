@@ -1,6 +1,12 @@
 from django.conf import settings
 from django.db import connection, transaction
 
+from app.services.database_rls import (
+    clear_rls_identity,
+    set_authenticated_rls_context,
+    set_rls_identity_for_lookup,
+)
+
 
 class PostgreSQLRLSMiddleware:
     def __init__(self, get_response):
@@ -25,24 +31,23 @@ class PostgreSQLRLSMiddleware:
 
         session = request.session
         self._set_context('app.session_key', session.session_key or '')
-        self._set_context('app.user_id', '')
-        self._set_context('app.user_role', '')
-        self._set_context('app.user_email', '')
+        clear_rls_identity()
 
         session_user_id = session.get('user_id')
         if not str(session_user_id or '').isdigit():
             return None
 
-        self._set_context('app.user_id', str(session_user_id))
+        set_rls_identity_for_lookup(session_user_id)
         user = User.objects.filter(pk=int(session_user_id)).only(
             'user_id', 'email', 'role', 'status'
         ).first()
 
         if user and user.status == 'active':
-            self._set_context('app.user_role', user.role)
-            self._set_context('app.user_email', user.email)
+            session['role'] = user.role
+            session['email'] = user.email
+            set_authenticated_rls_context(user)
         else:
-            self._set_context('app.user_id', '')
+            clear_rls_identity()
             session.flush()
 
         return None

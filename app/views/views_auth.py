@@ -93,7 +93,7 @@ def login_register_view(request):
             else:
                 if role == 'employer':
                     hashed_pwd = hash_password(password)
-                    new_user_id = prepare_registration_user_id()
+                    new_user_id = prepare_registration_user_id('employer', email)
                     new_user = User.objects.create(
                         **({'user_id': new_user_id} if new_user_id is not None else {}),
                         email=email,
@@ -163,7 +163,7 @@ def login_register_view(request):
 
                     if not error:
                         hashed_pwd = hash_password(password)
-                        new_user_id = prepare_registration_user_id()
+                        new_user_id = prepare_registration_user_id('applicant', email)
                         new_user = User.objects.create(
                             **({'user_id': new_user_id} if new_user_id is not None else {}),
                             email=email,
