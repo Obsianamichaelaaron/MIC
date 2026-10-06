@@ -212,6 +212,31 @@
         <!-- Right Column: Admin Actions, Forwarding & Interview Tracker -->
         <div style="display:flex;flex-direction:column;gap:1.5rem;">
 
+            <div style="background:#fff;border-radius:14px;border:1px solid #bfdbfe;padding:1.35rem;box-shadow:0 3px 12px rgba(0,0,0,0.04);">
+                <h3 style="margin:0 0 .5rem;font-size:1.05rem;color:#0a3d6b;font-weight:700;">
+                    <i class="fas fa-brain" style="color:#0284c7;margin-right:.35rem;"></i> Record Admin ML Assessment
+                </h3>
+                <p style="margin:0 0 1rem;color:#64748b;font-size:.8rem;line-height:1.5;">
+                    Review the applicant's resume and profile against this job before labeling. Saving this assessment does not forward the candidate.
+                </p>
+                <form method="POST" action="">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="save_admin_qualification">
+                    <label for="trainingQualification" style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">
+                        Reviewed outcome
+                    </label>
+                    <select id="trainingQualification" name="admin_qualification" required style="width:100%;padding:.65rem .85rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.88rem;background:#f8fafc;box-sizing:border-box;margin-bottom:.85rem;">
+                        <option value="" {% if application.admin_qualification != 'qualified' and application.admin_qualification != 'under_qualified' and application.admin_qualification != 'not_qualified' %}selected{% endif %} disabled>Select after reviewing</option>
+                        <option value="qualified" {% if application.admin_qualification == 'qualified' %}selected{% endif %}>High — qualified for this role</option>
+                        <option value="under_qualified" {% if application.admin_qualification == 'under_qualified' %}selected{% endif %}>Medium — partially meets requirements</option>
+                        <option value="not_qualified" {% if application.admin_qualification == 'not_qualified' %}selected{% endif %}>Low — does not meet key requirements</option>
+                    </select>
+                    <button type="submit" style="width:100%;padding:.7rem;border:0;border-radius:8px;background:#0a3d6b;color:#fff;font-weight:700;cursor:pointer;">
+                        Save Reviewed Assessment
+                    </button>
+                </form>
+            </div>
+
             <!-- 1. Send Candidate to Employer Card -->
             <div style="background:#fff;border-radius:14px;border:1.5px solid {% if application.forwarded_to_employer %}#3b82f6{% else %}#e2e8f0{% endif %};padding:1.6rem;box-shadow:0 3px 14px rgba(0,0,0,0.05);">
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.15rem;padding-bottom:.6rem;border-bottom:1px solid #e2e8f0;">
@@ -255,10 +280,10 @@
                         <label style="display:block;font-size:.82rem;font-weight:700;color:#334155;margin-bottom:.4rem;">
                             Admin Qualification Assessment <span style="color:#ef4444;">*</span>
                         </label>
-                        <select name="admin_qualification" style="width:100%;padding:.65rem .85rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.88rem;background:#f8fafc;box-sizing:border-box;">
-                            <option value="qualified" {% if application.admin_qualification == 'qualified' or not application.admin_qualification %}selected{% endif %}>Qualified (Recommended for Review & Interview)</option>
-                            <option value="highly_recommended" {% if application.admin_qualification == 'highly_recommended' %}selected{% endif %}>Highly Recommended (Top Tier Candidate)</option>
-                            <option value="under_qualified" {% if application.admin_qualification == 'under_qualified' %}selected{% endif %}>Under Qualified (For Consideration)</option>
+                        <select name="admin_qualification" required style="width:100%;padding:.65rem .85rem;border:1px solid #cbd5e1;border-radius:8px;font-size:.88rem;background:#f8fafc;box-sizing:border-box;">
+                            <option value="qualified" {% if application.admin_qualification == 'qualified' %}selected{% endif %}>High — Qualified</option>
+                            <option value="under_qualified" {% if application.admin_qualification == 'under_qualified' %}selected{% endif %}>Medium — Partially qualified</option>
+                            <option value="not_qualified" {% if application.admin_qualification == 'not_qualified' %}selected{% endif %}>Low — Not qualified</option>
                         </select>
                     </div>
 

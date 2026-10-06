@@ -31,7 +31,7 @@ from app.services.mailer import (
     send_applicant_forwarded_to_employer_email, send_interview_scheduled_email
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
-from app.services.ml_job_matching import evaluate_match_model
+from app.services.ml_job_matching import REVIEW_LABELS, evaluate_match_model
 
 LANDING_CMS_DEFAULTS = {
     'hero': {
@@ -1161,7 +1161,28 @@ def view_candidate_view(request, application_id=None):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'update_status':
+        if action == 'save_admin_qualification':
+            admin_qualification = request.POST.get('admin_qualification', '')
+            if admin_qualification not in REVIEW_LABELS:
+                error_msg = 'Choose a valid high, medium, or low assessment after reviewing the application.'
+            else:
+                application.admin_qualification = admin_qualification
+                application.save(update_fields=['admin_qualification', 'updated_at'])
+                log_audit_trail(
+                    request,
+                    admin_id,
+                    'save_admin_qualification',
+                    f"Recorded {admin_qualification} ML training label for application {application.application_id}.",
+                    'application',
+                    application.application_id,
+                    candidate_user.email,
+                )
+                success_msg = (
+                    'Admin assessment saved for model training. '
+                    'Predictions remain unavailable until every class has enough reviewed examples.'
+                )
+
+        elif action == 'update_status':
             new_status = request.POST.get('status')
             remarks = request.POST.get('remarks', '').strip()
 

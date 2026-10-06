@@ -756,6 +756,53 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(response, 'High-match predictions only')
         self.assertContains(response, 'ML unavailable')
 
+    def test_admin_can_record_ml_review_label_without_forwarding_candidate(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+        )
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.post(
+            f'/admin/candidates/{application.application_id}/',
+            {
+                'action': 'save_admin_qualification',
+                'admin_qualification': 'not_qualified',
+            },
+        )
+
+        application.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(application.admin_qualification, 'not_qualified')
+        self.assertFalse(application.forwarded_to_employer)
+        self.assertContains(response, 'Admin assessment saved for model training')
+
+    def test_admin_cannot_save_invalid_ml_review_label(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+        )
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.post(
+            f'/admin/candidates/{application.application_id}/',
+            {
+                'action': 'save_admin_qualification',
+                'admin_qualification': 'highly_recommended',
+            },
+        )
+
+        application.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(application.admin_qualification, 'pending')
+        self.assertContains(response, 'Choose a valid high, medium, or low assessment')
+
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_admin_dispatch_notice_is_blocked_when_trained_model_is_unavailable(self):
         application = Application.objects.create(
