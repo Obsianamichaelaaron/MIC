@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -24,6 +25,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'app.middleware.PostgreSQLRLSMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -79,7 +81,25 @@ if database_url:
             ssl_require=True,
         )
     }
+    rls_management_commands = {
+        'migrate',
+        'makemigrations',
+        'showmigrations',
+        'test',
+        'check',
+        'dbshell',
+        'dumpdata',
+        'loaddata',
+        'shell',
+        'createsuperuser',
+        'inspectdb',
+    }
+    RLS_DATABASE_ROLE = 'mic_app_rls'
+    RLS_USE_RESTRICTED_ROLE = (
+        len(sys.argv) < 2 or sys.argv[1] not in rls_management_commands
+    )
 else:
+    RLS_USE_RESTRICTED_ROLE = False
     # In Vercel serverless environments (/var/task is read-only), copy SQLite to /tmp.
     db_path = BASE_DIR / 'db.sqlite3'
     if os.environ.get('VERCEL') == '1' or 'VERCEL' in os.environ:
