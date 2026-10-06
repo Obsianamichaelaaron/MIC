@@ -9,8 +9,7 @@
         "includeFiles": [
           "templates/**",
           "app/templates/**",
-          "static/**",
-          "db.sqlite3"
+          "static/**"
         ]
       }
     }

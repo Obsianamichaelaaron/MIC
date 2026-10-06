@@ -337,6 +337,31 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(dash_response.status_code, 200)
         self.assertContains(dash_response, 'Job')
         self.assertEqual(self.client.session.get('role'), 'applicant')
+        self.applicant.profile_pic = 'https://example.invalid/profile.png'
+        self.applicant.save(update_fields=['profile_pic'])
+        profile_response = self.client.get('/applicant/profile.php')
+        self.assertEqual(profile_response.status_code, 200)
+        self.assertContains(profile_response, self.applicant.profile_pic)
+
+    def test_successful_legacy_login_upgrades_plain_password_hash(self):
+        legacy_user = User.objects.create(
+            email='legacy-password-applicant@example.com',
+            password='legacy-plaintext-password',
+            role='applicant',
+            status='active',
+        )
+
+        response = self.client.post('/loginregister.php', {
+            'email': legacy_user.email,
+            'password': 'legacy-plaintext-password',
+        })
+
+        legacy_user.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(legacy_user.password.startswith('$2b$'))
+        self.assertTrue(
+            verify_password('legacy-plaintext-password', legacy_user.password)
+        )
 
     def test_login_switches_to_the_new_applicant_dashboard(self):
         second_user = User.objects.create(
@@ -1170,3 +1195,129 @@ class PostgreSQLRLSContextTests(TransactionTestCase):
             self.assertIsNone(user_id)
             self.assertEqual(role, '')
             self.assertFalse(is_admin)
+
+
+class PrivateResumeAccessTests(TestCase):
+    def setUp(self):
+        self.applicant_user = User.objects.create(
+            email='private-resume-applicant@example.com',
+            password='not-a-real-account',
+            role='applicant',
+            status='active',
+        )
+        self.applicant = Applicant.objects.create(
+            user=self.applicant_user,
+            resume_file='uploads/resumes/private-resume.pdf',
+        )
+        self.employer_user = User.objects.create(
+            email='private-resume-employer@example.com',
+            password='not-a-real-account',
+            role='employer',
+            status='active',
+        )
+        self.employer = Employer.objects.create(user=self.employer_user)
+        self.job = JobPosting.objects.create(
+            employer=self.employer,
+            title='Private resume test',
+            status='active',
+        )
+
+    def _login(self, client, user):
+        session = client.session
+        session['user_id'] = user.user_id
+        session['role'] = user.role
+        session.save()
+
+    def _write_resume(self, root):
+        resume_path = Path(root) / 'resumes' / 'private-resume.pdf'
+        resume_path.parent.mkdir(parents=True)
+        resume_path.write_bytes(b'private test resume')
+        return resume_path
+
+    def test_resume_files_are_not_served_from_public_media_urls(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            self._write_resume(media_root)
+            with override_settings(MEDIA_ROOT=Path(media_root)):
+                response = Client().get(
+                    '/uploads/resumes/a-missing-resume.pdf'
+                )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_applicant_can_download_own_resume_but_other_applicant_cannot(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            self._write_resume(media_root)
+            with override_settings(MEDIA_ROOT=Path(media_root)):
+                owner_client = Client()
+                self._login(owner_client, self.applicant_user)
+                owner_response = owner_client.get(
+                    f'/resume/applicant/{self.applicant.pk}/'
+                )
+
+                other_user = User.objects.create(
+                    email='other-private-resume-applicant@example.com',
+                    password='not-a-real-account',
+                    role='applicant',
+                    status='active',
+                )
+                other_client = Client()
+                self._login(other_client, other_user)
+                other_response = other_client.get(
+                    f'/resume/applicant/{self.applicant.pk}/'
+                )
+
+        self.assertEqual(owner_response.status_code, 200)
+        self.assertEqual(owner_response['Content-Disposition'].split(';')[0], 'attachment')
+        self.assertEqual(owner_response['Cache-Control'], 'private, no-store')
+        self.assertEqual(other_response.status_code, 404)
+
+    def test_employer_can_download_only_forwarded_application_resume(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            resume_file=self.applicant.resume_file,
+            forwarded_to_employer=False,
+        )
+        client = Client()
+        self._login(client, self.employer_user)
+
+        with tempfile.TemporaryDirectory() as media_root:
+            self._write_resume(media_root)
+            with override_settings(MEDIA_ROOT=Path(media_root)):
+                denied_response = client.get(
+                    f'/resume/application/{application.pk}/'
+                )
+                application.forwarded_to_employer = True
+                application.save(update_fields=['forwarded_to_employer'])
+                allowed_response = client.get(
+                    f'/resume/application/{application.pk}/'
+                )
+
+        self.assertEqual(denied_response.status_code, 404)
+        self.assertEqual(allowed_response.status_code, 200)
+
+    @patch('app.services.resume_storage.requests.request')
+    def test_vercel_resume_upload_uses_private_supabase_bucket(self, storage_request):
+        from app.services.resume_storage import (
+            SUPABASE_RESUME_PREFIX,
+            store_verified_resume,
+        )
+
+        storage_request.return_value.raise_for_status.return_value = None
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source_path = Path(temp_dir) / 'resume.pdf'
+            source_path.write_bytes(b'private test resume')
+            with override_settings(
+                SUPABASE_URL='https://storage.example.invalid',
+                SUPABASE_SERVICE_ROLE_KEY='test-only-service-key',
+                RESUME_STORAGE_BUCKET='private-resumes',
+            ):
+                with patch.dict(os.environ, {'VERCEL': '1'}):
+                    reference = store_verified_resume(source_path, '.pdf')
+
+        self.assertTrue(reference.startswith(SUPABASE_RESUME_PREFIX))
+        self.assertTrue(reference.startswith('supabase://resumes/'))
+        self.assertIn(
+            '/storage/v1/object/private-resumes/resumes/',
+            storage_request.call_args.args[1],
+        )

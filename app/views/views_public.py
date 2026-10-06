@@ -1,13 +1,27 @@
 import os
+import io
+import logging
+import mimetypes
+
 from django.shortcuts import render, get_object_or_404, redirect
-from django.http import JsonResponse
+from django.http import (
+    FileResponse,
+    HttpResponseNotFound,
+    HttpResponseServerError,
+    JsonResponse,
+)
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
 from django.conf import settings
 from app.models import (
-    CmsSection, CmsContent, CmsHeroSlide, CmsTestimonial, CmsBrand, CmsNews,
-    JobPosting, Qualification, ContactInquiry, Employer
+    Application, Applicant, CmsSection, CmsContent, CmsHeroSlide,
+    CmsTestimonial, CmsBrand, CmsNews, JobPosting, Qualification,
+    ContactInquiry, Employer, User,
 )
+from app.services.resume_storage import ResumeStorageError, read_resume
+
+
+logger = logging.getLogger(__name__)
 
 def get_cms_content_dict():
     """
@@ -427,25 +441,92 @@ def contact_handler_view(request):
     })
 
 
+def _resume_response(request, applicant, resume_reference, application=None):
+    user_id = request.session.get('user_id')
+    if not str(user_id or '').isdigit():
+        return HttpResponseNotFound()
+
+    user = User.objects.filter(pk=int(user_id), status='active').only(
+        'user_id', 'role'
+    ).first()
+    if user is None:
+        return HttpResponseNotFound()
+
+    is_owner = applicant.user_id == user.user_id
+    is_admin = user.role == 'admin'
+    is_forwarded_employer = (
+        user.role == 'employer'
+        and application is not None
+        and application.job.employer.user_id == user.user_id
+        and application.forwarded_to_employer
+    )
+    if not (is_owner or is_admin or is_forwarded_employer):
+        return HttpResponseNotFound()
+
+    try:
+        content, filename = read_resume(resume_reference)
+    except FileNotFoundError:
+        return HttpResponseNotFound()
+    except (OSError, ValueError):
+        logger.exception('Invalid or unavailable resume reference.')
+        return HttpResponseServerError('Resume could not be retrieved.')
+    except ResumeStorageError:
+        logger.exception('Resume storage request failed.')
+        return HttpResponseServerError('Resume storage is temporarily unavailable.')
+
+    content_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+    response = FileResponse(
+        io.BytesIO(content),
+        as_attachment=True,
+        filename=os.path.basename(filename),
+        content_type=content_type,
+    )
+    response['Cache-Control'] = 'private, no-store'
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response
+
+
+def applicant_resume_view(request, applicant_id):
+    applicant = get_object_or_404(Applicant, pk=applicant_id)
+    if not applicant.resume_file:
+        return HttpResponseNotFound()
+    return _resume_response(request, applicant, applicant.resume_file)
+
+
+def application_resume_view(request, application_id):
+    application = get_object_or_404(
+        Application.objects.select_related('applicant', 'job__employer'),
+        pk=application_id,
+    )
+    resume_reference = application.resume_file or application.applicant.resume_file
+    if not resume_reference:
+        return HttpResponseNotFound()
+    return _resume_response(
+        request,
+        application.applicant,
+        resume_reference,
+        application=application,
+    )
+
+
 def smart_media_serve(request, path):
     """
-    Serves uploaded media files with automatic fallback for missing legacy files.
+    Serves public media, but never serves private resume documents directly.
     """
     import os
     from django.views.static import serve
     from django.http import FileResponse
 
+    normalized_path = path.replace('\\', '/').lower()
+    if (
+        normalized_path.startswith(('resumes/', 'uploads/resumes/'))
+        or normalized_path.endswith(('.pdf', '.docx', '.doc'))
+    ):
+        return HttpResponseNotFound()
+
     full_path = os.path.join(settings.MEDIA_ROOT, path)
     if os.path.exists(full_path) and os.path.isfile(full_path):
         return serve(request, path, document_root=str(settings.MEDIA_ROOT))
-
-    # Fallback for missing resumes
-    if 'resumes' in path or path.lower().endswith(('.pdf', '.docx', '.doc')):
-        resumes_dir = settings.MEDIA_ROOT / 'resumes'
-        if resumes_dir.exists():
-            for f in sorted(resumes_dir.glob('*.pdf'), key=lambda x: x.stat().st_size, reverse=True):
-                if f.is_file() and f.stat().st_size > 0:
-                    return FileResponse(open(f, 'rb'), content_type='application/pdf')
 
     # Fallback for missing profile images
     if 'profile_pics' in path or path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
@@ -454,4 +535,3 @@ def smart_media_serve(request, path):
             return FileResponse(open(fallback_img, 'rb'), content_type='image/png')
 
     return serve(request, path, document_root=str(settings.MEDIA_ROOT))
-

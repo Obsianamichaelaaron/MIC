@@ -1006,7 +1006,7 @@
         {% if error_msg %}<div class="profile-alert" style="background:#fff5f5;color:#c62828">{{ error_msg }}</div>{% endif %}
         <div class="profile-layout">
             <aside>
-                <section class="profile-card profile-identity"><div class="profile-avatar"><div class="profile-avatar-inner">{% if applicant.profile_pic %}<img src="../{{ applicant.profile_pic }}" alt="Profile">{% else %}{{ applicant.user.first_name|slice:":1"|upper }}{{ applicant.user.last_name|slice:":1"|upper }}{% endif %}</div></div><h2>{{ applicant.user.first_name }} {{ applicant.user.last_name }}</h2><p><i class="fas fa-envelope"></i> {{ applicant.user.email }}</p><span class="profile-verified"><i class="fas fa-circle-check"></i> Verified Candidate Account</span><div class="profile-meter"><div class="profile-meter-head"><span>Profile Completeness</span><strong>{{ completion_pct }}%</strong></div><div class="profile-track"><div class="profile-fill" style="--profile-fill: {{ completion_pct }}%;"></div></div><ul class="profile-checklist"><li>Personal Information {% if applicant.user.first_name and applicant.user.phone %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Resume Document {% if applicant.resume_file %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Educational Level {% if applicant.education_level %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Skills and Competencies {% if applicant.skills %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li></ul></div></section>
+                <section class="profile-card profile-identity"><div class="profile-avatar"><div class="profile-avatar-inner">{% if applicant.profile_pic %}<img src="{% if applicant.profile_pic|slice:':4' == 'http' %}{{ applicant.profile_pic }}{% else %}/{{ applicant.profile_pic }}{% endif %}" alt="Profile">{% else %}{{ applicant.user.first_name|slice:":1"|upper }}{{ applicant.user.last_name|slice:":1"|upper }}{% endif %}</div></div><h2>{{ applicant.user.first_name }} {{ applicant.user.last_name }}</h2><p><i class="fas fa-envelope"></i> {{ applicant.user.email }}</p><span class="profile-verified"><i class="fas fa-circle-check"></i> Verified Candidate Account</span><div class="profile-meter"><div class="profile-meter-head"><span>Profile Completeness</span><strong>{{ completion_pct }}%</strong></div><div class="profile-track"><div class="profile-fill" style="--profile-fill: {{ completion_pct }}%;"></div></div><ul class="profile-checklist"><li>Personal Information {% if applicant.user.first_name and applicant.user.phone %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Resume Document {% if applicant.resume_file %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Educational Level {% if applicant.education_level %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li><li>Skills and Competencies {% if applicant.skills %}<i class="fas fa-circle-check" style="color:#28a745"></i>{% else %}<i class="far fa-circle"></i>{% endif %}</li></ul></div></section>
                 <section class="profile-card">
                     <div class="profile-section-head">
                         <div class="profile-section-num"><i class="fas fa-file-pdf"></i></div>
@@ -1020,7 +1020,7 @@
                             <span class="profile-resume-name">
                                 <i class="fas fa-file-pdf" style="color:#dc3545"></i> {{ applicant.resume_file }}
                             </span>
-                            <a href="../{{ applicant.resume_file }}" target="_blank">View / Download</a>
+                            <a href="{% url 'applicant_resume' applicant.applicant_id %}" target="_blank">View / Download</a>
                         </div>
                         <form method="POST">
                             {% csrf_token %}
@@ -1068,7 +1068,7 @@
             <div class="pr-id-top">
               <div class="pr-avatar" onclick="document.getElementById('profilePhotoInput').click()">
     {% if applicant.profile_pic %}
-        <img src="../{{ applicant.profile_pic }}" alt="Profile">
+        <img src="{% if applicant.profile_pic|slice:':4' == 'http' %}{{ applicant.profile_pic }}{% else %}/{{ applicant.profile_pic }}{% endif %}" alt="Profile">
     {% else %}
         {{ initials }}
     {% endif %}
@@ -1222,8 +1222,8 @@
                                 </div>
                             </div>
                             <div class="pr-resume-actions">
-                                <a href="../{{ applicant.resume_file }}" target="_blank" class="pr-btn-xs pr-btn-view"><i class="fas fa-eye"></i> View</a>
-                                <a href="../{{ applicant.resume_file }}" download class="pr-btn-xs pr-btn-dl"><i class="fas fa-download"></i> Save</a>
+                                <a href="{% url 'applicant_resume' applicant.applicant_id %}" target="_blank" class="pr-btn-xs pr-btn-view"><i class="fas fa-eye"></i> View</a>
+                                <a href="{% url 'applicant_resume' applicant.applicant_id %}" class="pr-btn-xs pr-btn-dl"><i class="fas fa-download"></i> Save</a>
                             </div>
                         </div>
                         <form method="POST" style="margin-top:.5rem;">

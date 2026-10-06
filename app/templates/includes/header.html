@@ -1059,7 +1059,7 @@
             <button class="ud-trigger" id="udTrigger" aria-haspopup="true" aria-expanded="false">
                 <span class="ud-avatar" id="udAvatar">
                     {% if profile_pic %}
-                        <img src="/{{ profile_pic }}" alt="Profile">
+                        <img src="{% if profile_pic|slice:':4' == 'http' %}{{ profile_pic }}{% else %}/{{ profile_pic }}{% endif %}" alt="Profile">
                     {% else %}
                         {{ avatar_initials }}
                     {% endif %}
@@ -1072,7 +1072,7 @@
                 <div class="ud-header">
                     <span class="ud-avatar ud-avatar-lg" id="udAvatarLg">
                         {% if profile_pic %}
-                            <img src="/{{ profile_pic }}" alt="Profile">
+                            <img src="{% if profile_pic|slice:':4' == 'http' %}{{ profile_pic }}{% else %}/{{ profile_pic }}{% endif %}" alt="Profile">
                         {% else %}
                             {{ avatar_initials }}
                         {% endif %}

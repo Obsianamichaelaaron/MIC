@@ -103,7 +103,7 @@
                         </div>
                     </div>
                     {% if application.resume_file or applicant.resume_file %}
-                        <a href="/{{ application.resume_file|default:applicant.resume_file }}" target="_blank" style="padding:.5rem 1rem;background:#0f172a;color:#fff;border-radius:8px;font-size:.82rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;">
+                        <a href="{% url 'application_resume' application.application_id %}" style="padding:.5rem 1rem;background:#0f172a;color:#fff;border-radius:8px;font-size:.82rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;">
                             <i class="fas fa-download"></i> View / Download
                         </a>
                     {% endif %}

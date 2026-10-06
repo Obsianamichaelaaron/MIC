@@ -6,7 +6,13 @@ from django.http import JsonResponse, HttpResponseRedirect
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from app.models import User, Applicant, Qualification, Employer
-from app.auth_utils import verify_password, hash_password, isLoggedIn, getUserRole
+from app.auth_utils import (
+    hash_password,
+    isLoggedIn,
+    getUserRole,
+    password_needs_rehash,
+    verify_password,
+)
 from app.services.database_rls import (
     find_user_for_login,
     prepare_registration_user_id,
@@ -15,6 +21,11 @@ from app.services.database_rls import (
 )
 from app.services.mailer import send_otp_email, send_welcome_email, send_employer_welcome_email
 from app.services.resume_parser import verify_resume_document, parse_and_save_applicant_resume
+from app.services.resume_storage import (
+    ResumeStorageError,
+    stage_uploaded_file,
+    store_verified_resume,
+)
 
 @csrf_exempt
 def login_register_view(request):
@@ -141,25 +152,21 @@ def login_register_view(request):
                         elif uploaded_resume.size > 5 * 1024 * 1024:
                             error = "File size must be less than 5MB"
                         else:
-                            upload_dir = settings.MEDIA_ROOT / 'resumes'
-                            os.makedirs(upload_dir, exist_ok=True)
-                            new_fname = f"resume_{int(time.time())}_{random.randint(1000, 9999)}{file_ext}"
-                            file_path = upload_dir / new_fname
-                            with open(file_path, 'wb+') as dest:
-                                for chunk in uploaded_resume.chunks():
-                                    dest.write(chunk)
-
-                            # AI Resume Verification Check
-                            verification = verify_resume_document(str(file_path))
-                            if not verification.get('is_valid', False):
-                                if os.path.exists(file_path):
+                            with stage_uploaded_file(uploaded_resume, file_ext) as file_path:
+                                verification = verify_resume_document(str(file_path))
+                                if not verification.get('is_valid', False):
+                                    error = verification.get(
+                                        'rejection_reason',
+                                        'AI Verification Failed: The uploaded file is not recognized as a valid resume.',
+                                    )
+                                else:
                                     try:
-                                        os.remove(file_path)
-                                    except Exception:
-                                        pass
-                                error = verification.get('rejection_reason', 'AI Verification Failed: The uploaded file is not recognized as a valid resume.')
-                            else:
-                                resume_rel_path = f"uploads/resumes/{new_fname}"
+                                        resume_rel_path = store_verified_resume(
+                                            file_path,
+                                            file_ext,
+                                        )
+                                    except ResumeStorageError as exc:
+                                        error = str(exc)
 
                     if not error:
                         hashed_pwd = hash_password(password)
@@ -222,6 +229,12 @@ def login_register_view(request):
                 user = find_user_for_login(email)
                 if user and verify_password(password, user.password):
                     if user.status == 'active':
+                        if password_needs_rehash(user.password):
+                            set_authenticated_rls_context(user)
+                            user.password = hash_password(password)
+                            User.objects.filter(pk=user.pk).update(
+                                password=user.password
+                            )
                         request.session.flush()
                         request.session['user_id'] = user.user_id
                         request.session['email'] = user.email

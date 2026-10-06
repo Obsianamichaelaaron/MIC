@@ -15,6 +15,13 @@ from app.models import (
 )
 from app.auth_utils import require_role, getCurrentUserId
 from app.services.resume_parser import verify_resume_document, parse_and_save_applicant_resume
+from app.services.resume_storage import (
+    ResumeStorageError,
+    delete_resume,
+    stage_uploaded_file,
+    store_profile_picture,
+    store_verified_resume,
+)
 from app.services.ml_ranking import compute_job_match_score
 from app.services.ml_job_matching import get_match_classifier, predict_match_class
 from app.services.mailer import send_application_submitted_email
@@ -689,29 +696,28 @@ def apply_job_view(request, job_id=None):
             elif uploaded_resume.size > 5 * 1024 * 1024:
                 error = "Resume size must be under 5MB."
             else:
-                upload_dir = settings.MEDIA_ROOT / 'resumes'
-                os.makedirs(upload_dir, exist_ok=True)
-                new_fname = f"application_resume_{int(time.time())}_{random.randint(1000,9999)}{file_ext}"
-                dest_path = upload_dir / new_fname
-                with open(dest_path, 'wb+') as dest:
-                    for chunk in uploaded_resume.chunks():
-                        dest.write(chunk)
-
-                # AI Resume Verification Check
-                verification = verify_resume_document(str(dest_path))
-                if not verification.get('is_valid', False):
-                    if os.path.exists(dest_path):
+                with stage_uploaded_file(uploaded_resume, file_ext) as dest_path:
+                    verification = verify_resume_document(str(dest_path))
+                    if not verification.get('is_valid', False):
+                        error = verification.get(
+                            'rejection_reason',
+                            'AI Verification Failed: The uploaded file is not recognized as a valid resume.',
+                        )
+                    else:
                         try:
-                            os.remove(dest_path)
-                        except Exception:
-                            pass
-                    error = verification.get('rejection_reason', 'AI Verification Failed: The uploaded file is not recognized as a valid resume.')
-                else:
-                    resume_path = f"uploads/resumes/{new_fname}"
-                    applicant.resume_file = resume_path
-                    applicant.save()
-                    # Parse resume
-                    parse_and_save_applicant_resume(applicant, str(dest_path))
+                            resume_path = store_verified_resume(
+                                dest_path,
+                                file_ext,
+                            )
+                        except ResumeStorageError as exc:
+                            error = str(exc)
+                        else:
+                            applicant.resume_file = resume_path
+                            applicant.save()
+                            parse_and_save_applicant_resume(
+                                applicant,
+                                str(dest_path),
+                            )
 
         if not resume_path and not use_existing_resume:
             error = "Please provide or upload a resume to complete your application."
@@ -852,17 +858,26 @@ def profile_view(request):
 
         elif action == 'upload_photo':
             photo = request.FILES.get('profile_photo')
-            if photo:
-                upload_dir = settings.MEDIA_ROOT / 'profile_pics'
-                os.makedirs(upload_dir, exist_ok=True)
-                new_fname = f"photo_{user.user_id}_{int(time.time())}{os.path.splitext(photo.name)[1].lower()}"
-                dest_path = upload_dir / new_fname
-                with open(dest_path, 'wb+') as dest:
-                    for chunk in photo.chunks():
-                        dest.write(chunk)
-                applicant.profile_pic = f"uploads/profile_pics/{new_fname}"
-                applicant.save()
-                success_msg = "Profile picture updated!"
+            if not photo:
+                error_msg = "Please choose a profile picture to upload."
+            else:
+                photo_ext = os.path.splitext(photo.name)[1].lower()
+                if photo_ext not in {'.png', '.jpg', '.jpeg', '.webp'}:
+                    error_msg = "Only PNG, JPG, JPEG, and WEBP profile pictures are supported."
+                elif photo.size > 5 * 1024 * 1024:
+                    error_msg = "Profile picture must be smaller than 5 MB."
+                else:
+                    with stage_uploaded_file(photo, photo_ext) as photo_path:
+                        try:
+                            applicant.profile_pic = store_profile_picture(
+                                photo_path,
+                                photo_ext,
+                            )
+                        except ResumeStorageError as exc:
+                            error_msg = str(exc)
+                        else:
+                            applicant.save(update_fields=['profile_pic'])
+                            success_msg = "Profile picture updated!"
 
         elif action == 'upload_resume':
             resume = request.FILES.get('resume')
@@ -873,46 +888,44 @@ def profile_view(request):
             elif resume.size > 5 * 1024 * 1024:
                 error_msg = "Resume file must be smaller than 5 MB."
             else:
-                upload_dir = settings.MEDIA_ROOT / 'resumes'
-                os.makedirs(upload_dir, exist_ok=True)
                 file_ext = os.path.splitext(resume.name)[1].lower()
-                new_fname = f"resume_{user.user_id}_{int(time.time())}_{random.randint(1000, 9999)}{file_ext}"
-                dest_path = upload_dir / new_fname
-                with open(dest_path, 'wb+') as dest:
-                    for chunk in resume.chunks():
-                        dest.write(chunk)
-
-                # AI Resume Verification Check
-                verification = verify_resume_document(str(dest_path))
-                if not verification.get('is_valid', False):
-                    if os.path.exists(dest_path):
-                        try:
-                            os.remove(dest_path)
-                        except Exception:
-                            pass
-                    error_msg = verification.get('rejection_reason', 'AI Verification Failed: The uploaded file is not recognized as a valid resume.')
-                else:
-                    applicant.resume_file = f"uploads/resumes/{new_fname}"
-                    applicant.save()
-                    parsed_resume = parse_and_save_applicant_resume(applicant, str(dest_path))
-                    conf = int(verification.get('confidence_score', 90))
-                    if parsed_resume:
-                        success_msg = f"Resume verified by AI ({conf}% confidence) and profile updated successfully!"
+                with stage_uploaded_file(resume, file_ext) as dest_path:
+                    verification = verify_resume_document(str(dest_path))
+                    if not verification.get('is_valid', False):
+                        error_msg = verification.get(
+                            'rejection_reason',
+                            'AI Verification Failed: The uploaded file is not recognized as a valid resume.',
+                        )
                     else:
-                        success_msg = f"Resume verified by AI ({conf}% confidence) and uploaded successfully."
+                        try:
+                            applicant.resume_file = store_verified_resume(
+                                dest_path,
+                                file_ext,
+                            )
+                        except ResumeStorageError as exc:
+                            error_msg = str(exc)
+                        else:
+                            applicant.save()
+                            parsed_resume = parse_and_save_applicant_resume(
+                                applicant,
+                                str(dest_path),
+                            )
+                            conf = int(verification.get('confidence_score', 90))
+                            if parsed_resume:
+                                success_msg = f"Resume verified by AI ({conf}% confidence) and profile updated successfully!"
+                            else:
+                                success_msg = f"Resume verified by AI ({conf}% confidence) and uploaded successfully."
 
         elif action == 'delete_resume':
             if applicant.resume_file:
                 try:
-                    rel_path = applicant.resume_file.replace('/', os.sep)
-                    full_path = settings.BASE_DIR / rel_path
-                    if os.path.exists(full_path):
-                        os.remove(full_path)
-                except Exception:
-                    pass
-                applicant.resume_file = None
-                applicant.save()
-                success_msg = "Resume deleted successfully!"
+                    delete_resume(applicant.resume_file)
+                except ResumeStorageError as exc:
+                    error_msg = str(exc)
+                else:
+                    applicant.resume_file = None
+                    applicant.save()
+                    success_msg = "Resume deleted successfully!"
             else:
                 error_msg = "No active resume found to delete."
 

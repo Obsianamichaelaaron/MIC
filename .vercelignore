@@ -10,6 +10,7 @@ scratch/
 uploads/
 information_schema.sql
 u190037990_mb_db.sql
+db.sqlite3
 token.json
 client_secret*.json
 credentials*.json
@@ -17,4 +18,3 @@ candidaites*.json
 service_account*.json
 auth_drive.py
 generate_drive_oauth_token.py
-

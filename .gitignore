@@ -13,9 +13,13 @@ ENV/
 *.egg
 
 # Django
+db.sqlite3
 *.log
 local_settings.py
 db.sqlite3-journal
+uploads/
+information_schema.sql
+u190037990_mb_db.sql
 staticfiles/
 
 # Credentials & Secrets
@@ -39,4 +43,3 @@ Thumbs.db
 .vscode/
 .idea/
 scratch/
-

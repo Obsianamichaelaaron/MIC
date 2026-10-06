@@ -54,3 +54,35 @@ otherwise that table remains inaccessible to the runtime role.
 
 RLS policies restrict rows, not individual columns. Keep sensitive writes
 behind the existing application authorization checks as well.
+
+## Production secrets and files
+
+On Vercel, configure `DJANGO_SECRET_KEY`, `EMAIL_HOST_PASSWORD`,
+`SUPABASE_URL`, and `SUPABASE_SERVICE_ROLE_KEY` as encrypted environment
+variables. Never commit these values. `DJANGO_SECRET_KEY` is required at
+startup; SMTP password is required for email delivery. The Supabase service
+role key is server-only and must never be sent to a browser.
+
+Create a private Supabase Storage bucket named `private-resumes` (or configure
+`RESUME_STORAGE_BUCKET` to another private bucket). Applicant resume uploads
+are staged temporarily and then persisted to that bucket. Resume downloads use
+authenticated application endpoints: applicants can access their own files,
+admins can access all files, and employers can access only resumes for
+applications forwarded to them. Do not make the resume bucket public.
+
+Create a public Supabase Storage bucket named `public-profile-pictures` (or
+configure `PROFILE_PICTURE_STORAGE_BUCKET` accordingly) for profile images,
+which are intentionally displayed publicly by the existing site.
+
+Vercel's deployment filesystem is not persistent. Keep `uploads/` and
+`db.sqlite3` out of deployments and source control. The local SQLite database
+is development-only; Vercel requires the configured PostgreSQL database.
+
+## Exposed credentials and data
+
+If a database or credential has been committed to a public repository, removing
+the current file does not remove earlier copies from Git history or other
+clones. Rotate exposed SMTP credentials and Django signing keys, invalidate
+exposed user passwords, then coordinate any approved history rewrite with
+repository collaborators. Users whose credentials were exposed must reset
+their passwords even after repository history is cleaned.

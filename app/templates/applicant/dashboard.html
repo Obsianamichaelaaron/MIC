@@ -686,7 +686,7 @@
                     <div class="applicant-avatar-ring">
                         <div class="applicant-avatar-inner">
                             {% if applicant.profile_pic %}
-                                <img src="/{{ applicant.profile_pic }}" alt="{{ user.first_name }}">
+                                <img src="{% if applicant.profile_pic|slice:':4' == 'http' %}{{ applicant.profile_pic }}{% else %}/{{ applicant.profile_pic }}{% endif %}" alt="{{ user.first_name }}">
                             {% else %}
                                 <span>{{ user.first_name|slice:":1"|upper }}{{ user.last_name|slice:":1"|upper }}</span>
                             {% endif %}

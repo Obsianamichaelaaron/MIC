@@ -66,6 +66,11 @@ def hash_password(plain_password: str) -> str:
     salt = bcrypt.gensalt(rounds=10, prefix=b'2b')
     return bcrypt.hashpw(plain_password.encode('utf-8'), salt).decode('utf-8')
 
+
+def password_needs_rehash(hashed_password: str) -> bool:
+    return not str(hashed_password or '').startswith(('$2a$', '$2b$', '$2y$'))
+
+
 def isLoggedIn(request) -> bool:
     return bool(request.session.get('user_id'))
 

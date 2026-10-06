@@ -42,6 +42,10 @@ urlpatterns = [
     re_path(r'^(?:frontend/)?contact(?:us)?\.php$', views_public.contactus_view),
     re_path(r'^(?:frontend/)?(?:includes/handlers/)?contact_handler\.php$', views_public.contact_handler_view),
 
+    # ── Private Applicant Documents ──
+    path('resume/applicant/<int:applicant_id>/', views_public.applicant_resume_view, name='applicant_resume'),
+    path('resume/application/<int:application_id>/', views_public.application_resume_view, name='application_resume'),
+
     # ── Authentication & Session ──
     path('login/', views_auth.login_register_view, name='login'),
     path('register/', views_auth.login_register_view, name='register'),

@@ -6,11 +6,13 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '***REDACTED***'
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'false').lower() == 'true'
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    if os.environ.get('VERCEL') == '1':
+        raise RuntimeError('DJANGO_SECRET_KEY must be configured in production.')
+    SECRET_KEY = secrets.token_urlsafe(50)
 
 ALLOWED_HOSTS = ['*']
 
@@ -71,8 +73,20 @@ ASGI_APPLICATION = 'multibiz.asgi.application'
 
 # Use Supabase/PostgreSQL when DATABASE_URL is configured; retain SQLite locally.
 database_url = os.environ.get('DATABASE_URL')
+if os.environ.get('VERCEL') == '1' and not database_url:
+    raise RuntimeError('DATABASE_URL must be configured for the Vercel runtime.')
 RLS_CONTEXT_SECRET = os.environ.get('RLS_CONTEXT_SECRET', '')
 RLS_DATABASE_ROLE = 'mic_app_rls'
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
+RESUME_STORAGE_BUCKET = os.environ.get(
+    'RESUME_STORAGE_BUCKET',
+    'private-resumes',
+)
+PROFILE_PICTURE_STORAGE_BUCKET = os.environ.get(
+    'PROFILE_PICTURE_STORAGE_BUCKET',
+    'public-profile-pictures',
+)
 rls_management_commands = {
     'migrate',
     'makemigrations',
@@ -203,7 +217,7 @@ EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'reccapinto8@gmail.com'
-EMAIL_HOST_PASSWORD = '***REDACTED***'
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = 'MultiBiz Global <reccapinto8@gmail.com>'
 
 # Session Configuration

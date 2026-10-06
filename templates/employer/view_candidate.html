@@ -394,7 +394,7 @@
                         {% if application.resume_file %}
                             <div class="mt-3 pt-3 border-top d-flex align-items-center justify-content-between flex-wrap gap-2">
                                 <span class="small fw-semibold text-dark"><i class="fa-solid fa-file-pdf text-danger me-1"></i> Applicant Resume:</span>
-                                <a href="/uploads/{{ application.resume_file }}" target="_blank" class="btn btn-sm btn-outline-primary px-3 fw-semibold" style="border-radius:6px; font-size:0.8rem;">
+                                <a href="{% url 'application_resume' application.application_id %}" class="btn btn-sm btn-outline-primary px-3 fw-semibold" style="border-radius:6px; font-size:0.8rem;">
                                     <i class="fa-solid fa-download me-1"></i> Download PDF
                                 </a>
                             </div>
