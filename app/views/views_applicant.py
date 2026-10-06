@@ -22,8 +22,12 @@ from app.services.resume_storage import (
     store_profile_picture,
     store_verified_resume,
 )
-from app.services.ml_ranking import compute_job_match_score
-from app.services.ml_job_matching import get_match_classifier, predict_match_class
+from app.services.ml_ranking import compute_job_match_result, compute_job_match_score
+from app.services.ml_job_matching import (
+    get_match_classifier,
+    predict_match_class,
+    predict_match_score,
+)
 from app.services.mailer import send_application_submitted_email
 
 @require_role('applicant')
@@ -63,10 +67,10 @@ def dashboard_view(request):
     exp_score = min(100, int(applicant.experience_years or 0) * 20) if (applicant.experience_years and int(applicant.experience_years) > 0) else 0
     resume_score = 100 if applicant.resume_file else (40 if candidate_skills else 0)
 
-    # Live AI Employability Index
+    # Keep the profile-readiness indicator separate from supervised job matching.
     if applicant.employability_score and float(applicant.employability_score) > 0:
         base_score = float(applicant.employability_score)
-        score_source = 'AI Assessment Verified'
+        score_source = 'Resume Assessment'
     elif chatbot_completed:
         total_val = sum(a.score_value or 0 for a in chatbot_answers)
         base_score = min(100.0, max(40.0, (total_val / max(1, len(chatbot_answers) * 40)) * 100.0))
@@ -113,7 +117,10 @@ def dashboard_view(request):
             applicant=applicant
         ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
         for job in all_jobs:
-            score = compute_job_match_score(applicant, job, chatbot_answers)
+            score = (
+                predict_match_score(match_classifier, applicant, job, resume_text)
+                if match_classifier else None
+            )
             recommendations.append({
                 'job': job,
                 'job_id': job.job_id,
@@ -121,13 +128,19 @@ def dashboard_view(request):
                 'location': job.location,
                 'employment_type': job.employment_type,
                 'company_name': job.employer.company_name if job.employer else 'MultiBiz Partner',
-                'calculated_match_score': round(score, 2),
+                'calculated_match_score': score,
                 'ml_match_class': (
                     predict_match_class(match_classifier, applicant, job, resume_text)
                     if match_classifier else None
                 ),
             })
-        recommendations.sort(key=lambda x: x['calculated_match_score'], reverse=True)
+        recommendations.sort(
+            key=lambda x: (
+                x['calculated_match_score'] is not None,
+                x['calculated_match_score'] or 0,
+            ),
+            reverse=True,
+        )
         recommendations = recommendations[:4]
 
     # Feedback list
@@ -161,6 +174,10 @@ def dashboard_view(request):
     applications = Application.objects.filter(
         applicant=applicant
     ).select_related('job', 'job__employer').order_by('-applied_at')[:5]
+    for application in applications:
+        result = compute_job_match_result(applicant, application.job)
+        application.match_score = result['match_score']
+        application.qualification_status = result['qualification_status']
 
     # Upcoming interviews
     interviews = InterviewSchedule.objects.filter(
@@ -232,14 +249,7 @@ def dashboard_view(request):
 
 
 def compute_applicant_job_match(applicant, job, chatbot_answers=None):
-    """
-    Computes exact 5-factor match score matching jobs.php & job_details.php:
-    1. Skills (40 pts)
-    2. Experience (25 pts)
-    3. Qualifications (15 pts)
-    4. Chatbot Assessment (10 pts)
-    5. Bonuses (10 pts)
-    """
+    """Return the supervised model score used by applicant job surfaces."""
     return compute_job_match_score(applicant, job, chatbot_answers)
 
 
@@ -366,16 +376,21 @@ def jobs_view(request):
         match_classifier = None
         match_model_status = {
             'ready': False,
-            'reason': 'SVM match classification is unavailable without an applicant profile and active jobs.',
+            'reason': 'The trained match model is unavailable without an applicant profile and active jobs.',
         }
         resume_text = ''
     for job in all_jobs:
-        score = compute_applicant_job_match(applicant, job, chatbot_answers) if applicant and applicant.resume_file else 0
+        score = (
+            predict_match_score(match_classifier, applicant, job, resume_text)
+            if applicant and applicant.resume_file and match_classifier else None
+        )
         ml_match_class = (
             predict_match_class(match_classifier, applicant, job, resume_text)
             if match_classifier and applicant else None
         )
-        if score >= 80:
+        if score is None:
+            score_color = '#687386'
+        elif score >= 80:
             score_color = '#28a745'
         elif score >= 60:
             score_color = '#ffc107'
@@ -431,15 +446,26 @@ def jobs_view(request):
 
     if min_match:
         try:
-            jobs_list = [job_item for job_item in jobs_list if job_item['match_score'] >= float(min_match)]
+            jobs_list = [
+                job_item for job_item in jobs_list
+                if job_item['match_score'] is not None
+                and job_item['match_score'] >= float(min_match)
+            ]
         except ValueError:
             min_match = ''
 
     # Prioritize qualification matches first if applicant has selected qualification, otherwise sort by match score
     if selected_qualification_id:
-        jobs_list.sort(key=lambda x: (not x['qualification_matches'], -x['match_score']))
+        jobs_list.sort(key=lambda x: (
+            not x['qualification_matches'],
+            x['match_score'] is None,
+            -(x['match_score'] or 0),
+        ))
     else:
-        jobs_list.sort(key=lambda x: -x['match_score'])
+        jobs_list.sort(key=lambda x: (
+            x['match_score'] is None,
+            -(x['match_score'] or 0),
+        ))
 
     context = {
         'page_title': 'Browse Jobs - MultiBiz',
@@ -497,7 +523,20 @@ def job_details_view(request, job_id=None):
 
     chatbot_answers = list(ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number'))
     chatbot_completed = len(chatbot_answers) > 0
-    match_score = compute_job_match_score(applicant, job, chatbot_answers)
+    match_model, match_model_status = get_match_classifier(
+        exclude_applicant_id=applicant.pk
+    )
+    resume_text = ResumeAnalysis.objects.filter(
+        applicant=applicant
+    ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
+    match_score = (
+        predict_match_score(match_model, applicant, job, resume_text)
+        if match_model else None
+    )
+    match_class = (
+        predict_match_class(match_model, applicant, job, resume_text)
+        if match_model else None
+    )
 
     # Check if profile is complete (skills & qualifications present or profile_completed flag is True or resume uploaded)
     profile_completed = bool(applicant and (applicant.profile_completed or (applicant.skills and applicant.qualifications) or applicant.resume_file))
@@ -505,134 +544,24 @@ def job_details_view(request, job_id=None):
     # Job qualifications
     job_qualifications = [qm.qualification for qm in job.qualification_mappings.select_related('qualification').all() if qm.qualification]
 
-    # Skills comparison
-    app_skills_list = [s.strip() for s in (applicant.skills or '').split(',') if s.strip()]
-    app_skills = set([s.lower() for s in app_skills_list])
-    job_skills_raw = [s.strip() for s in (job.skills_required or '').split(',') if s.strip()]
-
-    matched_skills = []
-    missing_skills = []
-    job_skills = []
-    for s in job_skills_raw:
-        s_lower = s.lower()
-        matched = any(s_lower == a_s or s_lower in a_s or a_s in s_lower for a_s in app_skills)
-        job_skills.append({'name': s, 'matched': matched})
-        if matched:
-            matched_skills.append(s)
-        else:
-            missing_skills.append(s)
-
-    # Qualifications comparison
-    applicant_qual_text = (applicant.qualifications or '').lower()
-    matched_quals = []
-    missing_quals = []
-    for qual in job_qualifications:
-        if qual.name.lower().strip() in applicant_qual_text:
-            matched_quals.append({'name': qual.name})
-        else:
-            missing_quals.append({'name': qual.name})
-
-    # Scores breakdown
-    skills_score = round((len(matched_skills) / len(job_skills_raw) * 40.0), 1) if job_skills_raw else 40.0
-    exp_years = int(applicant.experience_years or 0)
-    exp_score = round(min(25.0, exp_years * 5.0), 1)
-    qual_score = round((len(matched_quals) / len(job_qualifications) * 15.0), 1) if job_qualifications else 7.5
-
-    cb_raw = 0
-    cb_max = 0
-    for ans in chatbot_answers:
-        if ans.score_value is not None:
-            cb_raw += ans.score_value
-            cb_max += 40
-        elif ans.answer_value is not None:
-            cb_raw += int(ans.answer_value)
-            cb_max += 5
-    cb_pct = round((cb_raw / cb_max * 100.0), 1) if cb_max > 0 else 0.0
-    cb_score = round((cb_raw / cb_max * 10.0), 1) if cb_max > 0 else 0.0
-
-    bonus_score = 0.0
-    if len(chatbot_answers) >= 5:
-        bonus_score += 5.0
-    if applicant.employability_score and float(applicant.employability_score) > 0:
-        bonus_score += round(min(5.0, (float(applicant.employability_score) / 100.0) * 5.0), 1)
-
-    breakdown = [
-        {
-            'category': 'Skills Match',
-            'score': skills_score,
-            'max': 40,
-            'percentage': round(skills_score / 40.0 * 100.0),
-            'description': f"{len(matched_skills)} of {len(job_skills_raw)} required skills matched",
-        },
-        {
-            'category': 'Experience',
-            'score': exp_score,
-            'max': 25,
-            'percentage': round(exp_score / 25.0 * 100.0),
-            'description': f"{exp_years} years of relevant experience",
-        },
-        {
-            'category': 'Qualifications',
-            'score': qual_score,
-            'max': 15,
-            'percentage': round(qual_score / 15.0 * 100.0),
-            'description': f"{len(matched_quals)} of {len(job_qualifications)} qualifications matched" if job_qualifications else "No specific qualification required",
-        },
-        {
-            'category': 'Chatbot Assessment',
-            'score': cb_score,
-            'max': 10,
-            'percentage': round(cb_score / 10.0 * 100.0),
-            'description': 'Assessment completed' if chatbot_completed else 'Take AI assessment for bonus points',
-        },
-        {
-            'category': 'Bonuses & Employability',
-            'score': bonus_score,
-            'max': 10,
-            'percentage': round(bonus_score / 10.0 * 100.0),
-            'description': 'Profile readiness and employability bonus',
-        },
+    job_skills = [
+        skill.strip()
+        for skill in (job.skills_required or '').split(',')
+        if skill.strip()
     ]
 
-    transparency_data = {
-        'total_score': match_score,
-        'breakdown': breakdown,
-        'skills_analysis': {
-            'required': job_skills_raw,
-            'matched': matched_skills,
-            'missing': missing_skills,
-        },
-        'qualifications_analysis': {
-            'required': [{'name': q.name} for q in job_qualifications],
-            'matched': matched_quals,
-            'missing': missing_quals,
-        },
-        'chatbot_analysis': {
-            'completed': chatbot_completed,
-            'score': cb_score,
-            'percentage': cb_pct,
-            'questions_answered': len(chatbot_answers),
-            'raw_score': cb_raw,
-            'max_raw': cb_max,
-        },
-        'experience_analysis': {
-            'years': exp_years,
-            'score': exp_score,
-        },
+    match_colors = {
+        'high': '#28a745',
+        'medium': '#ff9800',
+        'low': '#dc3545',
     }
-
-    if match_score >= 80:
-        color = '#28a745'
-        match_rating = 'Excellent Match'
-    elif match_score >= 60:
-        color = '#17a2b8'
-        match_rating = 'Good Match'
-    elif match_score >= 40:
-        color = '#ff9800'
-        match_rating = 'Moderate Match'
-    else:
-        color = '#dc3545'
-        match_rating = 'Needs Improvement'
+    match_ratings = {
+        'high': 'High ML match',
+        'medium': 'Medium ML match',
+        'low': 'Low ML match',
+    }
+    color = match_colors.get(match_class, '#687386')
+    match_rating = match_ratings.get(match_class, 'Model not ready')
 
     similar_jobs = JobPosting.objects.filter(
         status='active'
@@ -650,15 +579,16 @@ def job_details_view(request, job_id=None):
         'applicant_remarks': applicant_remarks,
         'interviews': interviews,
         'match_score': match_score,
+        'match_model_status': match_model_status,
         'score': match_score,
         'color': color,
         'display_match_score': match_score,
         'match_rating': match_rating,
+        'ml_match_class': match_class,
         'qualifications': job_qualifications,
         'job_qualifications': job_qualifications,
-        'skills': job_skills_raw,
+        'skills': job_skills,
         'job_skills': job_skills,
-        'transparency_data': transparency_data,
         'similar_jobs': similar_jobs,
     }
     return render(request, 'applicant/job_details.html', context)
@@ -723,21 +653,33 @@ def apply_job_view(request, job_id=None):
             error = "Please provide or upload a resume to complete your application."
 
         if not error:
-            match_score = compute_job_match_score(applicant, job, chatbot_answers)
-            
-            # Classification
-            if match_score >= 80:
-                classification = 'Strong Match'
-            elif match_score >= 60:
-                classification = 'Good Match'
-            else:
-                classification = 'General Match'
+            match_model, match_model_status = get_match_classifier(
+                exclude_applicant_id=applicant.pk
+            )
+            resume_text = ResumeAnalysis.objects.filter(
+                applicant=applicant
+            ).order_by('-analysis_date').values_list(
+                'extracted_text', flat=True
+            ).first() or ''
+            match_score = (
+                predict_match_score(match_model, applicant, job, resume_text)
+                if match_model else None
+            )
+            match_class = (
+                predict_match_class(match_model, applicant, job, resume_text)
+                if match_model else None
+            )
+            classification = {
+                'high': 'Strong Match',
+                'medium': 'Moderate Match',
+                'low': 'Low Match',
+            }.get(match_class, 'Awaiting model training')
 
             Application.objects.create(
                 job=job,
                 applicant=applicant,
                 status='pending',
-                match_score=Decimal(str(match_score)),
+                match_score=Decimal(str(match_score or 0)),
                 cover_letter=cover_letter,
                 resume_file=resume_path,
                 classification=classification,
@@ -760,7 +702,16 @@ def apply_job_view(request, job_id=None):
 
             return redirect('/applicant/applications.php?applied=success')
 
-    match_score = compute_job_match_score(applicant, job, chatbot_answers)
+    match_model, match_model_status = get_match_classifier(
+        exclude_applicant_id=applicant.pk
+    )
+    resume_text = ResumeAnalysis.objects.filter(
+        applicant=applicant
+    ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
+    match_score = (
+        predict_match_score(match_model, applicant, job, resume_text)
+        if match_model else None
+    )
 
     context = {
         'page_title': f"Apply for {job.title}",
@@ -770,6 +721,7 @@ def apply_job_view(request, job_id=None):
         'profile': applicant,
         'user': user,
         'match_score': match_score,
+        'match_model_status': match_model_status,
         'error': error,
     }
     return render(request, 'applicant/apply_job.html', context)
@@ -799,6 +751,9 @@ def applications_view(request):
 
     apps_list = []
     for app_item in apps_qs:
+        result = compute_job_match_result(applicant, app_item.job)
+        app_item.match_score = result['match_score']
+        app_item.qualification_status = result['qualification_status']
         apps_list.append({
             'app': app_item,
             'interview': interviews_map.get(app_item.application_id)
@@ -810,6 +765,12 @@ def applications_view(request):
         'applications': apps_list,
         'status_filter': status_filter,
         'total_count': len(apps_list),
+        'match_model_status': (
+            result if apps_list else {
+                'ready': False,
+                'reason': 'There are no applications to score.',
+            }
+        ),
         'applied_success': request.GET.get('applied') == 'success',
     }
     return render(request, 'applicant/applications.html', context)

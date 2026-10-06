@@ -14,7 +14,7 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.pipeline import Pipeline
-from sklearn.svm import LinearSVC
+from sklearn.linear_model import LogisticRegression
 
 from django.db.models import OuterRef, Subquery
 
@@ -79,18 +79,18 @@ def _class_counts(samples):
 def _model_readiness(samples, minimum_per_class=MIN_SAMPLES_PER_CLASS):
     counts = _class_counts(samples)
     if any(sample['label'] not in MATCH_CLASSES for sample in samples):
-        return counts, 'SVM training data contains a label outside the required high, medium, low classes.'
+        return counts, 'Training data contains a label outside the required high, medium, low classes.'
     missing = [label for label, count in counts.items() if count < minimum_per_class]
     if missing:
         minimum_words = {1: 'one', 2: 'two', 3: 'three'}
         minimum_text = minimum_words.get(minimum_per_class, str(minimum_per_class))
         return counts, (
-            f'SVM match classes need at least {minimum_text} admin-reviewed examples each. '
+            f'Match classes need at least {minimum_text} admin-reviewed examples each. '
             f'Current counts: high {counts["high"]}, medium {counts["medium"]}, '
             f'low {counts["low"]}.'
         )
     if any(not sample['text'].strip() for sample in samples):
-        return counts, 'SVM training is unavailable because a reviewed application has no match text.'
+        return counts, 'Training is unavailable because a reviewed application has no match text.'
     return counts, ''
 
 
@@ -103,7 +103,11 @@ def _new_pipeline():
             max_features=30000,
             sublinear_tf=True,
         )),
-        ('svm', LinearSVC(class_weight='balanced', random_state=RANDOM_STATE)),
+        ('classifier', LogisticRegression(
+            class_weight='balanced',
+            max_iter=1000,
+            random_state=RANDOM_STATE,
+        )),
     ])
 
 
@@ -122,7 +126,7 @@ def train_match_classifier(samples, minimum_per_class=MIN_SAMPLES_PER_CLASS):
     except ValueError as exc:
         return None, {
             'ready': False,
-            'reason': f'TFIDF could not fit the reviewed match text: {exc}',
+            'reason': f'TF-IDF could not fit the reviewed match text: {exc}',
             'class_counts': counts,
         }
     return model, {'ready': True, 'reason': '', 'class_counts': counts}
@@ -257,3 +261,16 @@ def predict_match_class(model, applicant, job, resume_text=''):
     if not re.search(r'\w', text, flags=re.UNICODE):
         return None
     return str(model.predict([text])[0])
+
+
+def predict_match_score(model, applicant, job, resume_text=''):
+    """Return the model-estimated probability of the admin-reviewed high class."""
+    text = build_match_text(applicant, job, resume_text)
+    if not re.search(r'\w', text, flags=re.UNICODE):
+        return None
+
+    classes = list(model.classes_)
+    if 'high' not in classes:
+        return None
+    high_probability = model.predict_proba([text])[0][classes.index('high')]
+    return round(float(high_probability) * 100.0, 2)

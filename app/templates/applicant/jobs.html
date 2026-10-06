@@ -77,7 +77,7 @@
         <section class="jobs-filter-old"><form method="GET" action="jobs.php"><input name="search" value="{{ query }}" placeholder="Job title, skill, or keyword..."><select name="type" onchange="this.form.submit()"><option value="">All Employment Types</option><option value="full-time" {% if emp_type == 'full-time' %}selected{% endif %}>Full-time</option><option value="part-time" {% if emp_type == 'part-time' %}selected{% endif %}>Part-time</option><option value="contract" {% if emp_type == 'contract' %}selected{% endif %}>Contract</option><option value="internship" {% if emp_type == 'internship' %}selected{% endif %}>Internship</option></select><select name="min_match" onchange="this.form.submit()"><option value="" {% if not min_match %}selected{% endif %}>All Match %</option><option value="80" {% if min_match == '80' %}selected{% endif %}>80%+ (Excellent)</option><option value="60" {% if min_match == '60' %}selected{% endif %}>60%+ (Good)</option><option value="40" {% if min_match == '40' %}selected{% endif %}>40%+ (Average)</option></select><button type="submit"><i class="fas fa-filter"></i> Filter</button></form></section>
         <div class="small text-muted mb-2" role="status">
             {% if match_model_status.ready %}
-                SVM match classification is active using reviewed application outcomes.
+                TF-IDF + Logistic Regression is trained on admin-reviewed application outcomes.
             {% else %}
                 {{ match_model_status.reason }}
             {% endif %}
@@ -102,9 +102,13 @@
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
                                     {% if item.ml_match_class %}
-                                        <span class="small text-primary fw-semibold">SVM {{ item.ml_match_class|title }}</span>
+                                        <span class="small text-primary fw-semibold">ML {{ item.ml_match_class|title }}</span>
                                     {% endif %}
-                                    <span class="job-score-old"><i class="fas fa-bolt"></i> {{ item.match_score|floatformat:0 }}%</span>
+                                    {% if item.match_score != None %}
+                                        <span class="job-score-old"><i class="fas fa-bolt"></i> {{ item.match_score|floatformat:0 }}% ML estimate</span>
+                                    {% else %}
+                                        <span class="job-score-old">No ML estimate</span>
+                                    {% endif %}
                                 </div>
                             </div>
                             <h2>{{ item.job.title }}</h2>
@@ -724,14 +728,12 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
     const scoreColor = numScore >= 80 ? '#28a745' : 
                      numScore >= 60 ? '#ffc107' : 
                      numScore >= 40 ? '#fd7e14' : '#dc3545';
-    const scoreLabel = numScore >= 80 ? 'Excellent Match!' : 
-                      numScore >= 60 ? 'Good Match' : 
-                      numScore >= 40 ? 'Fair Match' : 'Needs Improvement';
+    const scoreLabel = 'Estimated probability of a high match';
     
     let html = `
         <h3 style="color: #333; margin-bottom: 1rem;">${jobTitle}</h3>
         <div style="background: linear-gradient(135deg, ${scoreColor} 0%, ${scoreColor}dd 100%); padding: 2rem; border-radius: 10px; margin-bottom: 1.5rem;">
-            <p style="color: white; font-size: 0.9rem; margin-bottom: 0.5rem; opacity: 0.9;">Your Match Score</p>
+            <p style="color: white; font-size: 0.9rem; margin-bottom: 0.5rem; opacity: 0.9;">Model Score</p>
             <p style="color: white; font-size: 3rem; font-weight: 700; margin: 0.5rem 0;">
                 ${numScore.toFixed(1)}%
             </p>
@@ -740,14 +742,11 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
             </p>
         </div>
         <div style="text-align: left; background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
-            <h4 style="color: #333; margin-bottom: 0.75rem;">How this score is calculated:</h4>
+            <h4 style="color: #333; margin-bottom: 0.75rem;">How the model is trained:</h4>
             <ul style="color: #666; line-height: 1.8; margin: 0; padding-left: 1.5rem;">
-                <li><strong>Skills Match (40 pts):</strong> % of required skills matched</li>
-                <li><strong>Experience (25 pts):</strong> 5 points per year of experience</li>
-                <li><strong>Qualifications (15 pts):</strong> % of required qualifications matched</li>
-                <li><strong>Chatbot Assessment (10 pts):</strong> Based on assessment performance</li>
-                <li><strong>Bonuses (10 pts):</strong> Extra points for completion &amp; scores</li>
-                <li><em style="color: #0056b3;">Total possible: 100 points</em></li>
+                <li>TF-IDF converts resume, profile, and job text into numeric features.</li>
+                <li>Logistic Regression learns high, medium, and low labels from admin-reviewed applications.</li>
+                <li>This percentage is the model-estimated probability of the high class, not a guaranteed hiring outcome.</li>
             </ul>
         </div>
         <div style="display: flex; gap: 1rem; justify-content: center;">

@@ -872,7 +872,7 @@ def send_job_request_rejected_notification(to_email: str, company_name: str, con
         return {'success': False, 'error': str(e)}
 
 
-def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str, applicant_name: str, job_title: str, match_score: float = 0.0, admin_notes: str = '') -> dict:
+def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str, applicant_name: str, job_title: str, match_score: float | None = None, admin_notes: str = '') -> dict:
     """
     Sends notification to employer when admin forwards a candidate to them.
     """
@@ -882,6 +882,11 @@ def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str,
     safe_applicant = html.escape(applicant_name or 'Candidate')
     safe_title = html.escape(job_title or 'Job Position')
     safe_notes = html.escape(admin_notes or '').replace('\n', '<br>') if admin_notes else ''
+    match_score_html = (
+        f"<p style='margin:4px 0 0;color:#64748b;font-size:13px;'>ML-estimated high-match probability: <strong>{match_score:.0f}%</strong></p>"
+        if match_score is not None else
+        "<p style='margin:4px 0 0;color:#64748b;font-size:13px;'>ML match score: unavailable</p>"
+    )
 
     subject = f"🌟 New Candidate Forwarded: {applicant_name} for {job_title}"
     
@@ -909,7 +914,7 @@ def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str,
       <div style='background:#f8fafc;border:1px solid #e2e8f0;padding:18px 22px;border-radius:8px;margin:20px 0;'>
         <p style='margin:0;font-weight:700;color:#0f172a;font-size:16px;'>👤 {safe_applicant}</p>
         <p style='margin:4px 0 0;color:#0284c7;font-size:13.5px;font-weight:600;'>Position: {safe_title}</p>
-        <p style='margin:4px 0 0;color:#64748b;font-size:13px;'>AI Match Score: <strong>{match_score:.0f}%</strong></p>
+        {match_score_html}
         {notes_html}
       </div>
 

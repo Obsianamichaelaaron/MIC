@@ -61,9 +61,14 @@
     <div class="row g-3 mb-4">
         <div class="col-md-3">
             <div class="custom-card metric-card p-4 bg-white border-0 shadow-sm rounded-4">
-                <div class="text-muted small fw-semibold">Average Match Score</div>
-                <div class="display-6 fw-bold text-primary mt-1 metric-value">{{ avg_match_score }}%</div>
-                <div class="text-success small mt-1"><i class="fa-solid fa-arrow-trend-up me-1"></i> Healthy talent alignment</div>
+                <div class="text-muted small fw-semibold">Holdout Model Accuracy</div>
+                {% if match_model_evaluation.ready %}
+                    <div class="display-6 fw-bold text-primary mt-1 metric-value">{{ match_model_evaluation.accuracy_percent }}%</div>
+                    <div class="text-muted small mt-1">Stratified test records: {{ match_model_evaluation.test_count }}</div>
+                {% else %}
+                    <div class="display-6 fw-bold text-secondary mt-1 metric-value">Unavailable</div>
+                    <div class="text-muted small mt-1">{{ match_model_evaluation.reason }}</div>
+                {% endif %}
             </div>
         </div>
         <div class="col-md-3">
@@ -137,8 +142,8 @@
     <section class="custom-card p-4 mt-4 bg-white border-0 shadow-sm rounded-4">
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
             <div>
-                <h5 class="fw-bold text-dark mb-1"><i class="fa-solid fa-brain text-primary me-2"></i>NLP + TF-IDF + SVM Match Evaluation</h5>
-                <p class="text-muted small mb-0">Three-class evaluation uses admin-reviewed outcomes: qualified → high, under-qualified → medium, not qualified → low.</p>
+                <h5 class="fw-bold text-dark mb-1"><i class="fa-solid fa-brain text-primary me-2"></i>TF-IDF + Logistic Regression Match Evaluation</h5>
+                <p class="text-muted small mb-0">The model learns three classes from admin-reviewed outcomes: qualified → high, under-qualified → medium, not qualified → low.</p>
             </div>
             {% if match_model_evaluation.ready %}
                 <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2">Stratified holdout · {{ match_model_evaluation.test_count }} test records</span>

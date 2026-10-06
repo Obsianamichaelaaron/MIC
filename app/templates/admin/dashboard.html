@@ -189,11 +189,13 @@
         <div class="col-6 col-md-4 col-xl-2">
             <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 h-100 d-flex flex-column justify-content-between">
                 <div class="d-flex justify-content-between align-items-start">
-                    <span class="text-muted small fw-semibold">Avg Match Score</span>
+                    <span class="text-muted small fw-semibold">Match Model</span>
                     <i class="fa-solid fa-wand-magic-sparkles text-primary" style="font-size: 0.9rem;"></i>
                 </div>
                 <div>
-                    <div class="fs-3 fw-bold text-primary mt-1">{{ avg_match_score }}%</div>
+                    <div class="fs-5 fw-bold text-primary mt-1">
+                        {% if match_model_evaluation.ready %}Ready{% else %}Not ready{% endif %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -319,23 +321,16 @@
         </div>
     </div>
 
-    <!-- Analytics Graph Row 3: AI Candidate Match Score & Talent Quality Insights -->
+    <!-- Analytics Graph Row 3: Reviewed Match Outcomes -->
     <div class="row g-4 mb-4">
         <div class="col-12">
             <div class="analytics-chart-card p-4 bg-white">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center border-bottom pb-3 mb-3 gap-2">
                     <div>
                         <h6 class="fw-bold text-dark mb-0">
-                            <i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>AI Talent Alignment & Fitment Quality Spectrum
+                            <i class="fa-solid fa-wand-magic-sparkles text-primary me-2"></i>Admin-Reviewed Match Outcomes
                         </h6>
-                    </div>
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge-match badge-match-excellent py-1 px-2.5" style="font-size: 0.75rem;">Qualified: &gt;60%</span>
-                            <span class="badge-match badge-match-good py-1 px-2.5" style="font-size: 0.75rem;">Under-Qualified: 40-60%</span>
-                            <span class="badge bg-secondary rounded-pill py-1 px-2.5" style="font-size: 0.75rem;">Unclassified: 30- &lt;40%</span>
-                            <span class="badge bg-danger rounded-pill py-1 px-2.5" style="font-size: 0.75rem;">Not Qualified: &lt;30%</span>
-                        </div>
+                        <p class="text-muted small mb-0">Training-label counts, not live candidate predictions.</p>
                     </div>
                 </div>
 
@@ -349,22 +344,21 @@
                         <div class="p-3 bg-light rounded-4 border">
                             <div class="d-flex align-items-center gap-2 mb-2">
                                 <i class="fa-solid fa-brain text-primary fs-5"></i>
-                                <span class="fw-bold text-dark small">AI Talent Radar Insights</span>
+                                <span class="fw-bold text-dark small">Match Model Readiness</span>
                             </div>
                             
                             <div class="d-flex flex-column gap-2">
                                 <div class="d-flex justify-content-between align-items-center small p-2 bg-white rounded-3 border">
-                                    <span class="text-muted">Overall Average Fit:</span>
-                                    <span class="fw-bold text-primary">{{ avg_match_score }}%</span>
+                                    <span class="text-muted">Reviewed training examples:</span>
+                                    <span class="fw-bold text-primary">{{ match_training_count }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center small p-2 bg-white rounded-3 border">
-                                    <span class="text-muted">Elite & Strong Matches:</span>
-                                    <span class="fw-bold text-success">{{ elite_matches|add:strong_matches }} candidates</span>
+                                    <span class="text-muted">Model evaluation:</span>
+                                    <span class="fw-bold {% if match_model_evaluation.ready %}text-success{% else %}text-warning{% endif %}">
+                                        {% if match_model_evaluation.ready %}Ready{% else %}Not ready{% endif %}
+                                    </span>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center small p-2 bg-white rounded-3 border">
-                                    <span class="text-muted">Active AI Match Models:</span>
-                                    <span class="badge bg-success bg-opacity-10 text-success fw-semibold">100% Operational</span>
-                                </div>
+                                <div class="small text-muted">{{ match_model_evaluation.reason }}</div>
                             </div>
                         </div>
                     </div>
@@ -393,8 +387,8 @@ document.addEventListener('DOMContentLoaded', function() {
         pipeline_data: [0, 0, 0, 0, 0, 0],
         job_type_labels: ['Full-Time', 'Part-Time', 'Contract', 'Internship'],
         job_type_data: [0, 0, 0, 0],
-        match_tier_labels: ['Elite Qualified (85-100%)', 'Qualified (>60-<85%)', 'Under-Qualified (40-60%)', 'Unclassified (30-<40%)', 'Not Qualified (<30%)'],
-        match_tier_data: [0, 0, 0, 0, 0]
+        match_tier_labels: ['High reviewed outcome', 'Medium reviewed outcome', 'Low reviewed outcome'],
+        match_tier_data: [0, 0, 0]
     };
 
     try {

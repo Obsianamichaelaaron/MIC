@@ -19,9 +19,12 @@ from app.auth_utils import verify_password, hash_password
 from app.services.mailer import send_application_status_update_email
 from app.services.ml_job_matching import (
     MATCH_CLASSES,
+    build_match_text,
     evaluate_match_model,
+    predict_match_score,
     train_match_classifier,
 )
+from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
 from app.services.qualification import classify_match_score
 from app.services.database_rls import set_authenticated_rls_context
 
@@ -105,7 +108,7 @@ class MultiBizConversionTests(TestCase):
             with self.subTest(score=score):
                 self.assertEqual(classify_match_score(score), expected_status)
 
-    def test_admin_dashboard_score_distribution_uses_qualification_bands(self):
+    def test_admin_dashboard_distribution_does_not_reuse_legacy_score_bands(self):
         for index, score in enumerate((
             Decimal('85.00'),
             Decimal('60.01'),
@@ -136,7 +139,11 @@ class MultiBizConversionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         chart_data = json.loads(response.context['chart_data_json'])
-        self.assertEqual(chart_data['match_tier_data'], [1, 1, 2, 1, 1])
+        self.assertEqual(
+            chart_data['match_tier_labels'],
+            ['High reviewed outcome', 'Medium reviewed outcome', 'Low reviewed outcome'],
+        )
+        self.assertEqual(chart_data['match_tier_data'], [0, 0, 0])
 
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
@@ -416,7 +423,16 @@ class MultiBizConversionTests(TestCase):
             ))
 
         scores = {job.job_id: score for job, score in zip(jobs, [12, 39, 22, 99, 83])}
-        with patch('app.views.views_applicant.compute_job_match_score', side_effect=lambda applicant, job, answers: scores[job.job_id]):
+        with patch(
+            'app.views.views_applicant.get_match_classifier',
+            return_value=(object(), {'ready': True, 'reason': ''}),
+        ), patch(
+            'app.views.views_applicant.predict_match_score',
+            side_effect=lambda model, applicant, job, resume_text: scores[job.job_id],
+        ), patch(
+            'app.views.views_applicant.predict_match_class',
+            return_value='high',
+        ):
             response = self.client.get('/applicant/dashboard.php')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.context['recommended_jobs'], [])
@@ -433,18 +449,27 @@ class MultiBizConversionTests(TestCase):
             [99, 83, 39, 22],
         )
 
-    def test_browse_job_matches_are_zero_until_resume_uploaded(self):
+    def test_browse_job_ml_scores_wait_until_resume_uploaded(self):
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
         session.save()
 
-        with patch('app.views.views_applicant.compute_applicant_job_match', return_value=68) as score_match:
+        with patch(
+            'app.views.views_applicant.get_match_classifier',
+            return_value=(object(), {'ready': True, 'reason': ''}),
+        ), patch(
+            'app.views.views_applicant.predict_match_score',
+            return_value=68,
+        ) as score_match, patch(
+            'app.views.views_applicant.predict_match_class',
+            return_value='high',
+        ):
             response = self.client.get('/applicant/jobs.php')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(
                 [item['match_score'] for item in response.context['scored_jobs']],
-                [0],
+                [None],
             )
             score_match.assert_not_called()
 
@@ -459,7 +484,7 @@ class MultiBizConversionTests(TestCase):
         )
         score_match.assert_called_once()
 
-    def test_tfidf_svm_match_model_uses_three_classes_and_holdout_metrics(self):
+    def test_tfidf_logistic_regression_model_uses_three_classes_and_holdout_metrics(self):
         samples = [
             {'text': f'{label} match role {index} skill experience', 'label': label}
             for label in MATCH_CLASSES
@@ -470,9 +495,10 @@ class MultiBizConversionTests(TestCase):
         evaluation = evaluate_match_model(samples)
 
         self.assertTrue(status['ready'])
-        self.assertEqual(tuple(model.named_steps['svm'].classes_), tuple(sorted(MATCH_CLASSES)))
+        self.assertEqual(tuple(model.named_steps['classifier'].classes_), tuple(sorted(MATCH_CLASSES)))
         self.assertIn('tfidf', model.named_steps)
         self.assertEqual(set(model.predict(['high match role skill'])), {'high'})
+        self.assertEqual(len(model.predict_proba(['high match role skill'])[0]), 3)
         self.assertTrue(evaluation['ready'], evaluation)
         self.assertEqual(len(evaluation['confusion_rows']), 3)
         self.assertTrue(all(len(row['cells']) == 3 for row in evaluation['confusion_rows']))
@@ -530,7 +556,55 @@ class MultiBizConversionTests(TestCase):
             self.assertIn(metric, evaluation)
         self.assertEqual(evaluation['test_count'], 6)
 
-    def test_tfidf_svm_waits_for_reviewed_examples_in_all_three_classes(self):
+    def test_model_match_score_is_high_class_probability(self):
+        samples = [
+            {'text': f'{label} match role {index} skill experience', 'label': label}
+            for label in MATCH_CLASSES
+            for index in range(4)
+        ]
+        model, status = train_match_classifier(samples)
+
+        self.assertTrue(status['ready'])
+        text = build_match_text(self.applicant, self.job, 'python developer')
+        high_index = list(model.classes_).index('high')
+        expected_score = round(
+            model.predict_proba([text])[0][high_index] * 100,
+            2,
+        )
+        self.assertAlmostEqual(
+            predict_match_score(model, self.applicant, self.job, 'python developer'),
+            expected_score,
+        )
+
+    def test_candidate_ml_ranking_adds_no_hand_weighted_bonuses(self):
+        base = calculate_candidate_ml_score({'ml_match_score': 42})
+        with_profile_bonuses = calculate_candidate_ml_score({
+            'ml_match_score': 42,
+            'experience_years': 20,
+            'employability_score': 100,
+            'education_level': 'Doctorate',
+        })
+
+        self.assertEqual(base, with_profile_bonuses)
+        self.assertEqual(base['ml_ranking_score'], 42)
+        self.assertIsNone(
+            calculate_candidate_ml_score({'match_score': 42})['ml_ranking_score']
+        )
+
+    def test_job_match_result_does_not_fall_back_when_training_data_is_unavailable(self):
+        with patch(
+            'app.services.ml_job_matching.get_match_classifier',
+            return_value=(None, {'ready': False, 'reason': 'Reviewed examples are insufficient.'}),
+        ):
+            result = compute_job_match_result(self.applicant, self.job)
+
+        self.assertFalse(result['ready'])
+        self.assertIsNone(result['match_score'])
+        self.assertIsNone(result['match_class'])
+        self.assertEqual(result['qualification_status'], 'unavailable')
+        self.assertIn('insufficient', result['reason'])
+
+    def test_tfidf_model_waits_for_reviewed_examples_in_all_three_classes(self):
         samples = [
             {'text': f'{label} match role {index}', 'label': label}
             for label, count in [('high', 2), ('medium', 2), ('low', 1)]
@@ -543,7 +617,7 @@ class MultiBizConversionTests(TestCase):
         self.assertFalse(status['ready'])
         self.assertIn('at least two admin-reviewed examples each', status['reason'])
 
-    def test_job_list_adds_svm_class_without_changing_numeric_match_score(self):
+    def test_job_list_uses_model_probability_and_classification(self):
         reviewed_labels = [
             ('qualified', 'python django senior developer'),
             ('under_qualified', 'training internship junior'),
@@ -569,6 +643,8 @@ class MultiBizConversionTests(TestCase):
                     admin_qualification=label,
                 )
 
+        self.applicant.resume_file = 'resumes/test-resume.pdf'
+        self.applicant.save(update_fields=['resume_file'])
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
@@ -579,10 +655,10 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context['match_model_status']['ready'])
         self.assertIn(response.context['jobs'][0]['ml_match_class'], MATCH_CLASSES)
-        self.assertEqual(response.context['jobs'][0]['match_score'], 0)
-        self.assertContains(response, 'SVM ')
+        self.assertIsInstance(response.context['jobs'][0]['match_score'], float)
+        self.assertContains(response, 'ML ')
 
-    def test_admin_analytics_renders_svm_evaluation_status(self):
+    def test_admin_analytics_renders_logistic_regression_evaluation_status(self):
         session = self.client.session
         session['user_id'] = self.admin_user.user_id
         session['role'] = 'admin'
@@ -592,7 +668,7 @@ class MultiBizConversionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.context['match_model_evaluation']['ready'])
-        self.assertContains(response, 'NLP + TF-IDF + SVM Match Evaluation')
+        self.assertContains(response, 'TF-IDF + Logistic Regression Match Evaluation')
         self.assertContains(response, 'at least two admin-reviewed examples each')
 
     def test_admin_analytics_renders_three_by_three_heatmap(self):
@@ -647,11 +723,11 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'No Candidates Found')
         self.assertContains(response, self.job.title)
-        self.assertContains(response, 'AI Match &gt; 60%')
-        self.assertContains(response, 'Unclassified Only')
+        self.assertContains(response, 'High-match predictions only')
+        self.assertContains(response, 'ML unavailable')
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
-    def test_admin_dispatch_notice_route_is_rendered_and_sends_notice(self):
+    def test_admin_dispatch_notice_is_blocked_when_trained_model_is_unavailable(self):
         application = Application.objects.create(
             job=self.job,
             applicant=self.applicant,
@@ -675,53 +751,39 @@ class MultiBizConversionTests(TestCase):
 
         self.assertRedirects(
             notice_response,
-            f'/admin/jobs/{self.job.job_id}/candidates/?notified=email_sent',
+            f'/admin/jobs/{self.job.job_id}/candidates/?notified=model_unavailable',
             fetch_redirect_response=False,
         )
         application.refresh_from_db()
-        self.assertEqual(application.status, 'reviewed')
-        notice = Notification.objects.get(user=self.applicant_user)
-        self.assertIn('Qualified', notice.title)
-        self.assertIn('88%', notice.message)
-        self.assertEqual(len(mail.outbox), 1)
-        self.assertEqual(mail.outbox[0].to, [self.applicant_user.email])
-        self.assertIn('Qualified', mail.outbox[0].body)
-        self.assertIn('88%', mail.outbox[0].body)
-        self.assertNotIn('Applications Page', mail.outbox[0].alternatives[0][0])
+        self.assertEqual(application.status, 'pending')
+        self.assertFalse(Notification.objects.filter(user=self.applicant_user).exists())
+        self.assertEqual(len(mail.outbox), 0)
 
-    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
-    def test_admin_dispatch_notice_email_includes_each_qualification_result(self):
+    def test_admin_dispatch_notice_does_not_reuse_saved_rule_based_score(self):
         session = self.client.session
         session['user_id'] = self.admin_user.user_id
         session['role'] = 'admin'
         session.save()
 
-        expected_results = [
-            (Decimal('75.00'), 'Qualified'),
-            (Decimal('60.00'), 'Under-Qualified'),
-            (Decimal('35.00'), 'Unclassified'),
-            (Decimal('29.00'), 'Not Qualified'),
-        ]
-        for score, expected_result in expected_results:
-            with self.subTest(score=score):
-                application = Application.objects.create(
-                    job=self.job,
-                    applicant=self.applicant,
-                    match_score=score,
-                )
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            match_score=Decimal('88.00'),
+        )
 
-                response = self.client.post(
-                    f'/admin/notify_applicant/{application.application_id}/',
-                )
+        response = self.client.post(
+            f'/admin/notify_applicant/{application.application_id}/',
+        )
 
-                self.assertEqual(response.status_code, 302)
-                sent_email = mail.outbox[-1]
-                self.assertIn(expected_result, sent_email.subject)
-                self.assertIn(expected_result, sent_email.body)
-                self.assertNotIn('Applications Page', sent_email.alternatives[0][0])
+        self.assertRedirects(
+            response,
+            f'/admin/jobs/{self.job.job_id}/candidates/?notified=model_unavailable',
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(Notification.objects.filter(user=self.applicant_user).exists())
+        self.assertEqual(len(mail.outbox), 0)
 
-    @patch('app.services.mailer.send_mail', side_effect=OSError('SMTP unavailable'))
-    def test_admin_dispatch_notice_reports_email_delivery_failure(self, _send_mail):
+    def test_admin_dispatch_notice_reports_model_unavailable_instead_of_fake_score(self):
         application = Application.objects.create(
             job=self.job,
             applicant=self.applicant,
@@ -736,12 +798,10 @@ class MultiBizConversionTests(TestCase):
 
         self.assertRedirects(
             response,
-            f'/admin/jobs/{self.job.job_id}/candidates/?notified=email_failed',
+            f'/admin/jobs/{self.job.job_id}/candidates/?notified=model_unavailable',
             fetch_redirect_response=False,
         )
-        self.assertTrue(Notification.objects.filter(user=self.applicant_user).exists())
-        failure_page = self.client.get(response.url)
-        self.assertContains(failure_page, 'Email was not sent.')
+        self.assertFalse(Notification.objects.filter(user=self.applicant_user).exists())
 
     def test_forwarded_candidate_is_visible_in_employer_candidates_page(self):
         application = Application.objects.create(
@@ -761,46 +821,14 @@ class MultiBizConversionTests(TestCase):
             'scope': 'qualified',
         })
 
-        self.assertEqual(forward_response.status_code, 200)
-        self.assertTrue(forward_response.json()['success'])
-        self.assertEqual(forward_response.json()['count'], 1)
+        self.assertEqual(forward_response.status_code, 409)
+        self.assertFalse(forward_response.json()['success'])
+        self.assertIn('ML scores are unavailable', forward_response.json()['message'])
         application.refresh_from_db()
-        self.assertTrue(application.forwarded_to_employer)
-        self.assertTrue(Notification.objects.filter(
-            user=self.employer_user,
-            message__contains='Job Seeker',
-        ).exists())
+        self.assertFalse(application.forwarded_to_employer)
+        self.assertFalse(Notification.objects.filter(user=self.employer_user).exists())
 
-        session = self.client.session
-        session['user_id'] = self.employer_user.user_id
-        session['role'] = 'employer'
-        session.save()
-
-        candidates_response = self.client.get('/employer/candidates.php')
-
-        self.assertEqual(candidates_response.status_code, 200)
-        self.assertContains(candidates_response, 'Job Seeker')
-        self.assertContains(candidates_response, self.job.title)
-        self.assertContains(candidates_response, 'Review Dossier')
-        self.assertEqual(
-            candidates_response.context['applications'][0].application_id,
-            application.application_id,
-        )
-
-        application.employer_status = 'for_interview'
-        application.save(update_fields=['employer_status'])
-
-        interview_response = self.client.get('/employer/candidates.php?tab=interview')
-
-        self.assertEqual(interview_response.status_code, 200)
-        self.assertContains(interview_response, 'Job Seeker')
-        self.assertEqual(interview_response.context['current_tab'], 'interview')
-        self.assertEqual(
-            interview_response.context['applications'][0].application_id,
-            application.application_id,
-        )
-
-    def test_batch_forward_unclassified_includes_only_30_to_under_40_scores(self):
+    def test_batch_forward_does_not_use_legacy_unclassified_score_bands(self):
         applications_by_score = {}
         for index, score in enumerate((Decimal('29.99'), Decimal('30.00'), Decimal('39.99'), Decimal('40.00'))):
             user = User.objects.create(
@@ -827,14 +855,13 @@ class MultiBizConversionTests(TestCase):
             'scope': 'unclassified',
         })
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['count'], 2)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()['success'])
         for score, application in applications_by_score.items():
             application.refresh_from_db()
-            self.assertEqual(
+            self.assertFalse(
                 application.forwarded_to_employer,
-                Decimal('30.00') <= score < Decimal('40.00'),
-                msg=f'Unexpected forwarding result for score {score}',
+                msg=f'Legacy score {score} must not trigger forwarding',
             )
 
     def test_employer_active_jobs_are_rendered_in_job_list(self):

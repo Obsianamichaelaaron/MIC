@@ -318,26 +318,26 @@
 
     <!-- Status Tabs -->
     <div class="status-tabs-nav">
-        <a href="?status={% if search %}&search={{ search }}{% endif %}" class="status-tab-btn {% if not status_filter %}active{% endif %}">
+        <a href="{% if search %}?search={{ search|urlencode }}{% else %}?{% endif %}" class="status-tab-btn {% if not status_filter %}active{% endif %}">
             All Listings <span class="tab-badge">{{ counts.all|default:0 }}</span>
         </a>
-        <a href="?status=pending{% if search %}&search={{ search }}{% endif %}" class="status-tab-btn {% if status_filter == 'pending' %}active{% endif %}">
+        <a href="?status=pending{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'pending' %}active{% endif %}">
             <i class="fas fa-hourglass-half" style="color: #f59e0b;"></i> Pending Review
             <span class="tab-badge" style="background: #fef3c7; color: #b45309;">{{ counts.pending|default:0 }}</span>
         </a>
-        <a href="?status=approved{% if search %}&search={{ search }}{% endif %}" class="status-tab-btn {% if status_filter == 'approved' %}active{% endif %}">
+        <a href="?status=approved{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'approved' %}active{% endif %}">
             <i class="fas fa-thumbs-up" style="color: #0284c7;"></i> Approved (Ready)
             <span class="tab-badge">{{ counts.approved|default:0 }}</span>
         </a>
-        <a href="?status=active{% if search %}&search={{ search }}{% endif %}" class="status-tab-btn {% if status_filter == 'active' %}active{% endif %}">
+        <a href="?status=active{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'active' %}active{% endif %}">
             <i class="fas fa-broadcast-tower" style="color: #10b981;"></i> Active / Live
             <span class="tab-badge">{{ counts.active|default:0 }}</span>
         </a>
-        <a href="?status=rejected{% if search %}&search={{ search }}{% endif %}" class="status-tab-btn {% if status_filter == 'rejected' %}active{% endif %}">
+        <a href="?status=rejected{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'rejected' %}active{% endif %}">
             <i class="fas fa-ban" style="color: #ef4444;"></i> Rejected
             <span class="tab-badge">{{ counts.rejected|default:0 }}</span>
         </a>
-        <a href="?status=closed{% if search %}&search={{ search }}{% endif %}" class="status-tab-btn {% if status_filter == 'closed' %}active{% endif %}">
+        <a href="?status=closed{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'closed' %}active{% endif %}">
             Closed <span class="tab-badge">{{ counts.closed|default:0 }}</span>
         </a>
     </div>
@@ -600,23 +600,19 @@
                 <div style="display:grid;grid-template-columns:1fr;gap:.5rem;background:#f8fafc;padding:.9rem;border-radius:12px;border:1px solid #e2e8f0;">
                     <label style="display:flex;align-items:center;gap:.6rem;font-size:.86rem;color:#1e293b;cursor:pointer;font-weight:600;">
                         <input type="radio" name="jobsPageQualScope" value="all" checked style="accent-color:#0284c7;">
-                        <span><strong>All Applicants Included</strong> (all score bands)</span>
+                        <span><strong>All Applicants Included</strong> (regardless of model prediction)</span>
                     </label>
                     <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#15803d;cursor:pointer;">
                         <input type="radio" name="jobsPageQualScope" value="qualified" style="accent-color:#16a34a;">
-                        <span>Qualified Candidates Only (Match Score &gt; 60%)</span>
+                        <span>High-match predictions only</span>
                     </label>
                     <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#b91c1c;cursor:pointer;">
                         <input type="radio" name="jobsPageQualScope" value="not_qualified" style="accent-color:#dc2626;">
-                        <span>Not Qualified Candidates Only (Match Score &lt; 30%)</span>
+                        <span>Low-match predictions only</span>
                     </label>
                     <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#b45309;cursor:pointer;">
                         <input type="radio" name="jobsPageQualScope" value="under_qualified" style="accent-color:#f59e0b;">
-                        <span>Under-Qualified Candidates Only (40% &le; Match Score &le; 60%)</span>
-                    </label>
-                    <label style="display:flex;align-items:center;gap:.6rem;font-size:.84rem;color:#475569;cursor:pointer;">
-                        <input type="radio" name="jobsPageQualScope" value="unclassified" style="accent-color:#64748b;">
-                        <span>Unclassified Candidates Only (30% &le; Match Score &lt; 40%)</span>
+                        <span>Medium-match predictions only</span>
                     </label>
                 </div>
             </div>

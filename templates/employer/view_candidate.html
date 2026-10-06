@@ -342,21 +342,25 @@
                                 <h5 class="fw-bold text-dark mb-1">{{ application.first_name }} {{ application.last_name }}</h5>
                                 <div class="text-muted small">Applicant ID: #{{ application.applicant_id }} &bull; Applied on {{ application.applied_at|date:"M d, Y" }}</div>
                             </div>
-                            {% if qualification_status == 'qualified' %}
+                            {% if qualification_status == 'unavailable' %}
+                                <span class="badge-match badge-match-good fs-6">
+                                    <i class="fa-solid fa-circle-minus"></i> ML score unavailable
+                                </span>
+                            {% elif qualification_status == 'qualified' %}
                                 <span class="badge-match badge-match-excellent fs-6">
                                     <i class="fa-solid fa-circle-check"></i> {{ application.match_score|floatformat:0 }}% Qualified
                                 </span>
                             {% elif qualification_status == 'under_qualified' %}
                                 <span class="badge-match badge-match-average fs-6">
-                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ application.match_score|floatformat:0 }}% Under-Qualified
+                                    <i class="fa-solid fa-triangle-exclamation"></i> Predicted Medium
                                 </span>
                             {% elif qualification_status == 'unclassified' %}
                                 <span class="badge-match badge-match-good fs-6">
-                                    <i class="fa-solid fa-circle-minus"></i> {{ application.match_score|floatformat:0 }}% Unclassified
+                                    <i class="fa-solid fa-circle-minus"></i> Unclassified
                                 </span>
                             {% else %}
                                 <span class="badge-match badge-match-low fs-6">
-                                    <i class="fa-solid fa-circle-xmark"></i> {{ application.match_score|floatformat:0 }}% Not Qualified
+                                    <i class="fa-solid fa-circle-xmark"></i> Predicted Low
                                 </span>
                             {% endif %}
                         </div>

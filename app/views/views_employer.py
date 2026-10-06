@@ -15,8 +15,11 @@ from app.models import (
     Notification, ContactInquiry
 )
 from app.auth_utils import require_role, getCurrentUserId
-from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_score
-from app.services.qualification import classify_match_score
+from app.services.ml_ranking import (
+    calculate_candidate_ml_score,
+    compute_job_match_result,
+    compute_job_match_score,
+)
 from app.services.mailer import (
     send_application_status_update_email,
     send_talent_request_admin_notification,
@@ -95,6 +98,14 @@ def dashboard_view(request):
     for app in forwarded_qs.order_by('-forwarded_at', '-applied_at')[:6]:
         applicant = app.applicant
         user_obj = applicant.user if applicant else None
+        match_result = (
+            compute_job_match_result(applicant, app.job)
+            if applicant and app.job else {
+                'match_score': None,
+                'match_class': None,
+                'qualification_status': 'unavailable',
+            }
+        )
         
         cand_dict = {
             'application_id': app.application_id,
@@ -103,8 +114,8 @@ def dashboard_view(request):
             'email': user_obj.email if user_obj else '',
             'job_title': app.job.title if app.job else '',
             'job_id': app.job.job_id if app.job else 0,
-            'match_score': float(app.match_score),
-            'qualification_status': classify_match_score(app.match_score),
+            'match_score': match_result['match_score'],
+            'qualification_status': match_result['qualification_status'],
             'employer_status': app.employer_status,
             'status': app.status,
             'forwarded_at': app.forwarded_at or app.applied_at,
@@ -113,6 +124,8 @@ def dashboard_view(request):
             'employability_score': float(applicant.employability_score) if applicant else 0.0,
             'experience_years': applicant.experience_years if applicant else 0,
             'education_level': applicant.education_level or 'Not specified' if applicant else 'Not specified',
+            'ml_match_score': match_result['match_score'],
+            'ml_match_class': match_result['match_class'],
         }
         score_info = calculate_candidate_ml_score(cand_dict)
         cand_dict['ml_ranking_score'] = score_info['ml_ranking_score']
@@ -537,6 +550,14 @@ def candidates_view(request):
     for app in apps_qs.order_by('-forwarded_at', '-applied_at'):
         applicant = app.applicant
         user_obj = applicant.user if applicant else None
+        match_result = (
+            compute_job_match_result(applicant, app.job)
+            if applicant and app.job else {
+                'match_score': None,
+                'match_class': None,
+                'qualification_status': 'unavailable',
+            }
+        )
         
         # Latest scheduled interview for this application
         latest_interview = InterviewSchedule.objects.filter(application=app).order_by('-interview_date').first()
@@ -550,8 +571,8 @@ def candidates_view(request):
             'job_id': app.job.job_id if app.job else 0,
             'job_title': app.job.title if app.job else '',
             'company_name': employer.company_name or '',
-            'match_score': float(app.match_score),
-            'qualification_status': classify_match_score(app.match_score),
+            'match_score': match_result['match_score'],
+            'qualification_status': match_result['qualification_status'],
             'employer_status': app.employer_status,
             'status': app.status,
             'applied_at': app.applied_at,
@@ -564,6 +585,8 @@ def candidates_view(request):
             'experience_years': applicant.experience_years if applicant else 0,
             'education_level': applicant.education_level or 'Not specified' if applicant else 'Not specified',
             'latest_interview': latest_interview,
+            'ml_match_score': match_result['match_score'],
+            'ml_match_class': match_result['match_class'],
         }
         score_info = calculate_candidate_ml_score(cand_dict)
         cand_dict['ml_ranking_score'] = score_info['ml_ranking_score']
@@ -571,7 +594,13 @@ def candidates_view(request):
         candidates.append(cand_dict)
 
     # Sort candidates by ML score
-    candidates.sort(key=lambda x: x['ml_ranking_score'], reverse=True)
+    candidates.sort(
+        key=lambda x: (
+            x['ml_ranking_score'] is not None,
+            x['ml_ranking_score'] or 0,
+        ),
+        reverse=True,
+    )
 
     jobs_for_filter = JobPosting.objects.filter(employer=employer).order_by('-posted_at')
 
@@ -616,13 +645,13 @@ def recommended_candidates_view(request):
 
     recommended_list = []
     for app in applicants:
-        best_score = 0
+        best_score = None
         best_job = None
         for j in jobs:
             if job_id and job_id.isdigit() and int(job_id) > 0 and j.job_id != int(job_id):
                 continue
             sc = compute_job_match_score(app, j)
-            if sc > best_score:
+            if sc is not None and (best_score is None or sc > best_score):
                 best_score = sc
                 best_job = j
 
@@ -632,6 +661,7 @@ def recommended_candidates_view(request):
                 'user': app.user,
                 'job': best_job,
                 'match_score': best_score,
+                'ml_match_score': best_score,
                 'employability_score': float(app.employability_score),
                 'experience_years': app.experience_years,
                 'education_level': app.education_level or 'Not specified',
@@ -641,7 +671,13 @@ def recommended_candidates_view(request):
             cand_dict['ranking_category'] = score_info['ranking_category']
             recommended_list.append(cand_dict)
 
-    recommended_list.sort(key=lambda x: x['ml_ranking_score'], reverse=True)
+    recommended_list.sort(
+        key=lambda x: (
+            x['ml_ranking_score'] is not None,
+            x['ml_ranking_score'] or 0,
+        ),
+        reverse=True,
+    )
 
     context = {
         'page_title': 'AI Recommended Candidates - MultiBiz',
@@ -835,12 +871,11 @@ def view_candidate_view(request, application_id=None):
     # Chatbot assessment answers
     chatbot_answers = ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number')
 
-    # Calculate AI ranking score
+    match_result = compute_job_match_result(applicant, job)
+    application.match_score = match_result['match_score']
     cand_dict = {
-        'match_score': float(application.match_score),
-        'experience_years': applicant.experience_years,
-        'employability_score': float(applicant.employability_score),
-        'education_level': applicant.education_level or '',
+        'ml_match_score': match_result['match_score'],
+        'ml_match_class': match_result['match_class'],
     }
     score_info = calculate_candidate_ml_score(cand_dict)
 
@@ -848,7 +883,7 @@ def view_candidate_view(request, application_id=None):
         'page_title': f"Candidate: {candidate_user.full_name} - MultiBiz",
         'current_page': 'candidates.php',
         'application': application,
-        'qualification_status': classify_match_score(application.match_score),
+        'qualification_status': match_result['qualification_status'],
         'applicant': applicant,
         'candidate_user': candidate_user,
         'job': job,

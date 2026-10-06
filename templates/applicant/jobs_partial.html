@@ -68,14 +68,16 @@
                                 </p>
                             {% endif %}
                             
-                            {% if chatbot_completed and job.match_score %}
+                            {% if job.match_score != None %}
                                 <button type="button" 
                                         class="btn-match-score match-score-pill {% if job.match_score >= 80 %}score-badge-green{% elif job.match_score >= 60 %}score-badge-yellow{% elif job.match_score >= 40 %}score-badge-orange{% else %}score-badge-red{% endif %}"
                                         data-job-id="{{ job.job_id }}"
                                         data-job-title="{{ job.title }}"
                                         data-match-score="{{ job.match_score }}">
-                                    <i class="fas fa-star"></i> {{ job.match_score|floatformat:1 }}%
+                                    <i class="fas fa-star"></i> {{ job.match_score|floatformat:1 }}% ML estimate
                                 </button>
+                            {% elif match_model_status.ready %}
+                                <span class="small text-muted">Upload a resume to get an ML estimate.</span>
                             {% endif %}
                         </div>
                     </div>

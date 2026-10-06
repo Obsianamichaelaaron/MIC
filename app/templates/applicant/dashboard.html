@@ -789,9 +789,13 @@
                                             <p><i class="fas fa-location-dot"></i> {{ item.job.location }}</p>
                                         </div>
                                         <div class="d-flex flex-column align-items-end gap-1">
-                                            <span class="portal-match"><i class="fas fa-chart-line"></i> {{ item.match_score }}% Match</span>
+                                            {% if item.match_score != None %}
+                                                <span class="portal-match"><i class="fas fa-chart-line"></i> {{ item.match_score|floatformat:1 }}% ML score</span>
+                                            {% else %}
+                                                <span class="portal-match">ML model not ready</span>
+                                            {% endif %}
                                             {% if item.ml_match_class %}
-                                                <span class="small text-primary fw-semibold">SVM {{ item.ml_match_class|title }}</span>
+                                                <span class="small text-primary fw-semibold">ML {{ item.ml_match_class|title }}</span>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -883,12 +887,12 @@
                 </section>
             </main>
 
-            <!-- ── RIGHT COLUMN (35%): AI Employability Index & Interviews ── -->
+            <!-- ── RIGHT COLUMN (35%): Profile Readiness & Interviews ── -->
             <aside>
-                <!-- AI Employability Index Card -->
+                <!-- Profile Readiness Card -->
                 <section class="portal-card">
                     <div class="portal-card-heading">
-                        <h2><i class="fas fa-gauge-high" style="color:#0056b3"></i> AI Employability Index</h2>
+                        <h2><i class="fas fa-gauge-high" style="color:#0056b3"></i> Profile Readiness Index</h2>
                         <span class="portal-status" style="--score-color: {{ score_color }}; color: var(--score-color); border: 1px solid var(--score-color); background: transparent;">
                             {{ score_description|default:"Live Rating" }}
                         </span>
@@ -1062,14 +1066,12 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
     const scoreColor = matchScore >= 80 ? '#28a745' : 
                      matchScore >= 60 ? '#ffc107' : 
                      matchScore >= 40 ? '#fd7e14' : '#dc3545';
-    const scoreLabel = matchScore >= 80 ? 'Excellent Match!' : 
-                      matchScore >= 60 ? 'Good Match' : 
-                      matchScore >= 40 ? 'Fair Match' : 'Needs Improvement';
+    const scoreLabel = 'Estimated probability of a high match';
     
     let html = `
         <h3 style="color: #333; margin-bottom: 0.8rem; font-size: 1rem;">${jobTitle}</h3>
         <div style="background: linear-gradient(135deg, ${scoreColor} 0%, ${scoreColor}dd 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.2rem;">
-            <p style="color: white; font-size: 0.8rem; margin-bottom: 0.4rem; opacity: 0.9;">Your Match Score</p>
+            <p style="color: white; font-size: 0.8rem; margin-bottom: 0.4rem; opacity: 0.9;">Model Score</p>
             <p style="color: white; font-size: 2.5rem; font-weight: 700; margin: 0.4rem 0;">
                 ${matchScore.toFixed(1)}%
             </p>
@@ -1078,14 +1080,11 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
             </p>
         </div>
         <div style="text-align: left; background: #f8f9fa; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;">
-            <h4 style="color: #333; margin-bottom: 0.6rem; font-size: 0.85rem;">How this score is calculated:</h4>
+            <h4 style="color: #333; margin-bottom: 0.6rem; font-size: 0.85rem;">How the model is trained:</h4>
             <ul style="color: #666; line-height: 1.6; margin: 0; padding-left: 1.2rem; font-size: 0.8rem;">
-                <li><strong>Skills Match (40 pts):</strong> % of required skills matched</li>
-                <li><strong>Experience (25 pts):</strong> 5 points per year of experience</li>
-                <li><strong>Qualifications (15 pts):</strong> % of required qualifications matched</li>
-                <li><strong>Chatbot Assessment (10 pts):</strong> Based on assessment performance</li>
-                <li><strong>Bonuses (10 pts):</strong> Extra points for completion & scores</li>
-                <li><em style="color: #0056b3;">Total possible: 100 points</em></li>
+                <li>TF-IDF converts resume, profile, and job text into numeric features.</li>
+                <li>Logistic Regression learns high, medium, and low labels from admin-reviewed applications.</li>
+                <li>This is a model-estimated probability, not a guaranteed hiring outcome.</li>
             </ul>
         </div>
         <div style="display: flex; gap: 0.8rem; justify-content: center;">

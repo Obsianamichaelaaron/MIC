@@ -11,7 +11,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError, transaction
-from django.db.models import Q, Count, Avg
+from django.db.models import Q, Count
 from django.conf import settings
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -30,17 +30,8 @@ from app.services.mailer import (
     send_job_posted_live_notification, send_job_request_rejected_notification,
     send_applicant_forwarded_to_employer_email, send_interview_scheduled_email
 )
-from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_score
+from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
 from app.services.ml_job_matching import evaluate_match_model
-from app.services.qualification import (
-    NOT_QUALIFIED_SCORE_MAX,
-    QUALIFIED_SCORE_MIN,
-    UNDER_QUALIFIED_SCORE_MAX,
-    UNDER_QUALIFIED_SCORE_MIN,
-    UNCLASSIFIED_SCORE_MAX,
-    UNCLASSIFIED_SCORE_MIN,
-    classify_match_score,
-)
 
 LANDING_CMS_DEFAULTS = {
     'hero': {
@@ -128,16 +119,12 @@ def dashboard_view(request):
     unread_inquiries = ContactInquiry.objects.filter(is_read=False).count()
     total_audit_logs = AuditTrail.objects.count()
     thirty_days_ago = timezone.now() - timedelta(days=30)
-    avg_match_score = Application.objects.aggregate(value=Avg('match_score'))['value'] or 0
+    match_model_evaluation = evaluate_match_model()
+    match_class_counts = match_model_evaluation.get('class_counts', {})
+    match_training_count = sum(match_class_counts.values())
     new_users_30d = User.objects.filter(created_at__gte=thirty_days_ago).count()
     new_apps_30d = Application.objects.filter(applied_at__gte=thirty_days_ago).count()
     total_admins = User.objects.filter(role='admin').count()
-    elite_matches = Application.objects.filter(match_score__gt=QUALIFIED_SCORE_MIN, match_score__gte=85).count()
-    strong_matches = Application.objects.filter(
-        match_score__gt=QUALIFIED_SCORE_MIN,
-        match_score__lt=85,
-    ).count()
-
     month_starts = []
     month_cursor = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     for _ in range(6):
@@ -179,19 +166,11 @@ def dashboard_view(request):
             JobPosting.objects.filter(employment_type='contract').count(),
             JobPosting.objects.filter(employment_type='internship').count(),
         ],
-        'match_tier_labels': ['Elite Qualified (85-100%)', 'Qualified (>60-<85%)', 'Under-Qualified (40-60%)', 'Unclassified (30-<40%)', 'Not Qualified (<30%)'],
+        'match_tier_labels': ['High reviewed outcome', 'Medium reviewed outcome', 'Low reviewed outcome'],
         'match_tier_data': [
-            Application.objects.filter(match_score__gte=85).count(),
-            Application.objects.filter(match_score__gt=QUALIFIED_SCORE_MIN, match_score__lt=85).count(),
-            Application.objects.filter(
-                match_score__gte=UNDER_QUALIFIED_SCORE_MIN,
-                match_score__lte=UNDER_QUALIFIED_SCORE_MAX,
-            ).count(),
-            Application.objects.filter(
-                match_score__gte=UNCLASSIFIED_SCORE_MIN,
-                match_score__lt=UNCLASSIFIED_SCORE_MAX,
-            ).count(),
-            Application.objects.filter(match_score__lt=NOT_QUALIFIED_SCORE_MAX).count(),
+            match_class_counts.get('high', 0),
+            match_class_counts.get('medium', 0),
+            match_class_counts.get('low', 0),
         ],
     }
 
@@ -232,13 +211,12 @@ def dashboard_view(request):
         'total_applications': total_applications,
         'unread_inquiries': unread_inquiries,
         'total_audit_logs': total_audit_logs,
-        'avg_match_score': round(float(avg_match_score), 2),
+        'match_model_evaluation': match_model_evaluation,
+        'match_training_count': match_training_count,
         'new_users_30d': new_users_30d,
         'new_apps_30d': new_apps_30d,
         'total_admins': total_admins,
         'pending_inquiries': unread_inquiries,
-        'elite_matches': elite_matches,
-        'strong_matches': strong_matches,
         'chart_data_json': json.dumps(chart_data),
         'recent_users': recent_users,
         'recent_jobs': formatted_jobs,
@@ -1084,22 +1062,20 @@ def candidates_view(request):
     total_forwarded = 0
 
     for job in jobs_qs:
-        apps = Application.objects.filter(job=job)
+        apps = Application.objects.filter(job=job).select_related('applicant', 'job')
         count_all = apps.count()
         if count_all == 0:
             continue  # skip jobs with no applicants
 
-        count_qualified = apps.filter(match_score__gt=QUALIFIED_SCORE_MIN).count()
-        count_high_match = apps.filter(match_score__gte=85).count()
-        count_under_qualified = apps.filter(
-            match_score__gte=UNDER_QUALIFIED_SCORE_MIN,
-            match_score__lte=UNDER_QUALIFIED_SCORE_MAX,
-        ).count()
-        count_unclassified = apps.filter(
-            match_score__gte=UNCLASSIFIED_SCORE_MIN,
-            match_score__lt=UNCLASSIFIED_SCORE_MAX,
-        ).count()
-        count_not_qualified = apps.filter(match_score__lt=NOT_QUALIFIED_SCORE_MAX).count()
+        class_counts = {'high': 0, 'medium': 0, 'low': 0, 'unavailable': 0}
+        for application in apps:
+            result = compute_job_match_result(application.applicant, job)
+            class_counts[result['match_class'] or 'unavailable'] += 1
+        count_qualified = class_counts['high']
+        count_high_match = class_counts['high']
+        count_under_qualified = class_counts['medium']
+        count_unclassified = 0
+        count_not_qualified = class_counts['low']
         count_forwarded = apps.filter(forwarded_to_employer=True).count()
         count_pending = apps.filter(status='pending').count()
 
@@ -1130,6 +1106,7 @@ def candidates_view(request):
             'count_under_qualified': count_under_qualified,
             'count_unclassified': count_unclassified,
             'count_not_qualified': count_not_qualified,
+            'count_ml_unavailable': class_counts['unavailable'],
             'count_high_match': count_high_match,
             'count_forwarded': count_forwarded,
             'count_pending': count_pending,
@@ -1246,6 +1223,7 @@ def view_candidate_view(request, application_id=None):
         elif action == 'forward_to_employer':
             admin_notes = request.POST.get('admin_notes', '').strip()
             admin_qualification = request.POST.get('admin_qualification', 'qualified')
+            match_result = compute_job_match_result(applicant, job)
             
             application.forwarded_to_employer = True
             application.forwarded_at = timezone.now()
@@ -1280,12 +1258,11 @@ def view_candidate_view(request, application_id=None):
                 )
                 try:
                     send_applicant_forwarded_to_employer_email(
-                        employer_email=emp_user.email,
-                        employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
-                        candidate_name=candidate_name,
-                        job_title=job.title,
+                        to_email=emp_user.email,
+                        applicant_name=candidate_name,
                         company_name=company_name,
-                        match_score=float(application.match_score or 0.0),
+                        job_title=job.title,
+                        match_score=match_result['match_score'],
                         admin_notes=admin_notes
                     )
                 except Exception as e:
@@ -1297,11 +1274,11 @@ def view_candidate_view(request, application_id=None):
     interviews = InterviewSchedule.objects.filter(application=application).order_by('-interview_date')
     chatbot_answers = ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number')
 
+    match_result = compute_job_match_result(applicant, job)
+    application.match_score = match_result['match_score']
     cand_dict = {
-        'match_score': float(application.match_score),
-        'experience_years': applicant.experience_years,
-        'employability_score': float(applicant.employability_score),
-        'education_level': applicant.education_level or '',
+        'ml_match_score': match_result['match_score'],
+        'ml_match_class': match_result['match_class'],
     }
     score_info = calculate_candidate_ml_score(cand_dict)
 
@@ -1320,6 +1297,7 @@ def view_candidate_view(request, application_id=None):
         'resume_analysis': resume_analysis,
         'ml_score': score_info['ml_ranking_score'],
         'tier': score_info['ranking_category'],
+        'qualification_status': match_result['qualification_status'],
         'success_msg': success_msg,
         'error_msg': error_msg,
     }
@@ -1372,6 +1350,10 @@ def forward_candidate_api(request):
     candidate_name = f"{cand_user.first_name} {cand_user.last_name}".strip() if cand_user else "Candidate"
     company_name = application.job.employer.company_name if (application.job and application.job.employer) else "MultiBiz Partner"
     job_title = application.job.title if application.job else "Position"
+    match_result = (
+        compute_job_match_result(application.applicant, application.job)
+        if application.applicant and application.job else {'match_score': None}
+    )
 
     if emp_user:
         Notification.objects.create(
@@ -1382,12 +1364,11 @@ def forward_candidate_api(request):
         )
         try:
             send_applicant_forwarded_to_employer_email(
-                employer_email=emp_user.email,
-                employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
-                candidate_name=candidate_name,
-                job_title=job_title,
+                to_email=emp_user.email,
+                applicant_name=candidate_name,
                 company_name=company_name,
-                match_score=float(application.match_score or 0.0),
+                job_title=job_title,
+                match_score=match_result['match_score'],
                 admin_notes=admin_notes
             )
         except Exception as e:
@@ -1420,27 +1401,39 @@ def batch_forward_candidates_api(request):
         except Exception:
             app_ids = []
 
+    if scope == 'unclassified':
+        return JsonResponse({
+            'success': False,
+            'message': 'The legacy unclassified score band is no longer supported.',
+        }, status=400)
+
     if job_id and str(job_id).isdigit():
         job = JobPosting.objects.filter(pk=int(job_id)).first()
         if job:
             if scope == 'all':
                 apps = Application.objects.filter(job=job)
-            elif scope == 'qualified':
-                apps = Application.objects.filter(job=job, match_score__gt=QUALIFIED_SCORE_MIN)
-            elif scope == 'under_qualified':
-                apps = Application.objects.filter(
-                    job=job,
-                    match_score__gte=UNDER_QUALIFIED_SCORE_MIN,
-                    match_score__lte=UNDER_QUALIFIED_SCORE_MAX,
+            elif scope in {'qualified', 'under_qualified', 'not_qualified'}:
+                expected_class = {
+                    'qualified': 'high',
+                    'under_qualified': 'medium',
+                    'not_qualified': 'low',
+                }[scope]
+                scoped_apps = list(
+                    Application.objects.filter(job=job).select_related('applicant', 'job')
                 )
-            elif scope == 'not_qualified':
-                apps = Application.objects.filter(job=job, match_score__lt=NOT_QUALIFIED_SCORE_MAX)
-            elif scope == 'unclassified':
-                apps = Application.objects.filter(
-                    job=job,
-                    match_score__gte=UNCLASSIFIED_SCORE_MIN,
-                    match_score__lt=UNCLASSIFIED_SCORE_MAX,
-                )
+                scored_apps = [
+                    (application, compute_job_match_result(application.applicant, job))
+                    for application in scoped_apps
+                ]
+                if any(not result['ready'] for _, result in scored_apps):
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'ML scores are unavailable for one or more applicants. No candidates were forwarded.',
+                    }, status=409)
+                apps = [
+                    application for application, result in scored_apps
+                    if result['match_class'] == expected_class
+                ]
             else:
                 apps = Application.objects.filter(job=job, pk__in=app_ids)
         else:
@@ -1448,9 +1441,11 @@ def batch_forward_candidates_api(request):
     else:
         apps = Application.objects.filter(pk__in=app_ids)
 
-    apps = apps.select_related('applicant', 'applicant__user', 'job', 'job__employer', 'job__employer__user')
+    apps = list(apps.select_related(
+        'applicant', 'applicant__user', 'job', 'job__employer', 'job__employer__user'
+    )) if hasattr(apps, 'select_related') else list(apps)
 
-    if not apps.exists():
+    if not apps:
         return JsonResponse({'success': False, 'message': 'No candidates found for the selected scope'})
     count = 0
     for application in apps:
@@ -1463,9 +1458,6 @@ def batch_forward_candidates_api(request):
             application.employer_status = 'for_review'
         if application.status in ['pending', 'reviewed']:
             application.status = 'shortlisted'
-
-        # Set qualification tier automatically if unset
-        application.admin_qualification = classify_match_score(application.match_score)
 
         timestamp_str = timezone.now().strftime('%Y-%m-%d %H:%M')
         entry = f"[{timestamp_str}] Forwarded to Employer by Admin."
@@ -1657,12 +1649,12 @@ def generate_candidates_excel_workbook(job=None, applications=None):
     total_cand = len(applications) if applications else 0
     qual_count = sum(1 for a in (applications or []) if a.get('qualification_status') == 'qualified')
     under_count = sum(1 for a in (applications or []) if a.get('qualification_status') == 'under_qualified')
-    unclassified_count = sum(1 for a in (applications or []) if a.get('qualification_status') == 'unclassified')
     not_count  = sum(1 for a in (applications or []) if a.get('qualification_status') == 'not_qualified')
+    unavailable_count = sum(1 for a in (applications or []) if a.get('qualification_status') == 'unavailable')
 
     ws.merge_cells("A4:Q4")
     kpi_cell = ws["A4"]
-    kpi_cell.value = f"TOTAL APPLICANTS: {total_cand}   |   QUALIFIED (>60%): {qual_count}   |   UNDER-QUALIFIED (40-60%): {under_count}   |   UNCLASSIFIED (30-<40%): {unclassified_count}   |   NOT QUALIFIED (<30%): {not_count}   |   ALL APPLICANT STATUSES INCLUDED"
+    kpi_cell.value = f"TOTAL APPLICANTS: {total_cand}   |   HIGH MATCH: {qual_count}   |   MEDIUM MATCH: {under_count}   |   LOW MATCH: {not_count}   |   MODEL UNAVAILABLE: {unavailable_count}   |   ALL APPLICANT STATUSES INCLUDED"
     kpi_cell.font = font_kpi_text
     kpi_cell.fill = fill_card
     kpi_cell.alignment = Alignment(horizontal="center", vertical="center")
@@ -1723,6 +1715,10 @@ def generate_candidates_excel_workbook(job=None, applications=None):
             tier_label = "UNCLASSIFIED"
             tier_font = font_qual_unclassified
             tier_fill = fill_qual_unclassified
+        elif q_status == 'unavailable':
+            tier_label = "ML UNAVAILABLE"
+            tier_font = font_qual_unclassified
+            tier_fill = fill_qual_unclassified
         else:
             tier_label = "NOT QUALIFIED"
             tier_font = font_qual_not
@@ -1750,7 +1746,12 @@ def generate_candidates_excel_workbook(job=None, applications=None):
             (cand.get('education_level', 'Not specified'), "left", font_cell_main, zebra_fill),
             (cand.get('skills', 'None recorded'), "left", font_cell_main, zebra_fill),
             (cand.get('qualifications', 'None recorded'), "left", font_cell_main, zebra_fill),
-            (f"{float(cand.get('match_score', 0)):.1f}%", "center", font_cell_bold, zebra_fill),
+            (
+                f"{float(cand['match_score']):.1f}%" if cand.get('match_score') is not None else 'Unavailable',
+                "center",
+                font_cell_bold,
+                zebra_fill,
+            ),
             (tier_label, "center", tier_font, tier_fill),
             (cand.get('status', 'pending').title(), "center", status_font, zebra_fill),
             (cand.get('applied_at_formatted', ''), "center", font_cell_main, zebra_fill),
@@ -1826,10 +1827,9 @@ def export_candidates_excel_view(request, job_id=None):
         if not user_obj:
             continue
 
-        match_score = float(app.match_score or 0.0)
-        
-        # Determine qualification tier
-        q_status = classify_match_score(match_score)
+        match_result = compute_job_match_result(applicant, app.job)
+        match_score = match_result['match_score']
+        q_status = match_result['qualification_status']
 
         # Filter by qualification tier if explicitly requested
         if qual_filter and qual_filter != 'all' and q_status != qual_filter:
@@ -1855,7 +1855,10 @@ def export_candidates_excel_view(request, job_id=None):
         })
 
     # Sort descending by match score
-    candidates_list.sort(key=lambda x: x['match_score'], reverse=True)
+    candidates_list.sort(
+        key=lambda x: (x['match_score'] is not None, x['match_score'] or 0),
+        reverse=True,
+    )
 
     excel_file = generate_candidates_excel_workbook(job=job_obj, applications=candidates_list)
     
@@ -1927,8 +1930,9 @@ def upload_candidates_google_drive_api(request, job_id=None):
         if not user_obj:
             continue
 
-        match_score = float(app.match_score or 0.0)
-        q_status = classify_match_score(match_score)
+        match_result = compute_job_match_result(applicant, app.job)
+        match_score = match_result['match_score']
+        q_status = match_result['qualification_status']
 
         if qual_filter and qual_filter != 'all' and q_status != qual_filter:
             continue
@@ -1952,7 +1956,10 @@ def upload_candidates_google_drive_api(request, job_id=None):
             'remarks': app.remarks_history or '',
         })
 
-    candidates_list.sort(key=lambda x: x['match_score'], reverse=True)
+    candidates_list.sort(
+        key=lambda x: (x['match_score'] is not None, x['match_score'] or 0),
+        reverse=True,
+    )
     excel_file = generate_candidates_excel_workbook(job=job_obj, applications=candidates_list)
     clean_job_name = "".join(c if c.isalnum() else "_" for c in (job_obj.title if job_obj else "All_Jobs")).strip("_")
     filename = f"MultiBiz_Applicants_{clean_job_name}_{timezone.now().strftime('%Y%m%d_%H%M')}.xlsx"
@@ -2014,8 +2021,9 @@ def export_candidates_csv_view(request, job_id=None):
         if not user_obj:
             continue
 
-        match_score = float(app.match_score or 0.0)
-        q_status = classify_match_score(match_score).replace('_', ' ').upper()
+        match_result = compute_job_match_result(applicant, app.job)
+        match_score = match_result['match_score']
+        q_status = match_result['qualification_status'].replace('_', ' ').upper()
         if q_status == 'UNDER QUALIFIED':
             q_status = 'UNDER-QUALIFIED'
 
@@ -2031,7 +2039,7 @@ def export_candidates_csv_view(request, job_id=None):
             applicant.education_level or 'Not specified',
             applicant.skills or '',
             applicant.qualifications or '',
-            f"{match_score:.1f}%",
+            f"{match_score:.1f}%" if match_score is not None else 'Unavailable',
             q_status,
             app.status.title(),
             app.applied_at.strftime('%Y-%m-%d %H:%M') if app.applied_at else '',
@@ -2070,8 +2078,10 @@ def job_candidates_view(request, job_id):
         if not user_obj:
             continue
 
-        match_score = float(app.match_score or 0.0)
-        q_status = classify_match_score(match_score)
+        match_result = compute_job_match_result(applicant, job)
+        match_score = match_result['match_score']
+        q_status = match_result['qualification_status']
+        app.match_score = match_score
 
         cand_info = {
             'application': app,
@@ -2086,12 +2096,20 @@ def job_candidates_view(request, job_id):
             'employer_status': app.employer_status or 'for_review',
             'admin_notes': app.admin_notes or '',
             'admin_qualification': app.admin_qualification or q_status,
+            'ml_match_class': match_result['match_class'],
+            'ml_unavailable_reason': match_result['reason'],
         }
         all_candidates.append(cand_info)
 
     # Sort candidates
     if selected_sort == 'score':
-        all_candidates.sort(key=lambda x: x['match_score'], reverse=True)
+        all_candidates.sort(
+            key=lambda x: (
+                x['match_score'] is not None,
+                x['match_score'] or 0,
+            ),
+            reverse=True,
+        )
     elif selected_sort == 'experience':
         all_candidates.sort(key=lambda x: x['applicant'].experience_years or 0, reverse=True)
     elif selected_sort == 'date':
@@ -2114,6 +2132,7 @@ def job_candidates_view(request, job_id):
         'under_qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'under_qualified'),
         'unclassified': sum(1 for c in all_candidates if c['qualification_status'] == 'unclassified'),
         'not_qualified': sum(1 for c in all_candidates if c['qualification_status'] == 'not_qualified'),
+        'unavailable': sum(1 for c in all_candidates if c['qualification_status'] == 'unavailable'),
         'forwarded': sum(1 for c in all_candidates if c['forwarded_to_employer']),
         'not_forwarded': sum(1 for c in all_candidates if not c['forwarded_to_employer']),
         'under_review': sum(1 for c in all_candidates if c['application'].status in ['pending', 'reviewed']),
@@ -2159,10 +2178,17 @@ def notify_qualified_applicants_view(request, job_id):
     """Dispatches review notifications to all qualified applicants for a job."""
     admin_id = getCurrentUserId(request)
     job = get_object_or_404(JobPosting, pk=job_id)
-    apps = Application.objects.filter(job=job, match_score__gt=QUALIFIED_SCORE_MIN).select_related('applicant__user')
+    apps = Application.objects.filter(job=job).select_related('applicant__user', 'applicant', 'job')
+    scored_apps = [
+        (app, compute_job_match_result(app.applicant, job))
+        for app in apps
+    ]
+    if any(not result['ready'] for _, result in scored_apps):
+        return redirect(f'/admin/jobs/{job_id}/candidates/?notified=model_unavailable')
+
     count = 0
-    for app in apps:
-        if app.status == 'pending':
+    for app, result in scored_apps:
+        if result['match_class'] == 'high' and app.status == 'pending':
             app.status = 'reviewed'
             app.save()
             count += 1
@@ -2186,19 +2212,28 @@ def forward_qualified_candidates_view(request, job_id):
     job = get_object_or_404(JobPosting.objects.select_related('employer', 'employer__user'), pk=job_id)
 
     apps = Application.objects.filter(job=job).select_related('applicant', 'applicant__user', 'job', 'job__employer')
+    scored_apps = [
+        (app, compute_job_match_result(app.applicant, job))
+        for app in apps
+    ]
+    if any(not result['ready'] for _, result in scored_apps):
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({
+                'success': False,
+                'message': 'ML scores are unavailable for one or more applicants. No candidates were forwarded.',
+            }, status=409)
+        return redirect(f'/admin/jobs/{job_id}/candidates/?notified=model_unavailable')
 
     count = 0
     now_ts = timezone.now()
     timestamp_str = now_ts.strftime('%Y-%m-%d %H:%M')
 
-    for app in apps:
-        score = float(app.match_score or 0.0)
-        is_qual = score > QUALIFIED_SCORE_MIN
+    for app, result in scored_apps:
+        is_qual = result['match_class'] == 'high'
         if is_qual:
             app.forwarded_to_employer = True
             app.forwarded_at = now_ts
             app.forwarded_by_admin = admin_user
-            app.admin_qualification = 'qualified'
             if not app.employer_status or app.employer_status == 'for_review':
                 app.employer_status = 'for_review'
             if app.status in ['pending', 'reviewed']:
@@ -2244,19 +2279,28 @@ def notify_single_applicant_view(request, application_id):
         Application.objects.select_related('applicant__user', 'job', 'job__employer'),
         pk=application_id,
     )
+    match_result = compute_job_match_result(app.applicant, app.job)
+    if not match_result['ready']:
+        log_audit_trail(
+            request,
+            admin_id,
+            'notify_single_applicant_unavailable',
+            f"Skipped screening notification for application #{application_id}: {match_result['reason']}",
+        )
+        return redirect(f'/admin/jobs/{app.job.job_id}/candidates/?notified=model_unavailable')
+
     if app.status == 'pending':
         app.status = 'reviewed'
         app.save()
     applicant_user = app.applicant.user
     applicant_name = f"{applicant_user.first_name or ''} {applicant_user.last_name or ''}".strip() or applicant_user.email
     company_name = app.job.employer.company_name if app.job.employer else 'MultiBiz'
-    match_score = float(app.match_score or 0)
-    qualification_status = classify_match_score(match_score)
+    match_score = match_result['match_score']
+    qualification_status = match_result['qualification_status']
     qualification_label = {
         'qualified': 'Qualified',
         'under_qualified': 'Under-Qualified',
         'not_qualified': 'Not Qualified',
-        'unclassified': 'Unclassified',
     }[qualification_status]
     notice_message = (
         f"Your application for {app.job.title} was screened as {qualification_label} "
@@ -2308,7 +2352,6 @@ def analytics_view(request):
     accepted_apps = Application.objects.filter(status='accepted').count()
     rejected_apps = Application.objects.filter(status='rejected').count()
     thirty_days_ago = timezone.now() - timedelta(days=30)
-    avg_match_score = Application.objects.aggregate(value=Avg('match_score'))['value'] or 0
     status_counts = Application.objects.values('status').annotate(count=Count('application_id')).order_by('status')
     jobs_by_type = JobPosting.objects.values('employment_type').annotate(count=Count('job_id')).order_by('employment_type')
     match_model_evaluation = evaluate_match_model()
@@ -2331,7 +2374,7 @@ def analytics_view(request):
         'shortlisted_apps': shortlisted_apps,
         'accepted_apps': accepted_apps,
         'rejected_apps': rejected_apps,
-        'avg_match_score': round(float(avg_match_score), 2),
+        'avg_match_score': None,
         'new_users_30d': User.objects.filter(created_at__gte=thirty_days_ago).count(),
         'new_apps_30d': Application.objects.filter(applied_at__gte=thirty_days_ago).count(),
         'status_counts': status_counts,
