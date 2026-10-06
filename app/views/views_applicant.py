@@ -24,7 +24,6 @@ from app.services.resume_storage import (
 )
 from app.services.ml_ranking import compute_job_match_result, compute_job_match_score
 from app.services.ml_job_matching import (
-    estimate_job_text_similarity,
     get_match_classifier,
     predict_match_class,
     predict_match_score,
@@ -389,10 +388,6 @@ def jobs_view(request):
             )
             if score is not None:
                 score_type = 'model'
-        elif applicant:
-            score = estimate_job_text_similarity(applicant, job, resume_text)
-            if score is not None:
-                score_type = 'similarity'
         else:
             score = None
         ml_match_class = (

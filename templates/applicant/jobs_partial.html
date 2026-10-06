@@ -1,7 +1,7 @@
 <span id="jobsCount">{{ jobs|length }}</span>
 {% if not match_model_status.ready %}
     <div class="small text-muted mb-2" role="status">
-        {{ match_model_status.reason }} Any percentages shown are TF-IDF text similarity only, not trained-model predictions or probabilities.
+        {{ match_model_status.reason }} No trained-model estimate is available yet. The model uses applicant resume/profile information and job details after sufficient reviewed examples are collected.
     </div>
 {% endif %}
 <div id="activeFilters">
@@ -81,12 +81,10 @@
                                         data-match-score="{{ job.match_score }}">
                                     <i class="fas fa-star"></i> {{ job.match_score|floatformat:1 }}% ML estimate
                                 </button>
-                            {% elif job.match_score != None and job.match_score_type == 'similarity' %}
-                                <span class="small text-muted">{{ job.match_score|floatformat:1 }}% text similarity</span>
                             {% elif match_model_status.ready %}
                                 <span class="small text-muted">Add profile skills or a resume to get an ML estimate.</span>
                             {% else %}
-                                <span class="small text-muted">Add profile skills or a resume for text similarity.</span>
+                                <span class="small text-muted">ML estimate unavailable</span>
                             {% endif %}
                         </div>
                     </div>
