@@ -302,11 +302,11 @@
                 <div class="row g-3">
                     <div class="col-md-8">
                         <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-briefcase text-primary me-1"></i> Job Title *</label>
-                        <input type="text" name="title" required value="{{ form_data.title|default:'' }}" class="form-control-custom" placeholder="e.g., Senior Full-Stack Python Engineer">
+                        <input type="text" name="title" required value="{{ form_data.title|default:'' }}" class="form-control-custom" placeholder="e.g., Managed Print Technician, DMS Implementation Specialist, Scanner Service Technician">
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-layer-group text-primary me-1"></i> Category *</label>
-                        <input type="text" name="category" required value="{{ form_data.category|default:'' }}" class="form-control-custom" placeholder="e.g., Information Technology">
+                        <input type="text" name="category" required value="{{ form_data.category|default:'' }}" class="form-control-custom" placeholder="e.g., Managed Print, Document Management, Scanner Leasing, System Integration">
                     </div>
 
                     <div class="col-md-4">
@@ -336,18 +336,18 @@
 
                     <div class="col-12">
                         <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-wand-magic-sparkles text-primary me-1"></i> Required Skills & Tags (Comma-separated)</label>
-                        <input type="text" name="skills_required" value="{{ form_data.skills_required|default:'' }}" class="form-control-custom" placeholder="e.g., Python, Django, PostgreSQL, Docker, AWS, React">
+                        <input type="text" name="skills_required" value="{{ form_data.skills_required|default:'' }}" class="form-control-custom" placeholder="e.g., printer maintenance, print fleet support, DMS, scanner troubleshooting, APIs, cloud integration">
                         <div class="form-text text-muted small">Our AI matching engine uses these skills to calculate applicant employability match scores.</div>
                     </div>
 
                     <div class="col-12">
                         <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-align-left text-primary me-1"></i> Job Description & Responsibilities *</label>
-                        <textarea name="description" rows="5" required class="form-control-custom" placeholder="Describe the day-to-day responsibilities, mission, and objectives for this role...">{{ form_data.description|default:'' }}</textarea>
+                        <textarea name="description" rows="5" required class="form-control-custom" placeholder="Describe the role and its service-related work: managed print support, document workflow implementation, scanner leasing and maintenance, or system integration...">{{ form_data.description|default:'' }}</textarea>
                     </div>
 
                     <div class="col-12">
                         <label class="form-label fw-semibold small text-dark"><i class="fa-solid fa-list-check text-primary me-1"></i> Role Requirements & Qualifications</label>
-                        <textarea name="requirements" rows="4" class="form-control-custom" placeholder="List certifications, tools, soft skills, or specific industry background required...">{{ form_data.requirements|default:'' }}</textarea>
+                        <textarea name="requirements" rows="4" class="form-control-custom" placeholder="List relevant equipment or platforms, technical skills, customer support duties, certifications, and experience...">{{ form_data.requirements|default:'' }}</textarea>
                     </div>
                 </div>
 

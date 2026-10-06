@@ -225,7 +225,7 @@
                     <label class="form-field-label">
                         Job Title <span class="req">*</span>
                     </label>
-                    <input type="text" name="title" class="form-control-custom" value="{{ form_values.title|default:initial_title|default:'' }}" placeholder="e.g. Senior Software Engineer, Operations Supervisor" required>
+                    <input type="text" name="title" class="form-control-custom" value="{{ form_values.title|default:initial_title|default:'' }}" placeholder="e.g. Managed Print Technician, DMS Implementation Specialist, Scanner Service Technician, Systems Integration Engineer" required>
                 </div>
 
                 <div>
@@ -317,7 +317,7 @@
                 <label class="form-field-label">
                     Required Skills (Comma-separated) <span class="req">*</span>
                 </label>
-                <textarea name="skills_required" rows="2" class="form-control-custom" placeholder="e.g. Python, Django, SQL, PostgreSQL, Docker, Git, Problem Solving" required>{{ form_values.skills_required|default:initial_skills|default:'' }}</textarea>
+                <textarea name="skills_required" rows="2" class="form-control-custom" placeholder="e.g. printer maintenance, print fleet support, document management, scanner troubleshooting, system integration, APIs, cloud platforms" required>{{ form_values.skills_required|default:initial_skills|default:'' }}</textarea>
                 <small style="color:#64748b;font-size:0.76rem;margin-top:0.25rem;display:block;">Our AI Matching Algorithm evaluates and ranks candidate resumes against these exact keywords.</small>
             </div>
 
@@ -330,13 +330,13 @@
                     <label class="form-field-label">
                         Job Description <span class="req">*</span>
                     </label>
-                    <textarea name="description" rows="6" class="form-control-custom" placeholder="Provide overview of the role, team, and day-to-day work..." required>{{ form_values.description|default:initial_description|default:'' }}</textarea>
+                    <textarea name="description" rows="6" class="form-control-custom" placeholder="Describe service-related work, such as supporting managed print fleets, implementing document workflows, maintaining leased scanners, or integrating business systems..." required>{{ form_values.description|default:initial_description|default:'' }}</textarea>
                 </div>
                 <div>
                     <label class="form-field-label">
                         Requirements &amp; Responsibilities <span class="req">*</span>
                     </label>
-                    <textarea name="requirements" rows="6" class="form-control-custom" placeholder="List qualifications, key responsibilities, experience needed..." required>{{ form_values.requirements|default:initial_requirements|default:'' }}</textarea>
+                    <textarea name="requirements" rows="6" class="form-control-custom" placeholder="List relevant technical skills, equipment or platforms, customer support duties, certifications, and experience required..." required>{{ form_values.requirements|default:initial_requirements|default:'' }}</textarea>
                 </div>
             </div>
 
