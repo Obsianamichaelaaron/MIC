@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
+from django.db import connection
 from django.db.models import Q, Count
 from django.conf import settings
 from django.utils import timezone
@@ -52,6 +53,23 @@ def log_status_history_event(application, stage_title, status_key, actor_name, a
         'notes': notes or '',
     })
     application.status_history = history
+
+
+def _notify_applicant_for_employer_application(application, title, message):
+    if connection.vendor == 'postgresql':
+        with connection.cursor() as cursor:
+            cursor.execute(
+                'SELECT public.mic_rls_create_employer_notification(%s, %s, %s, %s)',
+                [application.application_id, title, message, 'application'],
+            )
+        return
+
+    Notification.objects.create(
+        user=application.applicant.user,
+        title=title,
+        message=message,
+        type='application',
+    )
 
 
 @require_role('employer')
@@ -766,11 +784,10 @@ def view_candidate_view(request, application_id=None):
                 application.save()
 
                 # In-App Notification
-                Notification.objects.create(
-                    user=candidate_user,
-                    title=f"Application Update: {job.title}",
-                    message=f"Your application status at {employer.company_name} was updated to '{status_label}'.",
-                    type='application'
+                _notify_applicant_for_employer_application(
+                    application,
+                    f"Application Update: {job.title}",
+                    f"Your application status at {employer.company_name} was updated to '{status_label}'.",
                 )
 
                 # Send email update
@@ -847,11 +864,10 @@ def view_candidate_view(request, application_id=None):
                 application.save()
 
                 # Send In-App Notification to Applicant
-                Notification.objects.create(
-                    user=candidate_user,
-                    title=f"📅 Interview Scheduled: {job.title}",
-                    message=f"{employer.company_name} scheduled an interview for {job.title} on {interview_date} at {formatted_time}.",
-                    type='application'
+                _notify_applicant_for_employer_application(
+                    application,
+                    f"📅 Interview Scheduled: {job.title}",
+                    f"{employer.company_name} scheduled an interview for {job.title} on {interview_date} at {formatted_time}.",
                 )
 
                 # Send Automated Email with Complete Details to Applicant
@@ -972,13 +988,12 @@ def update_status_api(request):
         # In-App Notification and Email
         cand_user = application.applicant.user if (application.applicant and application.applicant.user) else None
         if cand_user:
+            _notify_applicant_for_employer_application(
+                application,
+                f"Application Update: {application.job.title}",
+                f"Your application status at {employer.company_name} was updated to '{status_label}'.",
+            )
             try:
-                Notification.objects.create(
-                    user=cand_user,
-                    title=f"Application Update: {application.job.title}",
-                    message=f"Your application status at {employer.company_name} was updated to '{status_label}'.",
-                    type='application'
-                )
                 send_application_status_update_email(
                     to_email=cand_user.email,
                     applicant_name=cand_user.full_name or cand_user.email,
@@ -1051,11 +1066,10 @@ def schedule_interview_api(request):
     application.save()
 
     # Send Notification and Email
-    Notification.objects.create(
-        user=candidate_user,
-        title=f"📅 Interview Scheduled: {application.job.title}",
-        message=f"{employer.company_name} scheduled an interview for {application.job.title} on {interview_date} at {interview_time}.",
-        type='application'
+    _notify_applicant_for_employer_application(
+        application,
+        f"📅 Interview Scheduled: {application.job.title}",
+        f"{employer.company_name} scheduled an interview for {application.job.title} on {interview_date} at {interview_time}.",
     )
 
     try:

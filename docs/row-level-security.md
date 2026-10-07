@@ -50,6 +50,10 @@ privileged `DATABASE_URL` connection:
 python manage.py migrate
 ```
 
+Run this migration command against the production database after deploying
+schema changes. Migration `0009_employer_candidate_notifications` adds the
+restricted database function used to notify applicants from employer workflows.
+
 Management commands that need schema access use the configured privileged
 connection. Runtime web requests assume `mic_app_rls` inside a request
 transaction from the non-bypass `RLS_DATABASE_URL` login. When adding a public
