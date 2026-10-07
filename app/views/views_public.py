@@ -19,28 +19,10 @@ from app.models import (
     ContactInquiry, Employer, User,
 )
 from app.services.resume_storage import ResumeStorageError, read_resume
+from app.services.job_listings import unique_public_job_postings
 
 
 logger = logging.getLogger(__name__)
-
-
-def _unique_public_job_postings(queryset, limit):
-    jobs = []
-    seen_jobs = set()
-    for job in queryset.iterator(chunk_size=100):
-        company_name = ' '.join((job.employer.company_name or '').casefold().split())
-        title = ' '.join((job.title or '').casefold().split())
-        if not company_name or not title:
-            continue
-
-        key = (company_name, title)
-        if key in seen_jobs:
-            continue
-        seen_jobs.add(key)
-        jobs.append(job)
-        if len(jobs) == limit:
-            break
-    return jobs
 
 
 def get_cms_content_dict():
@@ -134,7 +116,7 @@ def index_view(request):
     news_articles = list(CmsNews.objects.filter(is_active=True).order_by('-news_date', '-id')[:6])
 
     # Keep landing-page jobs in sync with the applicant-visible active listings.
-    featured_jobs = _unique_public_job_postings(
+    featured_jobs = unique_public_job_postings(
         JobPosting.objects.filter(
             status='active',
             employer__company_name__isnull=False,
@@ -343,7 +325,7 @@ def careers_view(request):
     if location:
         jobs_qs = jobs_qs.filter(location__icontains=location)
 
-    jobs = _unique_public_job_postings(jobs_qs, limit=30)
+    jobs = unique_public_job_postings(jobs_qs, limit=30)
 
     qualifications = Qualification.objects.filter(status='active').order_by('name')
 

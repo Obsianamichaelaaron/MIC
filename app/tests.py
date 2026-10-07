@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import types
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -775,6 +776,34 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(response.context['total_jobs_count'], 30)
         self.assertContains(response, 'MultiBiz Corporation')
 
+    def test_admin_active_jobs_match_public_careers_list(self):
+        duplicate_job = JobPosting.objects.create(
+            employer=self.employer,
+            title='  SENIOR   FULL STACK DEVELOPER ',
+            status='active',
+        )
+        JobPosting.objects.create(
+            employer=self.employer,
+            title='Pending Service Role',
+            status='pending',
+        )
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        careers_response = self.client.get('/careers.php')
+        admin_response = self.client.get('/admin/jobs.php?status=active')
+
+        self.assertEqual(careers_response.status_code, 200)
+        self.assertEqual(admin_response.status_code, 200)
+        careers_ids = {job.job_id for job in careers_response.context['jobs']}
+        admin_ids = {job.job_id for job in admin_response.context['jobs']}
+        self.assertEqual(admin_ids, careers_ids)
+        matching_title_ids = {self.job.job_id, duplicate_job.job_id}
+        self.assertEqual(len(admin_ids & matching_title_ids), 1)
+        self.assertEqual(admin_response.context['counts']['active'], len(careers_ids))
+
     def test_homepage_featured_jobs_are_unique_and_use_employer_names(self):
         JobPosting.objects.create(
             employer=self.employer,
@@ -844,6 +873,73 @@ class MultiBizConversionTests(TestCase):
         self.assertNotContains(response, '40–60%')
         self.assertNotContains(response, '&lt;40%')
         self.assertNotContains(response, '≥ 85%')
+
+    def test_candidate_pipeline_merges_exact_duplicate_job_postings_only(self):
+        duplicate_job = JobPosting.objects.create(
+            employer=self.employer,
+            title='  SENIOR   FULL STACK DEVELOPER ',
+            description=self.job.description,
+            requirements=self.job.requirements,
+            skills_required=self.job.skills_required,
+            location=self.job.location,
+            employment_type=self.job.employment_type,
+            salary_range=self.job.salary_range,
+            positions_available=self.job.positions_available,
+            status=self.job.status,
+            posted_at=self.job.posted_at,
+        )
+        Application.objects.create(job=self.job, applicant=self.applicant)
+        Application.objects.create(job=duplicate_job, applicant=self.applicant)
+
+        second_user = User.objects.create(
+            email='duplicate-job-applicant@example.com',
+            password='test-password',
+            role='applicant',
+            status='active',
+        )
+        second_applicant = Applicant.objects.create(
+            user=second_user,
+            employability_score=Decimal('50'),
+        )
+        Application.objects.create(job=duplicate_job, applicant=second_applicant)
+
+        distinct_repost = JobPosting.objects.create(
+            employer=self.employer,
+            title='Senior Full Stack Developer',
+            description=self.job.description,
+            requirements=self.job.requirements,
+            skills_required=self.job.skills_required,
+            location=self.job.location,
+            employment_type=self.job.employment_type,
+            salary_range=self.job.salary_range,
+            positions_available=self.job.positions_available,
+            status=self.job.status,
+            posted_at=self.job.posted_at + timedelta(days=1),
+        )
+        Application.objects.create(job=distinct_repost, applicant=self.applicant)
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.get('/admin/candidates.php')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_jobs'], 2)
+        self.assertEqual(response.context['total_applicants'], 3)
+        merged_summary = next(
+            summary for summary in response.context['job_summaries']
+            if len(summary['job_ids']) == 2
+        )
+        self.assertEqual(merged_summary['count_all'], 2)
+
+        candidates_response = self.client.get(
+            f"/admin/jobs/{merged_summary['job_id']}/candidates/",
+            {'job_ids': ','.join(map(str, merged_summary['job_ids']))},
+        )
+        self.assertEqual(candidates_response.status_code, 200)
+        self.assertEqual(candidates_response.context['counts']['all'], 2)
 
     def test_legacy_unavailable_filter_redirects_to_automatic_candidate_list(self):
         Application.objects.create(job=self.job, applicant=self.applicant)

@@ -314,6 +314,7 @@
                 <!-- Action: Send Qualified to Employer -->
                 <form method="POST" action="{% url 'admin_forward_qualified_candidates' job.id %}" class="d-inline" onsubmit="return confirm('Send all {{ counts.qualified }} qualified candidate(s) to {{ job.company_name|escapejs }} for review?');">
                     {% csrf_token %}
+                    <input type="hidden" name="job_ids" value="{{ job_ids_query }}">
                     <button type="submit" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2">
                         <i class="fa-solid fa-paper-plane"></i>
                         <span>Send Qualified to {{ job.company_name|default:'Employer' }} ({{ counts.qualified }})</span>
@@ -323,6 +324,7 @@
                 <!-- Action: Notify Qualified Applicants -->
                 <form method="POST" action="{% url 'admin_notify_qualified_applicants' job.id %}" class="d-inline" onsubmit="return confirm('Send Under Review notifications to all qualified applicants?');">
                     {% csrf_token %}
+                    <input type="hidden" name="job_ids" value="{{ job_ids_query }}">
                     <button type="submit" class="btn btn-primary-custom btn-sm px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2">
                         <i class="fa-solid fa-bell"></i>
                         <span>Notify Qualified ({{ counts.qualified }})</span>
@@ -388,19 +390,19 @@
             <!-- Filter Pills -->
             <div class="col-12 col-xl-7">
                 <div class="d-flex flex-nowrap gap-1.5 align-items-center candidate-filter-pills">
-                    <a href="{% url 'admin_job_candidates' job.id %}{% if selected_sort %}?sort={{ selected_sort }}{% endif %}{% if query %}{% if selected_sort %}&{% else %}?{% endif %}q={{ query }}{% endif %}" class="filter-pill-btn {% if not selected_qual and not selected_status and not forwarded_filter %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                    <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if not selected_qual and not selected_status and not forwarded_filter %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         All <span class="badge bg-white text-dark ms-1.5">{{ counts.all }}</span>
                     </a>
-                    <a href="{% url 'admin_job_candidates' job.id %}?qual=qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                    <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&qual=qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         High Employability <span class="badge bg-success text-white ms-1.5">{{ counts.qualified }}</span>
                     </a>
-                    <a href="{% url 'admin_job_candidates' job.id %}?forwarded=yes{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if forwarded_filter == 'yes' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                    <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&forwarded=yes{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if forwarded_filter == 'yes' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         <i class="fa-solid fa-paper-plane me-1"></i> Sent to Employer <span class="badge bg-info text-white ms-1.5">{{ counts.forwarded }}</span>
                     </a>
-                    <a href="{% url 'admin_job_candidates' job.id %}?qual=under_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'under_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                    <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&qual=under_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'under_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         Medium Employability <span class="badge bg-warning text-dark ms-1.5">{{ counts.under_qualified }}</span>
                     </a>
-                    <a href="{% url 'admin_job_candidates' job.id %}?qual=not_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'not_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                    <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&qual=not_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'not_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         Low Employability <span class="badge bg-danger text-white ms-1.5">{{ counts.not_qualified }}</span>
                     </a>
                 </div>
@@ -409,6 +411,7 @@
             <!-- Search and Sort Toolbar -->
             <div class="col-12 col-xl-5">
                 <form method="GET" action="{% url 'admin_job_candidates' job.id %}" class="d-flex align-items-center justify-content-xl-end gap-2">
+                    <input type="hidden" name="job_ids" value="{{ job_ids_query }}">
                     {% if selected_qual %}<input type="hidden" name="qual" value="{{ selected_qual }}">{% endif %}
                     {% if selected_status %}<input type="hidden" name="status" value="{{ selected_status }}">{% endif %}
                     {% if forwarded_filter %}<input type="hidden" name="forwarded" value="{{ forwarded_filter }}">{% endif %}
@@ -418,7 +421,7 @@
                         <button class="btn btn-primary" type="submit" title="Search"><i class="fa-solid fa-magnifying-glass"></i></button>
                     </div>
                     {% if selected_qual or selected_status or forwarded_filter or query or selected_sort != 'score' %}
-                        <a href="{% url 'admin_job_candidates' job.id %}" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center" title="Reset Filters" style="height: 31px; width: 31px; padding: 0; flex-shrink: 0;">
+                        <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}" class="btn btn-sm btn-outline-secondary d-flex align-items-center justify-content-center" title="Reset Filters" style="height: 31px; width: 31px; padding: 0; flex-shrink: 0;">
                             <i class="fa-solid fa-xmark"></i>
                         </a>
                     {% endif %}
@@ -446,7 +449,7 @@
                                 <img src="{{ cand.applicant.user.profile_picture.url }}" alt="{{ cand.applicant.user.full_name }}" class="rounded-circle object-fit-cover shadow-sm" style="width: 50px; height: 50px;">
                             {% else %}
                                 <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold shadow-sm" style="width: 50px; height: 50px; font-size: 1.1rem; border: 1px solid rgba(37,99,235,0.15);">
-                                    {{ cand.applicant.user.first_name|first }}{{ cand.applicant.user.last_name|first }}
+                                    {{ cand.applicant.user.first_name|default_if_none:""|first }}{{ cand.applicant.user.last_name|default_if_none:""|first }}
                                 </div>
                             {% endif %}
                             
@@ -741,6 +744,7 @@ function submitSendToEmployer(e) {
 
     const formData = new FormData();
     formData.append('job_id', '{{ job.id }}');
+    formData.append('job_ids', '{{ job_ids_query }}');
     formData.append('scope', scope === 'selected' ? 'selected' : scope);
     formData.append('admin_notes', adminNotes);
     if (appIds.length > 0) {
@@ -774,7 +778,7 @@ function submitSendToEmployer(e) {
 
 function copyJobGoogleSheetsFormula() {
     const baseUrl = window.location.origin;
-    const csvUrl = `${baseUrl}{% url 'admin_export_candidates_csv' job.id %}`;
+    const csvUrl = `${baseUrl}{% url 'admin_export_candidates_csv' job.id %}?job_ids={{ job_ids_query }}`;
     const formula = `=IMPORTDATA("${csvUrl}")`;
     navigator.clipboard.writeText(formula).then(() => {
         const note = document.getElementById('jobCopyConfirmNote');

@@ -8,7 +8,12 @@ from datetime import date, timedelta
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
+from django.http import (
+    HttpResponseBadRequest,
+    HttpResponseForbidden,
+    HttpResponse,
+    JsonResponse,
+)
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Count
@@ -31,6 +36,53 @@ from app.services.mailer import (
     send_applicant_forwarded_to_employer_email, send_interview_scheduled_email
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
+from app.services.job_listings import unique_public_job_postings
+
+
+def _job_posting_duplicate_key(job):
+    def normalize(value):
+        return ' '.join(str(value or '').casefold().split())
+
+    return (
+        job.employer_id,
+        normalize(job.title),
+        normalize(job.description),
+        normalize(job.requirements),
+        normalize(job.skills_required),
+        normalize(job.location),
+        normalize(job.employment_type),
+        normalize(job.salary_range),
+        job.positions_available,
+        normalize(job.status),
+        job.posted_at.date() if job.posted_at else None,
+    )
+
+
+def _resolve_duplicate_job_group(primary_job, raw_job_ids):
+    if not raw_job_ids:
+        return [primary_job]
+
+    try:
+        job_ids = list(dict.fromkeys(
+            int(value.strip())
+            for value in raw_job_ids.split(',')
+            if value.strip()
+        ))
+    except ValueError as exc:
+        raise ValueError('Invalid duplicate job group.') from exc
+    if not job_ids or primary_job.job_id not in job_ids:
+        raise ValueError('Invalid duplicate job group.')
+
+    jobs = list(
+        JobPosting.objects.filter(job_id__in=job_ids).select_related('employer')
+    )
+    if len(jobs) != len(job_ids) or any(
+        _job_posting_duplicate_key(job) != _job_posting_duplicate_key(primary_job)
+        for job in jobs
+    ):
+        raise ValueError('The selected jobs are not identical duplicate postings.')
+    return jobs
+
 
 LANDING_CMS_DEFAULTS = {
     'hero': {
@@ -910,11 +962,17 @@ def jobs_view(request):
         applicant_count=Count('applications')
     )
 
+    active_jobs_qs = jobs_base_qs.filter(
+        status='active',
+        employer__company_name__isnull=False,
+    ).exclude(employer__company_name='').order_by('-posted_at', '-job_id')
+    active_public_jobs = unique_public_job_postings(active_jobs_qs, limit=30)
+
     counts = {
         'all': jobs_base_qs.count(),
         'pending': jobs_base_qs.filter(status='pending').count(),
         'approved': jobs_base_qs.filter(status='approved').count(),
-        'active': jobs_base_qs.filter(status='active').count(),
+        'active': len(active_public_jobs),
         'rejected': jobs_base_qs.filter(status='rejected').count(),
         'closed': jobs_base_qs.filter(status='closed').count(),
     }
@@ -931,6 +989,12 @@ def jobs_view(request):
 
     if status_filter:
         jobs_qs = jobs_qs.filter(status=status_filter)
+
+    if status_filter == 'active':
+        jobs_qs = jobs_qs.filter(
+            employer__company_name__isnull=False,
+        ).exclude(employer__company_name='').order_by('-posted_at', '-job_id')
+        jobs_qs = unique_public_job_postings(jobs_qs, limit=30)
 
     context = {
         'page_title': 'All Jobs & Requests - MultiBiz Admin',
@@ -1063,22 +1127,44 @@ def candidates_view(request):
             Q(location__icontains=search)
         )
 
+    grouped_jobs = {}
+    for job in jobs_qs:
+        duplicate_key = _job_posting_duplicate_key(job)
+        group = grouped_jobs.setdefault(
+            duplicate_key,
+            {'job': job, 'jobs': []},
+        )
+        group['jobs'].append(job)
+
     job_summaries = []
     total_applicants = 0
     total_qualified = 0
     total_high_match = 0
     total_forwarded = 0
 
-    for job in jobs_qs:
-        apps = Application.objects.filter(job=job).select_related('applicant', 'job')
-        count_all = apps.count()
+    for group in grouped_jobs.values():
+        job = group['job']
+        grouped_job_ids = [grouped_job.job_id for grouped_job in group['jobs']]
+        all_apps = list(
+            Application.objects.filter(job_id__in=grouped_job_ids)
+            .select_related('applicant', 'job')
+            .order_by('-applied_at', '-application_id')
+        )
+        apps = []
+        seen_applicants = set()
+        for application in all_apps:
+            if application.applicant_id in seen_applicants:
+                continue
+            seen_applicants.add(application.applicant_id)
+            apps.append(application)
+        count_all = len(apps)
         if count_all == 0:
             continue  # skip jobs with no applicants
 
         class_counts = {'high': 0, 'medium': 0, 'low': 0, 'unavailable': 0}
         count_high_match = 0
         for application in apps:
-            result = compute_job_match_result(application.applicant, job)
+            result = compute_job_match_result(application.applicant, application.job)
             class_counts[result['match_class'] or 'unavailable'] += 1
             if result['match_score'] >= 85:
                 count_high_match += 1
@@ -1086,8 +1172,8 @@ def candidates_view(request):
         count_under_qualified = class_counts['medium']
         count_unclassified = 0
         count_not_qualified = class_counts['low']
-        count_forwarded = apps.filter(forwarded_to_employer=True).count()
-        count_pending = apps.filter(status='pending').count()
+        count_forwarded = sum(1 for application in apps if application.forwarded_to_employer)
+        count_pending = sum(1 for application in apps if application.status == 'pending')
 
         total_applicants += count_all
         total_qualified += count_qualified
@@ -1106,6 +1192,7 @@ def candidates_view(request):
         job_summaries.append({
             'job': job,
             'job_id': job.job_id,
+            'job_ids': grouped_job_ids,
             'job_title': job.title,
             'company_name': job.employer.company_name if job.employer else 'MultiBiz Partner',
             'location': job.location or '',
@@ -1415,8 +1502,16 @@ def batch_forward_candidates_api(request):
     if job_id and str(job_id).isdigit():
         job = JobPosting.objects.filter(pk=int(job_id)).first()
         if job:
+            try:
+                grouped_jobs = _resolve_duplicate_job_group(
+                    job,
+                    request.POST.get('job_ids', ''),
+                )
+            except ValueError as exc:
+                return JsonResponse({'success': False, 'message': str(exc)}, status=400)
+            grouped_job_ids = [grouped_job.job_id for grouped_job in grouped_jobs]
             if scope == 'all':
-                apps = Application.objects.filter(job=job)
+                apps = Application.objects.filter(job_id__in=grouped_job_ids)
             elif scope in {'qualified', 'under_qualified', 'not_qualified'}:
                 expected_class = {
                     'qualified': 'high',
@@ -1424,10 +1519,15 @@ def batch_forward_candidates_api(request):
                     'not_qualified': 'low',
                 }[scope]
                 scoped_apps = list(
-                    Application.objects.filter(job=job).select_related('applicant', 'job')
+                    Application.objects.filter(job_id__in=grouped_job_ids)
+                    .select_related('applicant', 'job')
+                    .order_by('-applied_at', '-application_id')
                 )
                 scored_apps = [
-                    (application, compute_job_match_result(application.applicant, job))
+                    (
+                        application,
+                        compute_job_match_result(application.applicant, application.job),
+                    )
                     for application in scoped_apps
                 ]
                 if any(not result['ready'] for _, result in scored_apps):
@@ -1440,7 +1540,10 @@ def batch_forward_candidates_api(request):
                     if result['match_class'] == expected_class
                 ]
             else:
-                apps = Application.objects.filter(job=job, pk__in=app_ids)
+                apps = Application.objects.filter(
+                    job_id__in=grouped_job_ids,
+                    pk__in=app_ids,
+                )
         else:
             apps = Application.objects.filter(pk__in=app_ids)
     else:
@@ -1448,10 +1551,18 @@ def batch_forward_candidates_api(request):
 
     apps = list(apps.select_related(
         'applicant', 'applicant__user', 'job', 'job__employer', 'job__employer__user'
-    )) if hasattr(apps, 'select_related') else list(apps)
+    ).order_by('-applied_at', '-application_id')) if hasattr(apps, 'select_related') else list(apps)
 
     if not apps:
         return JsonResponse({'success': False, 'message': 'No candidates found for the selected scope'})
+    unique_apps = []
+    seen_applicants = set()
+    for application in apps:
+        if application.applicant_id in seen_applicants:
+            continue
+        seen_applicants.add(application.applicant_id)
+        unique_apps.append(application)
+    apps = unique_apps
     count = 0
     for application in apps:
         application.forwarded_to_employer = True
@@ -1793,12 +1904,23 @@ def export_candidates_excel_view(request, job_id=None):
     if j_id and str(j_id).isdigit() and int(j_id) > 0:
         job_obj = JobPosting.objects.filter(pk=int(j_id)).select_related('employer').first()
 
+    export_job_ids = [job_obj.job_id] if job_obj else []
+    if job_obj and request.GET.get('job_ids'):
+        try:
+            export_jobs = _resolve_duplicate_job_group(
+                job_obj,
+                request.GET.get('job_ids', ''),
+            )
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc))
+        export_job_ids = [job.job_id for job in export_jobs]
+
     apps_qs = Application.objects.select_related(
         'applicant', 'applicant__user', 'job', 'job__employer'
     ).order_by('-applied_at')
 
     if job_obj:
-        apps_qs = apps_qs.filter(job=job_obj)
+        apps_qs = apps_qs.filter(job_id__in=export_job_ids)
 
     # Specific selections if filtered
     selected_raw = request.GET.get('selected_candidates') or request.GET.getlist('selected_candidates')
@@ -1999,13 +2121,23 @@ def export_candidates_csv_view(request, job_id=None):
     job_obj = None
     if j_id and str(j_id).isdigit() and int(j_id) > 0:
         job_obj = JobPosting.objects.filter(pk=int(j_id)).select_related('employer').first()
+    export_job_ids = [job_obj.job_id] if job_obj else []
+    if job_obj and request.GET.get('job_ids'):
+        try:
+            export_jobs = _resolve_duplicate_job_group(
+                job_obj,
+                request.GET.get('job_ids', ''),
+            )
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc))
+        export_job_ids = [job.job_id for job in export_jobs]
 
     apps_qs = Application.objects.select_related(
         'applicant', 'applicant__user', 'job', 'job__employer'
     ).order_by('-applied_at')
 
     if job_obj:
-        apps_qs = apps_qs.filter(job=job_obj)
+        apps_qs = apps_qs.filter(job_id__in=export_job_ids)
 
     response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
     clean_job_name = "".join(c if c.isalnum() else "_" for c in (job_obj.title if job_obj else "All_Jobs")).strip("_")
@@ -2063,6 +2195,14 @@ def job_candidates_view(request, job_id):
     and direct Excel & Google Drive export capabilities.
     """
     job = get_object_or_404(JobPosting.objects.select_related('employer'), pk=job_id)
+    try:
+        grouped_jobs = _resolve_duplicate_job_group(
+            job,
+            request.GET.get('job_ids', ''),
+        )
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+    grouped_job_ids = [grouped_job.job_id for grouped_job in grouped_jobs]
     # Ensure template compat properties
     job.id = job.job_id
     job.company_name = job.employer.company_name if job.employer else 'MultiBiz Partner'
@@ -2074,18 +2214,20 @@ def job_candidates_view(request, job_id):
     query           = request.GET.get('q', '').strip()
     selected_sort   = request.GET.get('sort', 'score').strip()
 
-    apps_qs = Application.objects.filter(job=job).select_related(
-        'applicant', 'applicant__user'
-    ).order_by('-applied_at')
+    apps_qs = Application.objects.filter(job_id__in=grouped_job_ids).select_related(
+        'applicant', 'applicant__user', 'job'
+    ).order_by('-applied_at', '-application_id')
 
     all_candidates = []
+    seen_applicants = set()
     for app in apps_qs:
         applicant = app.applicant
         user_obj = applicant.user if applicant else None
-        if not user_obj:
+        if not user_obj or applicant.pk in seen_applicants:
             continue
+        seen_applicants.add(applicant.pk)
 
-        match_result = compute_job_match_result(applicant, job)
+        match_result = compute_job_match_result(applicant, app.job)
         match_score = match_result['match_score']
         q_status = match_result['qualification_status']
         app.match_score = match_score
@@ -2168,6 +2310,8 @@ def job_candidates_view(request, job_id):
 
     context = {
         'job': job,
+        'job_ids': grouped_job_ids,
+        'job_ids_query': ','.join(str(grouped_job_id) for grouped_job_id in grouped_job_ids),
         'candidates': displayed,
         'counts': counts,
         'selected_qual': selected_qual,
@@ -2184,14 +2328,35 @@ def job_candidates_view(request, job_id):
 def notify_qualified_applicants_view(request, job_id):
     """Dispatches review notifications to all qualified applicants for a job."""
     admin_id = getCurrentUserId(request)
-    job = get_object_or_404(JobPosting, pk=job_id)
-    apps = Application.objects.filter(job=job).select_related('applicant__user', 'applicant', 'job')
+    job = get_object_or_404(JobPosting.objects.select_related('employer'), pk=job_id)
+    try:
+        grouped_jobs = _resolve_duplicate_job_group(
+            job,
+            request.POST.get('job_ids', ''),
+        )
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+    grouped_job_ids = [grouped_job.job_id for grouped_job in grouped_jobs]
+    apps = Application.objects.filter(job_id__in=grouped_job_ids).select_related(
+        'applicant__user', 'applicant', 'job'
+    ).order_by('-applied_at', '-application_id')
     scored_apps = [
-        (app, compute_job_match_result(app.applicant, job))
+        (app, compute_job_match_result(app.applicant, app.job))
         for app in apps
     ]
+    unique_scored_apps = []
+    seen_applicants = set()
+    for app, result in scored_apps:
+        if app.applicant_id in seen_applicants:
+            continue
+        seen_applicants.add(app.applicant_id)
+        unique_scored_apps.append((app, result))
+    scored_apps = unique_scored_apps
     if any(not result['ready'] for _, result in scored_apps):
-        return redirect(f'/admin/jobs/{job_id}/candidates/?notified=score_unavailable')
+        return redirect(
+            f'/admin/jobs/{job_id}/candidates/?job_ids={",".join(map(str, grouped_job_ids))}'
+            '&notified=score_unavailable'
+        )
 
     count = 0
     for app, result in scored_apps:
@@ -2206,7 +2371,10 @@ def notify_qualified_applicants_view(request, job_id):
                 type='application'
             )
     log_audit_trail(request, admin_id, 'notify_qualified_applicants', f"Notified {count} qualified applicants for job #{job_id}")
-    return redirect(f'/admin/jobs/{job_id}/candidates/?notified=success')
+    return redirect(
+        f'/admin/jobs/{job_id}/candidates/?job_ids={",".join(map(str, grouped_job_ids))}'
+        '&notified=success'
+    )
 
 
 @require_role('admin')
@@ -2218,18 +2386,43 @@ def forward_qualified_candidates_view(request, job_id):
     admin_user = get_object_or_404(User, pk=admin_id)
     job = get_object_or_404(JobPosting.objects.select_related('employer', 'employer__user'), pk=job_id)
 
-    apps = Application.objects.filter(job=job).select_related('applicant', 'applicant__user', 'job', 'job__employer')
+    try:
+        grouped_jobs = _resolve_duplicate_job_group(
+            job,
+            request.POST.get('job_ids', ''),
+        )
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+    grouped_job_ids = [grouped_job.job_id for grouped_job in grouped_jobs]
+    apps = Application.objects.filter(job_id__in=grouped_job_ids).select_related(
+        'applicant',
+        'applicant__user',
+        'job',
+        'job__employer',
+        'job__employer__user',
+    ).order_by('-applied_at', '-application_id')
     scored_apps = [
-        (app, compute_job_match_result(app.applicant, job))
+        (app, compute_job_match_result(app.applicant, app.job))
         for app in apps
     ]
+    unique_scored_apps = []
+    seen_applicants = set()
+    for app, result in scored_apps:
+        if app.applicant_id in seen_applicants:
+            continue
+        seen_applicants.add(app.applicant_id)
+        unique_scored_apps.append((app, result))
+    scored_apps = unique_scored_apps
     if any(not result['ready'] for _, result in scored_apps):
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({
                 'success': False,
                 'message': 'Employability scores are unavailable for one or more applicants. No candidates were forwarded.',
             }, status=409)
-        return redirect(f'/admin/jobs/{job_id}/candidates/?notified=score_unavailable')
+        return redirect(
+            f'/admin/jobs/{job_id}/candidates/?job_ids={",".join(map(str, grouped_job_ids))}'
+            '&notified=score_unavailable'
+        )
 
     count = 0
     now_ts = timezone.now()
@@ -2274,7 +2467,10 @@ def forward_qualified_candidates_view(request, job_id):
             'count': count
         })
 
-    return redirect(f'/admin/jobs/{job_id}/candidates/?forwarded_qualified={count}')
+    return redirect(
+        f'/admin/jobs/{job_id}/candidates/?job_ids={",".join(map(str, grouped_job_ids))}'
+        f'&forwarded_qualified={count}'
+    )
 
 
 @require_role('admin')
