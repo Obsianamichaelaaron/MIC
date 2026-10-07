@@ -1466,6 +1466,10 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Interview successfully scheduled')
         self.assertNotContains(response, '> Schedule Interview</h6>')
+        self.assertNotContains(response, 'Online Video')
+        self.assertNotContains(response, 'Meeting Link / Location:')
+        self.assertNotContains(response, 'Instructions for Candidate:')
+        self.assertNotContains(response, 'Send Interview Invitation')
         schedule = InterviewSchedule.objects.get(application=application)
         self.assertEqual(schedule.interview_date.isoformat(), '2026-10-15')
         self.assertEqual(schedule.start_time.strftime('%H:%M'), '10:30')
@@ -1485,6 +1489,31 @@ class MultiBizConversionTests(TestCase):
         )
         self.assertEqual(detail_response.status_code, 200)
         self.assertNotContains(detail_response, 'Schedule Interview')
+
+    def test_interview_form_is_hidden_at_interview_stage(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='interviewed',
+            employer_status='for_interview',
+            forwarded_to_employer=True,
+        )
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session['email'] = self.employer_user.email
+        session.save()
+
+        response = self.client.get(
+            f'/employer/view_candidate.php?id={application.application_id}'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Schedule Interview')
+        self.assertNotContains(response, 'Online Video')
+        self.assertNotContains(response, 'Meeting Link / Location:')
+        self.assertNotContains(response, 'Instructions for Candidate:')
+        self.assertNotContains(response, 'Send Interview Invitation')
 
     def test_chat_messaging_system(self):
         """Test real-time messaging between employer and applicant"""
