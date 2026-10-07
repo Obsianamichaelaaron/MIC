@@ -112,6 +112,11 @@ urlpatterns = [
     path('admin/batch_forward_candidates/', views_admin.batch_forward_candidates_api, name='admin_batch_forward_candidates'),
     re_path(r'^(?:frontend/)?admin/batch_forward_candidates\.php$', views_admin.batch_forward_candidates_api),
     path('admin/jobs/<int:job_id>/candidates/', views_admin.job_candidates_view, name='admin_job_candidates'),
+    path(
+        'admin/jobs/<int:job_id>/applications/<int:application_id>/delete/',
+        views_admin.delete_application_view,
+        name='admin_delete_application',
+    ),
     path('admin/jobs/<int:job_id>/export_excel/', views_admin.export_candidates_excel_view, name='admin_export_candidates_excel'),
     path('admin/jobs/<int:job_id>/upload_google_drive/', views_admin.upload_candidates_google_drive_api, name='admin_upload_candidates_google_drive'),
     path('admin/jobs/<int:job_id>/export_csv/', views_admin.export_candidates_csv_view, name='admin_export_candidates_csv'),

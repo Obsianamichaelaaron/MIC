@@ -360,6 +360,12 @@
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
     {% endif %}
+    {% if request.GET.removed == '1' %}
+    <div class="alert alert-success alert-dismissible fade show rounded-4 border-0 shadow-sm mb-4" role="alert">
+        <strong>Application removed.</strong> Related interview, screening, and feedback records were removed; the applicant account remains.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
 
     <!-- Overview Counters -->
     <div class="row g-3 mb-4">
@@ -581,6 +587,14 @@
                         <button type="button" class="candidate-action-btn btn btn-light text-muted border" data-notification-url="{% url 'admin_notify_single_applicant' cand.application.pk %}" data-app-name="{{ cand.applicant.user.full_name }}" onclick="triggerSingleNotice(this)">
                             <i class="fa-solid fa-envelope"></i> Dispatch Notice
                         </button>
+
+                        <form method="POST" action="{% url 'admin_delete_application' job.id cand.application.pk %}" onsubmit="return confirm('Remove the application for {{ cand.applicant.user.full_name|escapejs }} ({{ cand.applicant.user.email|escapejs }}) and its related interview, screening, and feedback records? Their applicant account will not be deleted.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="job_ids" value="{{ job_ids_query }}">
+                            <button type="submit" class="candidate-action-btn btn btn-outline-danger">
+                                <i class="fa-solid fa-trash"></i> Remove Application
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>

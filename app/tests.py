@@ -894,6 +894,68 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(response, 'High employability only')
         self.assertNotContains(response, 'ML unavailable')
 
+    def test_admin_can_remove_one_application_without_deleting_applicant_account(self):
+        target_application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+        )
+        retained_application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+        )
+        unrelated_job = JobPosting.objects.create(
+            employer=self.employer,
+            title='Unrelated posting',
+            status='active',
+        )
+        unrelated_application = Application.objects.create(
+            job=unrelated_job,
+            applicant=self.applicant,
+        )
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        candidate_page = self.client.get(
+            f'/admin/jobs/{self.job.job_id}/candidates/',
+            {'job_ids': str(self.job.job_id)},
+        )
+        self.assertEqual(candidate_page.status_code, 200)
+        self.assertContains(candidate_page, 'Remove Application')
+
+        wrong_job_response = self.client.post(
+            f'/admin/jobs/{unrelated_job.job_id}/applications/{target_application.application_id}/delete/',
+            {'job_ids': str(unrelated_job.job_id)},
+        )
+        self.assertEqual(wrong_job_response.status_code, 404)
+        self.assertTrue(
+            Application.objects.filter(pk=target_application.application_id).exists()
+        )
+
+        response = self.client.post(
+            f'/admin/jobs/{self.job.job_id}/applications/{target_application.application_id}/delete/',
+            {'job_ids': str(self.job.job_id)},
+        )
+
+        self.assertRedirects(
+            response,
+            f'/admin/jobs/{self.job.job_id}/candidates/?job_ids={self.job.job_id}&removed=1',
+            fetch_redirect_response=False,
+        )
+        self.assertFalse(
+            Application.objects.filter(pk=target_application.application_id).exists()
+        )
+        self.assertTrue(
+            Application.objects.filter(pk=retained_application.application_id).exists()
+        )
+        self.assertTrue(
+            Application.objects.filter(pk=unrelated_application.application_id).exists()
+        )
+        self.assertTrue(User.objects.filter(pk=self.applicant_user.user_id).exists())
+        self.assertTrue(Applicant.objects.filter(pk=self.applicant.applicant_id).exists())
+
     def test_candidate_pipeline_counts_high_match_separately_from_high_employability(self):
         self.applicant.employability_score = Decimal('70')
         self.applicant.save(update_fields=['employability_score'])

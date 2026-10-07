@@ -2331,6 +2331,50 @@ def job_candidates_view(request, job_id):
 
 
 @require_role('admin')
+@require_POST
+def delete_application_view(request, job_id, application_id):
+    job = get_object_or_404(JobPosting.objects.select_related('employer'), pk=job_id)
+    try:
+        grouped_jobs = _resolve_duplicate_job_group(
+            job,
+            request.POST.get('job_ids', ''),
+        )
+    except ValueError as exc:
+        return HttpResponseBadRequest(str(exc))
+
+    grouped_job_ids = [grouped_job.job_id for grouped_job in grouped_jobs]
+    application = get_object_or_404(
+        Application.objects.select_related('applicant__user', 'job'),
+        pk=application_id,
+        job_id__in=grouped_job_ids,
+    )
+    applicant_name = application.applicant.user.full_name
+    applicant_email = application.applicant.user.email
+    job_title = application.job.title
+
+    with transaction.atomic():
+        CandidateFeedback.objects.filter(application_id=application.application_id).delete()
+        application.delete()
+        log_audit_trail(
+            request,
+            getCurrentUserId(request),
+            'delete_application',
+            (
+                f"Removed application #{application_id} for {applicant_name} "
+                f"({applicant_email}) from job {job_title}."
+            ),
+            'application',
+            application_id,
+            applicant_email,
+        )
+
+    group_query = ','.join(str(grouped_job_id) for grouped_job_id in grouped_job_ids)
+    return redirect(
+        f'/admin/jobs/{job_id}/candidates/?job_ids={group_query}&removed=1'
+    )
+
+
+@require_role('admin')
 def notify_qualified_applicants_view(request, job_id):
     """Dispatches review notifications to all qualified applicants for a job."""
     admin_id = getCurrentUserId(request)
