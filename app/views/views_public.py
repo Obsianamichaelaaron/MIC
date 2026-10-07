@@ -299,9 +299,6 @@ def careers_view(request):
 
     jobs_qs = JobPosting.objects.filter(
         status='active',
-        employer__company_name__isnull=False,
-    ).exclude(
-        employer__company_name='',
     ).select_related('employer').order_by('-posted_at', '-job_id')
 
     if search_query:
@@ -325,7 +322,7 @@ def careers_view(request):
     if location:
         jobs_qs = jobs_qs.filter(location__icontains=location)
 
-    jobs = unique_public_job_postings(jobs_qs, limit=30)
+    jobs = list(jobs_qs)
 
     qualifications = Qualification.objects.filter(status='active').order_by('name')
 

@@ -747,7 +747,7 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(response, 'Medium · 40 to 60')
         self.assertContains(response, 'Low · below 40')
 
-    def test_public_careers_shows_up_to_30_unique_jobs_with_company_names(self):
+    def test_public_careers_shows_all_active_jobs_with_company_names(self):
         for index in range(30):
             JobPosting.objects.create(
                 employer=self.employer,
@@ -764,16 +764,9 @@ class MultiBizConversionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         jobs = response.context['jobs']
-        self.assertEqual(len(jobs), 30)
-        keys = {
-            (
-                ' '.join(job.employer.company_name.casefold().split()),
-                ' '.join(job.title.casefold().split()),
-            )
-            for job in jobs
-        }
-        self.assertEqual(len(keys), len(jobs))
-        self.assertEqual(response.context['total_jobs_count'], 30)
+        self.assertEqual(len(jobs), 32)
+        self.assertEqual(len({job.job_id for job in jobs}), 32)
+        self.assertEqual(response.context['total_jobs_count'], 32)
         self.assertContains(response, 'MultiBiz Corporation')
 
     def test_admin_active_jobs_match_public_careers_list(self):
@@ -801,7 +794,7 @@ class MultiBizConversionTests(TestCase):
         admin_ids = {job.job_id for job in admin_response.context['jobs']}
         self.assertEqual(admin_ids, careers_ids)
         matching_title_ids = {self.job.job_id, duplicate_job.job_id}
-        self.assertEqual(len(admin_ids & matching_title_ids), 1)
+        self.assertEqual(admin_ids & matching_title_ids, matching_title_ids)
         self.assertEqual(admin_response.context['counts']['active'], len(careers_ids))
 
     def test_homepage_featured_jobs_are_unique_and_use_employer_names(self):

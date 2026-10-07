@@ -36,7 +36,6 @@ from app.services.mailer import (
     send_applicant_forwarded_to_employer_email, send_interview_scheduled_email
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
-from app.services.job_listings import unique_public_job_postings
 
 
 def _job_posting_duplicate_key(job):
@@ -962,22 +961,16 @@ def jobs_view(request):
         applicant_count=Count('applications')
     )
 
-    active_jobs_qs = jobs_base_qs.filter(
-        status='active',
-        employer__company_name__isnull=False,
-    ).exclude(employer__company_name='').order_by('-posted_at', '-job_id')
-    active_public_jobs = unique_public_job_postings(active_jobs_qs, limit=30)
-
     counts = {
         'all': jobs_base_qs.count(),
         'pending': jobs_base_qs.filter(status='pending').count(),
         'approved': jobs_base_qs.filter(status='approved').count(),
-        'active': len(active_public_jobs),
+        'active': jobs_base_qs.filter(status='active').count(),
         'rejected': jobs_base_qs.filter(status='rejected').count(),
         'closed': jobs_base_qs.filter(status='closed').count(),
     }
 
-    jobs_qs = jobs_base_qs.order_by('-posted_at')
+    jobs_qs = jobs_base_qs.order_by('-posted_at', '-job_id')
 
     if search:
         jobs_qs = jobs_qs.filter(
@@ -989,12 +982,6 @@ def jobs_view(request):
 
     if status_filter:
         jobs_qs = jobs_qs.filter(status=status_filter)
-
-    if status_filter == 'active':
-        jobs_qs = jobs_qs.filter(
-            employer__company_name__isnull=False,
-        ).exclude(employer__company_name='').order_by('-posted_at', '-job_id')
-        jobs_qs = unique_public_job_postings(jobs_qs, limit=30)
 
     context = {
         'page_title': 'All Jobs & Requests - MultiBiz Admin',
