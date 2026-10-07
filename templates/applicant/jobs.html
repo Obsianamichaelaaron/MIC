@@ -73,13 +73,13 @@
 
 <div class="old-jobs-page">
     <div class="old-jobs-shell">
-        <section class="jobs-hero-old"><div class="jobs-hero-content-old"><div><p class="jobs-crumb"><a href="dashboard.php">Dashboard</a> / Matched Jobs</p><h1><i class="fas fa-briefcase"></i> Personalized Job Directory <span class="jobs-hero-badge">{% if match_model_status.ready %}<i class="fas fa-brain"></i> Supervised ML{% else %}<i class="fas fa-chart-bar"></i> Profile Fit Estimate{% endif %}</span></h1></div><a href="profile.php" class="jobs-hero-action"><i class="fas fa-user-pen"></i> Update Skills</a></div></section>
+        <section class="jobs-hero-old"><div class="jobs-hero-content-old"><div><p class="jobs-crumb"><a href="dashboard.php">Dashboard</a> / Matched Jobs</p><h1><i class="fas fa-briefcase"></i> Personalized Job Directory <span class="jobs-hero-badge"><i class="fas fa-brain"></i> Pre-trained AI</span></h1></div><a href="profile.php" class="jobs-hero-action"><i class="fas fa-user-pen"></i> Update Skills</a></div></section>
         <section class="jobs-filter-old"><form method="GET" action="jobs.php"><input name="search" value="{{ query }}" placeholder="Job title, skill, or keyword..."><select name="type" onchange="this.form.submit()"><option value="">All Employment Types</option><option value="full-time" {% if emp_type == 'full-time' %}selected{% endif %}>Full-time</option><option value="part-time" {% if emp_type == 'part-time' %}selected{% endif %}>Part-time</option><option value="contract" {% if emp_type == 'contract' %}selected{% endif %}>Contract</option><option value="internship" {% if emp_type == 'internship' %}selected{% endif %}>Internship</option></select><select name="min_match" onchange="this.form.submit()" {% if not match_filter_available %}disabled title="No profile or model match estimate is available to filter."{% endif %}>{% if match_filter_available %}<option value="" {% if not min_match %}selected{% endif %}>All Match %</option><option value="80" {% if min_match == '80' %}selected{% endif %}>80%+ match</option><option value="60" {% if min_match == '60' %}selected{% endif %}>60%+ match</option><option value="40" {% if min_match == '40' %}selected{% endif %}>40%+ match</option>{% else %}<option value="" selected>Match filter unavailable</option>{% endif %}</select><button type="submit"><i class="fas fa-filter"></i> Filter</button></form></section>
         <div class="small text-muted mb-2" role="status">
             {% if match_model_status.ready %}
-                TF-IDF + Logistic Regression is trained on admin-reviewed application outcomes.
+                Uses the pre-trained all-MiniLM-L6-v2 sentence-transformer to compare your profile or resume with each job. It runs inside this app; resume text is not sent to an AI API. The percentage is semantic relevance, not a hiring probability, and does not depend on admin-reviewed outcomes.
             {% else %}
-                The supervised model is still training. The percentage below is a temporary profile-fit estimate based on coverage of explicit job skills, experience requirements, and mapped qualifications. Each criterion counts equally; this is not a trained ML prediction. The model will replace it when enough genuine admin-reviewed examples are available.
+                {{ match_model_status.reason }}
             {% endif %}
         </div>
         <div class="jobs-split">
@@ -101,13 +101,8 @@
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
-                                    {% if item.ml_match_class %}
-                                        <span class="small text-primary fw-semibold">ML {{ item.ml_match_class|title }}</span>
-                                    {% endif %}
-                                    {% if item.match_score != None and item.match_score_type == 'model' %}
-                                        <span class="job-score-old"><i class="fas fa-bolt"></i> {{ item.match_score|floatformat:0 }}% ML estimate</span>
-                                    {% elif item.match_score != None and item.match_score_type == 'profile_fit' %}
-                                        <span class="job-score-old" title="Coverage of explicit job criteria; not a trained ML prediction"><i class="fas fa-chart-bar"></i> {{ item.match_score|floatformat:0 }}% profile fit</span>
+                                    {% if item.match_score != None and item.match_score_type == 'semantic_model' %}
+                                        <span class="job-score-old" title="Pre-trained semantic relevance; not a probability of being hired"><i class="fas fa-brain"></i> {{ item.match_score|floatformat:0 }}% AI relevance</span>
                                     {% else %}
                                         <span class="job-score-old" title="{{ item.match_reason }}">{{ item.match_reason|default:"Estimate unavailable" }}</span>
                                     {% endif %}
@@ -730,12 +725,12 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
     const scoreColor = numScore >= 80 ? '#28a745' : 
                      numScore >= 60 ? '#ffc107' : 
                      numScore >= 40 ? '#fd7e14' : '#dc3545';
-    const scoreLabel = 'Estimated probability of a high match';
+    const scoreLabel = 'Semantic relevance to this job, not hiring probability';
     
     let html = `
         <h3 style="color: #333; margin-bottom: 1rem;">${jobTitle}</h3>
         <div style="background: linear-gradient(135deg, ${scoreColor} 0%, ${scoreColor}dd 100%); padding: 2rem; border-radius: 10px; margin-bottom: 1.5rem;">
-            <p style="color: white; font-size: 0.9rem; margin-bottom: 0.5rem; opacity: 0.9;">Model Score</p>
+            <p style="color: white; font-size: 0.9rem; margin-bottom: 0.5rem; opacity: 0.9;">Pre-trained AI Relevance</p>
             <p style="color: white; font-size: 3rem; font-weight: 700; margin: 0.5rem 0;">
                 ${numScore.toFixed(1)}%
             </p>
@@ -744,11 +739,11 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
             </p>
         </div>
         <div style="text-align: left; background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem;">
-            <h4 style="color: #333; margin-bottom: 0.75rem;">How the model is trained:</h4>
+            <h4 style="color: #333; margin-bottom: 0.75rem;">About this estimate:</h4>
             <ul style="color: #666; line-height: 1.8; margin: 0; padding-left: 1.5rem;">
-                <li>TF-IDF converts resume, profile, and job text into numeric features.</li>
-                <li>Logistic Regression learns high, medium, and low labels from admin-reviewed applications.</li>
-                <li>This percentage is the model-estimated probability of the high class, not a guaranteed hiring outcome.</li>
+                <li>A pre-trained sentence-transformer compares the meaning of your profile/resume with the job.</li>
+                <li>Text is processed inside this app and is not sent to an external AI API.</li>
+                <li>This percentage measures semantic relevance and is not a probability of being hired.</li>
             </ul>
         </div>
         <div style="display: flex; gap: 1rem; justify-content: center;">

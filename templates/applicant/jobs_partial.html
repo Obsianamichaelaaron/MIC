@@ -1,9 +1,7 @@
 <span id="jobsCount">{{ jobs|length }}</span>
-{% if not match_model_status.ready %}
-    <div class="small text-muted mb-2" role="status">
-        The model is still training. Profile-fit percentages below cover explicit job criteria and are not trained ML predictions; genuine admin-reviewed examples are needed before model estimates are available.
-    </div>
-{% endif %}
+<div class="small text-muted mb-2" role="status">
+    {{ match_model_status.reason }} Semantic relevance is not a probability of being hired.
+</div>
 <div id="activeFilters">
     {% if employment_type and employment_type != 'all' or remote_option and remote_option != 'all' or salary_range and salary_range != 'any' %}
         <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 6px;">
@@ -73,20 +71,14 @@
                                 </p>
                             {% endif %}
                             
-                            {% if job.match_score != None and job.match_score_type == 'model' %}
+                            {% if job.match_score != None and job.match_score_type == 'semantic_model' %}
                                 <button type="button" 
                                         class="btn-match-score match-score-pill {% if job.match_score >= 80 %}score-badge-green{% elif job.match_score >= 60 %}score-badge-yellow{% elif job.match_score >= 40 %}score-badge-orange{% else %}score-badge-red{% endif %}"
                                         data-job-id="{{ job.job_id }}"
                                         data-job-title="{{ job.title }}"
                                         data-match-score="{{ job.match_score }}">
-                                    <i class="fas fa-star"></i> {{ job.match_score|floatformat:1 }}% ML estimate
+                                    <i class="fas fa-brain"></i> {{ job.match_score|floatformat:0 }}% AI relevance
                                 </button>
-                            {% elif job.match_score != None and job.match_score_type == 'profile_fit' %}
-                                <span class="btn-match-score match-score-pill" title="Coverage of explicit job criteria; not a trained ML prediction">
-                                    <i class="fas fa-chart-bar"></i> {{ job.match_score|floatformat:0 }}% profile fit
-                                </span>
-                            {% elif match_model_status.ready %}
-                                <span class="small text-muted">Add profile skills or a resume to get an ML estimate.</span>
                             {% else %}
                                 <span class="small text-muted" title="{{ job.match_reason }}">{{ job.match_reason|default:"Estimate unavailable" }}</span>
                             {% endif %}

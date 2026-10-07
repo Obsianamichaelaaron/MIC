@@ -331,21 +331,12 @@
         {% if match_score != None %}
             <div role="status" style="margin: 1rem 0; padding: 1rem; border-radius: 8px; background: #eff6ff; color: #1e3a8a;">
                 <strong>
-                    {% if match_score_type == 'model' %}
-                        {{ match_score|floatformat:0 }}% trained ML match estimate
-                    {% else %}
-                        {{ match_score|floatformat:0 }}% profile-fit estimate
-                    {% endif %}
+                    {{ match_score|floatformat:0 }}% pre-trained AI relevance
                 </strong>
-                {% if match_score_type == 'profile_fit' %}
-                    <div class="small" style="margin-top: .35rem;">Coverage of the job's stated skills, experience requirement, and mapped qualifications. Each criterion counts equally; this is not a trained ML prediction.</div>
-                    {% if profile_fit.matched_skills %}
-                        <div class="small" style="margin-top: .25rem;">Matched skills: {{ profile_fit.matched_skills|join:", " }}</div>
-                    {% endif %}
-                    {% if profile_fit.missing_skills %}
-                        <div class="small" style="margin-top: .25rem;">Skills not found in your profile: {{ profile_fit.missing_skills|join:", " }}</div>
-                    {% endif %}
-                {% endif %}
+                <div class="small" style="margin-top: .35rem;">Meaning-based relevance between your profile/resume and this job, computed with a pre-trained sentence-transformer. This is not a hiring probability and does not use admin-reviewed outcomes.</div>
+                {% for component in semantic_breakdown %}
+                    <div class="small" style="margin-top: .25rem;">{{ component.label }} relevance: {{ component.score|floatformat:0 }}%</div>
+                {% endfor %}
             </div>
         {% else %}
             <div class="small text-muted" role="status" style="margin: 1rem 0;">{{ match_reason }}</div>

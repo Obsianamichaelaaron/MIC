@@ -790,12 +790,9 @@
                                         </div>
                                         <div class="d-flex flex-column align-items-end gap-1">
                                             {% if item.match_score != None %}
-                                                <span class="portal-match" title="{% if item.match_score_type == 'model' %}Trained ML match estimate{% else %}Coverage of explicit job criteria; each criterion counts equally; not a trained ML prediction{% endif %}"><i class="fas fa-chart-line"></i> {{ item.match_score|floatformat:1 }}% {% if item.match_score_type == 'model' %}ML score{% else %}profile fit{% endif %}</span>
+                                                <span class="portal-match" title="Pre-trained semantic relevance; not a probability of being hired"><i class="fas fa-brain"></i> {{ item.match_score|floatformat:0 }}% AI relevance</span>
                                             {% else %}
                                                 <span class="portal-match" title="{{ item.match_reason }}">{{ item.match_reason|default:"Estimate unavailable" }}</span>
-                                            {% endif %}
-                                            {% if item.ml_match_class %}
-                                                <span class="small text-primary fw-semibold">ML {{ item.ml_match_class|title }}</span>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -1071,7 +1068,7 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
     let html = `
         <h3 style="color: #333; margin-bottom: 0.8rem; font-size: 1rem;">${jobTitle}</h3>
         <div style="background: linear-gradient(135deg, ${scoreColor} 0%, ${scoreColor}dd 100%); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.2rem;">
-            <p style="color: white; font-size: 0.8rem; margin-bottom: 0.4rem; opacity: 0.9;">Model Score</p>
+            <p style="color: white; font-size: 0.8rem; margin-bottom: 0.4rem; opacity: 0.9;">AI Semantic Relevance</p>
             <p style="color: white; font-size: 2.5rem; font-weight: 700; margin: 0.4rem 0;">
                 ${matchScore.toFixed(1)}%
             </p>
@@ -1080,11 +1077,11 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
             </p>
         </div>
         <div style="text-align: left; background: #f8f9fa; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;">
-            <h4 style="color: #333; margin-bottom: 0.6rem; font-size: 0.85rem;">How the model is trained:</h4>
+            <h4 style="color: #333; margin-bottom: 0.6rem; font-size: 0.85rem;">About this estimate:</h4>
             <ul style="color: #666; line-height: 1.6; margin: 0; padding-left: 1.2rem; font-size: 0.8rem;">
-                <li>TF-IDF converts resume, profile, and job text into numeric features.</li>
-                <li>Logistic Regression learns high, medium, and low labels from admin-reviewed applications.</li>
-                <li>This is a model-estimated probability, not a guaranteed hiring outcome.</li>
+                <li>A pre-trained sentence-transformer compares your profile/resume with the job requirements.</li>
+                <li>Text is processed inside this app and is not sent to an external AI API.</li>
+                <li>This percentage measures semantic relevance; it is not a hiring probability.</li>
             </ul>
         </div>
         <div style="display: flex; gap: 0.8rem; justify-content: center;">

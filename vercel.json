@@ -5,7 +5,7 @@
       "src": "multibiz/wsgi.py",
       "use": "@vercel/python",
       "config": {
-        "maxLambdaSize": "15mb",
+        "maxLambdaSize": "50mb",
         "includeFiles": [
           "templates/**",
           "app/templates/**",

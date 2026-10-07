@@ -22,56 +22,44 @@ from app.services.resume_storage import (
     store_profile_picture,
     store_verified_resume,
 )
-from app.services.ml_ranking import compute_job_match_score
-from app.services.ml_job_matching import (
-    get_match_classifier,
-    predict_match_class,
-    predict_match_score,
+from app.services.semantic_job_matching import (
+    SemanticMatchingUnavailable,
+    compute_semantic_match,
 )
-from app.services.profile_fit import compute_profile_fit
 from app.services.mailer import send_application_submitted_email
+
+
+def _semantic_model_status(match=None):
+    if match and not match['model_ready']:
+        return {'ready': False, 'reason': match['reason']}
+    return {
+        'ready': True,
+        'reason': 'Uses a pre-trained sentence-transformer model; no admin-reviewed outcomes are required.',
+    }
 
 
 def get_applicant_job_match(
     applicant: Applicant,
     job: JobPosting,
-    model,
     resume_text: str = '',
 ) -> dict[str, object]:
-    """Prefer the trained prediction; otherwise return explicit-criteria coverage."""
-    has_profile_evidence = any((
-        resume_text,
-        applicant.skills,
-        applicant.qualifications,
-        applicant.education_level,
-        (applicant.experience_years or 0) > 0,
-    ))
-    if model and has_profile_evidence:
-        model_score = predict_match_score(model, applicant, job, resume_text)
-        if model_score is not None:
-            return {
-                'score': model_score,
-                'score_type': 'model',
-                'match_class': predict_match_class(model, applicant, job, resume_text),
-                'profile_fit': None,
-                'reason': '',
-            }
-
-    profile_fit = compute_profile_fit(applicant, job, resume_text)
-    if profile_fit['score'] is None:
+    """Return pre-trained semantic relevance without application outcome labels."""
+    try:
+        semantic_match = compute_semantic_match(applicant, job, resume_text)
+    except SemanticMatchingUnavailable as exc:
         return {
             'score': None,
             'score_type': None,
-            'match_class': None,
-            'profile_fit': None,
-            'reason': profile_fit['reason'],
+            'semantic_breakdown': [],
+            'reason': str(exc),
+            'model_ready': False,
         }
     return {
-        'score': profile_fit['score'],
-        'score_type': 'profile_fit',
-        'match_class': None,
-        'profile_fit': profile_fit,
-        'reason': '',
+        'score': semantic_match['score'],
+        'score_type': 'semantic_model' if semantic_match['score'] is not None else None,
+        'semantic_breakdown': semantic_match['breakdown'],
+        'reason': semantic_match['reason'],
+        'model_ready': True,
     }
 
 
@@ -153,17 +141,16 @@ def dashboard_view(request):
     # Fresh account check
     is_fresh_account = bool(app_count == 0 and not chatbot_completed and completion_pct < 75)
 
-    # Recommendations are personalized from applicant information parsed from their resume.
+    # Recommendations use a pre-trained semantic model and do not require admin labels.
     recommendations = []
     all_jobs = JobPosting.objects.filter(status='active').select_related(
         'employer'
     ).prefetch_related('qualification_mappings__qualification').order_by('-posted_at')
-    match_classifier, _ = get_match_classifier(exclude_applicant_id=applicant.pk)
     resume_text = ResumeAnalysis.objects.filter(
         applicant=applicant
     ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
     for job in all_jobs:
-        match = get_applicant_job_match(applicant, job, match_classifier, resume_text)
+        match = get_applicant_job_match(applicant, job, resume_text)
         recommendations.append({
             'job': job,
             'job_id': job.job_id,
@@ -173,7 +160,6 @@ def dashboard_view(request):
             'company_name': job.employer.company_name if job.employer else 'MultiBiz Partner',
             'calculated_match_score': match['score'],
             'match_score_type': match['score_type'],
-            'ml_match_class': match['match_class'],
             'match_reason': match['reason'],
         })
     recommendations.sort(
@@ -217,11 +203,10 @@ def dashboard_view(request):
         applicant=applicant
     ).select_related('job', 'job__employer').order_by('-applied_at')[:5]
     for application in applications:
-        result = get_applicant_job_match(applicant, application.job, match_classifier, resume_text)
+        result = get_applicant_job_match(applicant, application.job, resume_text)
         application.match_score = result['score']
         application.match_score_type = result['score_type']
         application.match_reason = result['reason']
-        application.qualification_status = result['match_class']
 
     # Upcoming interviews
     interviews = InterviewSchedule.objects.filter(
@@ -245,7 +230,6 @@ def dashboard_view(request):
                 'job': recommended_job,
                 'match_score': recommendation['calculated_match_score'],
                 'match_score_type': recommendation['match_score_type'],
-                'ml_match_class': recommendation['ml_match_class'],
                 'match_reason': recommendation['match_reason'],
                 'matched_skills': [],
                 'missing_skills': [],
@@ -292,11 +276,6 @@ def dashboard_view(request):
         'ai_tip_badge': 'Improve Profile',
     }
     return render(request, 'applicant/dashboard.html', context)
-
-
-def compute_applicant_job_match(applicant, job, chatbot_answers=None):
-    """Return the supervised model score used by applicant job surfaces."""
-    return compute_job_match_score(applicant, job, chatbot_answers)
 
 
 def jobs_view(request):
@@ -414,34 +393,31 @@ def jobs_view(request):
     now = timezone.now()
     jobs_list = []
     if applicant and all_jobs:
-        match_classifier, match_model_status = get_match_classifier(
-            exclude_applicant_id=applicant.pk
-        )
+        match_model_status = _semantic_model_status()
         resume_text = ResumeAnalysis.objects.filter(
             applicant=applicant
         ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
     else:
-        match_classifier = None
         match_model_status = {
             'ready': False,
-            'reason': 'The trained match model is unavailable without an applicant profile and active jobs.',
+            'reason': 'An applicant profile and active jobs are required for semantic matching.',
         }
         resume_text = ''
+    model_failure = None
     for job in all_jobs:
-        score_type = None
         match = (
-            get_applicant_job_match(applicant, job, match_classifier, resume_text)
+            get_applicant_job_match(applicant, job, resume_text)
             if applicant else {
                 'score': None,
                 'score_type': None,
-                'match_class': None,
-                'profile_fit': None,
+                'semantic_breakdown': [],
                 'reason': 'Applicant profile is not available.',
             }
         )
+        if not match.get('model_ready', True) and model_failure is None:
+            model_failure = match['reason']
         score = match['score']
         score_type = match['score_type']
-        ml_match_class = match['match_class']
         if score is None:
             score_color = '#687386'
         elif score >= 80:
@@ -491,8 +467,7 @@ def jobs_view(request):
             'time_ago': time_ago,
             'match_score': score,
             'match_score_type': score_type,
-            'ml_match_class': ml_match_class,
-            'profile_fit': match['profile_fit'],
+            'semantic_breakdown': match['semantic_breakdown'],
             'match_reason': match['reason'],
             'score_color': score_color,
             'qualification_matches': qual_match,
@@ -500,6 +475,9 @@ def jobs_view(request):
             'is_applied': job.job_id in applied_job_ids,
             'has_applied': job.job_id in applied_job_ids,
         })
+
+    if model_failure:
+        match_model_status = {'ready': False, 'reason': model_failure}
 
     match_filter_available = any(item['match_score'] is not None for item in jobs_list)
     if min_match and match_filter_available:
@@ -544,6 +522,7 @@ def jobs_view(request):
         # Aliases used by the supplied split-pane Applicant Jobs design.
         'scored_jobs': jobs_list,
         'match_model_status': match_model_status,
+        'semantic_model_status': match_model_status,
         'query': search,
         'emp_type': employment_type,
         'min_match': min_match,
@@ -589,15 +568,11 @@ def job_details_view(request, job_id=None):
 
     chatbot_answers = list(ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number'))
     chatbot_completed = len(chatbot_answers) > 0
-    match_model, match_model_status = get_match_classifier(
-        exclude_applicant_id=applicant.pk
-    )
     resume_text = ResumeAnalysis.objects.filter(
         applicant=applicant
     ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
-    match = get_applicant_job_match(applicant, job, match_model, resume_text)
+    match = get_applicant_job_match(applicant, job, resume_text)
     match_score = match['score']
-    match_class = match['match_class']
 
     # Check if profile is complete (skills & qualifications present or profile_completed flag is True or resume uploaded)
     profile_completed = bool(applicant and (applicant.profile_completed or (applicant.skills and applicant.qualifications) or applicant.resume_file))
@@ -611,21 +586,8 @@ def job_details_view(request, job_id=None):
         if skill.strip()
     ]
 
-    match_colors = {
-        'high': '#28a745',
-        'medium': '#ff9800',
-        'low': '#dc3545',
-    }
-    match_ratings = {
-        'high': 'High ML match',
-        'medium': 'Medium ML match',
-        'low': 'Low ML match',
-    }
-    color = match_colors.get(match_class, '#687386')
-    match_rating = match_ratings.get(
-        match_class,
-        'Profile fit estimate' if match['score_type'] == 'profile_fit' else 'Estimate unavailable',
-    )
+    color = '#1866a3' if match_score is not None else '#687386'
+    match_rating = 'Pre-trained AI semantic relevance' if match_score is not None else 'Estimate unavailable'
 
     similar_jobs = JobPosting.objects.filter(
         status='active'
@@ -644,14 +606,13 @@ def job_details_view(request, job_id=None):
         'interviews': interviews,
         'match_score': match_score,
         'match_score_type': match['score_type'],
-        'profile_fit': match['profile_fit'],
+        'semantic_breakdown': match['semantic_breakdown'],
         'match_reason': match['reason'],
-        'match_model_status': match_model_status,
+        'match_model_status': _semantic_model_status(match),
         'score': match_score,
         'color': color,
         'display_match_score': match_score,
         'match_rating': match_rating,
-        'ml_match_class': match_class,
         'qualifications': job_qualifications,
         'job_qualifications': job_qualifications,
         'skills': job_skills,
@@ -720,31 +681,24 @@ def apply_job_view(request, job_id=None):
             error = "Please provide or upload a resume to complete your application."
 
         if not error:
-            match_model, match_model_status = get_match_classifier(
-                exclude_applicant_id=applicant.pk
-            )
             resume_text = ResumeAnalysis.objects.filter(
                 applicant=applicant
             ).order_by('-analysis_date').values_list(
                 'extracted_text', flat=True
             ).first() or ''
-            match = get_applicant_job_match(applicant, job, match_model, resume_text)
+            match = get_applicant_job_match(applicant, job, resume_text)
             match_score = match['score']
-            match_class = match['match_class']
-            classification = {
-                'high': 'Strong Match',
-                'medium': 'Moderate Match',
-                'low': 'Low Match',
-            }.get(
-                match_class,
-                'Profile fit estimate' if match['score_type'] == 'profile_fit' else 'Awaiting model training',
+            classification = (
+                'Pre-trained AI semantic relevance estimate'
+                if match['score_type'] == 'semantic_model'
+                else 'AI semantic estimate unavailable'
             )
 
             Application.objects.create(
                 job=job,
                 applicant=applicant,
                 status='pending',
-                match_score=Decimal(str(match_score or 0)) if match['score_type'] == 'model' else Decimal('0'),
+                match_score=Decimal('0'),
                 cover_letter=cover_letter,
                 resume_file=resume_path,
                 classification=classification,
@@ -767,13 +721,10 @@ def apply_job_view(request, job_id=None):
 
             return redirect('/applicant/applications.php?applied=success')
 
-    match_model, match_model_status = get_match_classifier(
-        exclude_applicant_id=applicant.pk
-    )
     resume_text = ResumeAnalysis.objects.filter(
         applicant=applicant
     ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
-    match = get_applicant_job_match(applicant, job, match_model, resume_text)
+    match = get_applicant_job_match(applicant, job, resume_text)
     match_score = match['score']
 
     context = {
@@ -785,9 +736,8 @@ def apply_job_view(request, job_id=None):
         'user': user,
         'match_score': match_score,
         'match_score_type': match['score_type'],
-        'profile_fit': match['profile_fit'],
         'match_reason': match['reason'],
-        'match_model_status': match_model_status,
+        'match_model_status': _semantic_model_status(match),
         'error': error,
     }
     return render(request, 'applicant/apply_job.html', context)
@@ -816,17 +766,15 @@ def applications_view(request):
     for inv in interviews:
         interviews_map[inv.application_id] = inv
 
-    match_model, _ = get_match_classifier(exclude_applicant_id=applicant.pk)
     resume_text = ResumeAnalysis.objects.filter(
         applicant=applicant
     ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
     apps_list = []
     for app_item in apps_qs:
-        result = get_applicant_job_match(applicant, app_item.job, match_model, resume_text)
+        result = get_applicant_job_match(applicant, app_item.job, resume_text)
         app_item.match_score = result['score']
         app_item.match_score_type = result['score_type']
         app_item.match_reason = result['reason']
-        app_item.qualification_status = result['match_class']
         apps_list.append({
             'app': app_item,
             'interview': interviews_map.get(app_item.application_id)
@@ -838,12 +786,10 @@ def applications_view(request):
         'applications': apps_list,
         'status_filter': status_filter,
         'total_count': len(apps_list),
-        'match_model_status': (
-            result if apps_list else {
-                'ready': False,
-                'reason': 'There are no applications to score.',
-            }
-        ),
+        'match_model_status': {
+            'ready': True,
+            'reason': 'Uses a pre-trained sentence-transformer model; no admin-reviewed outcomes are required.',
+        },
         'applied_success': request.GET.get('applied') == 'success',
     }
     return render(request, 'applicant/applications.html', context)

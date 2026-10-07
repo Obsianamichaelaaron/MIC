@@ -25,7 +25,11 @@ from app.services.ml_job_matching import (
     train_match_classifier,
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
-from app.services.profile_fit import compute_profile_fit
+from app.services.semantic_job_matching import (
+    SemanticMatchingUnavailable,
+    _criteria_groups,
+    compute_semantic_match,
+)
 from app.services.qualification import classify_match_score
 from app.services.database_rls import set_authenticated_rls_context
 
@@ -404,7 +408,7 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(dashboard.context['applicant'].pk, second_applicant.pk)
         self.assertEqual(dashboard.context['candidate_skills'], ['Rust', 'Go'])
 
-    def test_dashboard_recommendations_show_top_four_with_profile_data(self):
+    def test_dashboard_recommendations_show_top_four_using_semantic_scores(self):
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
@@ -425,17 +429,13 @@ class MultiBizConversionTests(TestCase):
 
         scores = {job.job_id: score for job, score in zip(jobs, [12, 39, 22, 99, 83])}
         with patch(
-            'app.views.views_applicant.get_match_classifier',
-            return_value=(object(), {'ready': True, 'reason': ''}),
-        ), patch(
-            'app.views.views_applicant.predict_match_score',
-            side_effect=lambda model, applicant, job, resume_text: scores[job.job_id],
-        ), patch(
-            'app.views.views_applicant.predict_match_class',
-            return_value='high',
+            'app.views.views_applicant.compute_semantic_match',
+            side_effect=lambda applicant, job, resume_text: {
+                'score': scores[job.job_id],
+                'reason': '',
+                'breakdown': [],
+            },
         ):
-            self.applicant.resume_file = 'resumes/test-resume.pdf'
-            self.applicant.save(update_fields=['resume_file'])
             response = self.client.get('/applicant/dashboard.php')
 
         self.assertEqual(response.status_code, 200)
@@ -446,40 +446,33 @@ class MultiBizConversionTests(TestCase):
             [99, 83, 39, 22],
         )
 
-    def test_browse_job_uses_ready_model_with_profile_data_without_resume(self):
+    def test_browse_jobs_use_pretrained_semantic_model_without_review_labels(self):
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
         session.save()
 
         with patch(
-            'app.views.views_applicant.get_match_classifier',
-            return_value=(object(), {'ready': True, 'reason': ''}),
-        ), patch(
-            'app.views.views_applicant.predict_match_score',
-            return_value=68,
-        ) as score_match, patch(
-            'app.views.views_applicant.predict_match_class',
-            return_value='high',
-        ):
+            'app.views.views_applicant.compute_semantic_match',
+            return_value={
+                'score': 68.4,
+                'reason': '',
+                'breakdown': [{'label': 'Required skills', 'score': 72.0}],
+            },
+        ) as semantic_match:
             response = self.client.get('/applicant/jobs.php')
             self.assertEqual(response.status_code, 200)
             self.assertEqual(
                 [item['match_score'] for item in response.context['scored_jobs']],
-                [68],
+                [68.4],
             )
-            score_match.assert_called_once()
-
-            self.applicant.resume_file = 'resumes/test-resume.pdf'
-            self.applicant.save(update_fields=['resume_file'])
-            response = self.client.get('/applicant/jobs.php')
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(
-            [item['match_score'] for item in response.context['scored_jobs']],
-            [68],
-        )
-        self.assertEqual(score_match.call_count, 2)
+            self.assertEqual(
+                response.context['scored_jobs'][0]['match_score_type'],
+                'semantic_model',
+            )
+            self.assertContains(response, 'pre-trained all-MiniLM-L6-v2')
+            self.assertContains(response, 'not a hiring probability')
+            semantic_match.assert_called_once()
 
     def test_tfidf_logistic_regression_model_uses_three_classes_and_holdout_metrics(self):
         samples = [
@@ -614,59 +607,33 @@ class MultiBizConversionTests(TestCase):
         self.assertFalse(status['ready'])
         self.assertIn('at least two admin-reviewed examples each', status['reason'])
 
-    def test_job_list_uses_model_probability_and_classification(self):
-        reviewed_labels = [
-            ('qualified', 'python django senior developer'),
-            ('under_qualified', 'training internship junior'),
-            ('not_qualified', 'beginner unrelated background'),
-        ]
-        for label, skills in reviewed_labels:
-            for index in range(2):
-                user = User.objects.create(
-                    email=f'match-{label}-{index}@example.com',
-                    password='test-password',
-                    role='applicant',
-                    status='active',
-                )
-                applicant = Applicant.objects.create(
-                    user=user,
-                    skills=skills,
-                    qualifications='Information Technology',
-                    experience_years=index,
-                )
-                Application.objects.create(
-                    job=self.job,
-                    applicant=applicant,
-                    admin_qualification=label,
-                )
-
-        self.applicant.resume_file = 'resumes/test-resume.pdf'
-        self.applicant.save(update_fields=['resume_file'])
-        session = self.client.session
-        session['user_id'] = self.applicant_user.user_id
-        session['role'] = 'applicant'
-        session.save()
-
-        response = self.client.get('/applicant/jobs.php')
-
-        self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context['match_model_status']['ready'])
-        self.assertIn(response.context['jobs'][0]['ml_match_class'], MATCH_CLASSES)
-        self.assertIsInstance(response.context['jobs'][0]['match_score'], float)
-        self.assertContains(response, 'ML ')
-
-    def test_job_list_shows_profile_fit_until_model_is_trained(self):
+    def test_job_list_uses_semantic_model_regardless_of_review_labels(self):
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
         session.save()
 
         with patch(
-            'app.views.views_applicant.get_match_classifier',
-            return_value=(None, {
-                'ready': False,
-                'reason': 'Match classes need more admin-reviewed examples.',
-            }),
+            'app.views.views_applicant.compute_semantic_match',
+            return_value={'score': 77.6, 'reason': '', 'breakdown': []},
+        ):
+            response = self.client.get('/applicant/jobs.php')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['match_model_status']['ready'])
+        self.assertEqual(response.context['jobs'][0]['match_score_type'], 'semantic_model')
+        self.assertEqual(response.context['jobs'][0]['match_score'], 77.6)
+        self.assertContains(response, '78% AI relevance')
+
+    def test_job_list_shows_pretrained_semantic_score_without_admin_reviews(self):
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        with patch(
+            'app.views.views_applicant.compute_semantic_match',
+            return_value={'score': 82.5, 'reason': '', 'breakdown': []},
         ):
             response = self.client.get('/applicant/jobs.php?min_match=80')
 
@@ -675,34 +642,33 @@ class MultiBizConversionTests(TestCase):
             result for result in response.context['jobs']
             if result['job_id'] == self.job.job_id
         )
-        self.assertEqual(job_result['match_score'], 100)
-        self.assertEqual(job_result['match_score_type'], 'profile_fit')
-        self.assertIsNone(job_result['ml_match_class'])
+        self.assertEqual(job_result['match_score'], 82.5)
+        self.assertEqual(job_result['match_score_type'], 'semantic_model')
         self.assertEqual(response.context['min_match'], '80')
         self.assertEqual(len(response.context['jobs']), 1)
-        self.assertContains(response, 'Profile Fit Estimate')
-        self.assertContains(response, '100% profile fit')
-        self.assertContains(response, 'not a trained ML prediction')
+        self.assertContains(response, 'Pre-trained AI')
+        self.assertContains(response, '83% AI relevance')
+        self.assertContains(response, 'does not depend on admin-reviewed outcomes')
 
-    def test_profile_fit_uses_skill_and_explicit_experience_coverage(self):
-        self.applicant.skills = 'Python'
-        self.applicant.qualifications = ''
-        self.applicant.education_level = ''
-        self.applicant.experience_years = 2
-        self.applicant.save()
-        self.job.skills_required = 'Python, Django, React'
-        self.job.requirements = 'At least 4 years of professional experience.'
-        self.job.save()
+    def test_job_list_reports_model_download_failure(self):
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
 
-        profile_fit = compute_profile_fit(self.applicant, self.job)
+        with patch(
+            'app.views.views_applicant.compute_semantic_match',
+            side_effect=SemanticMatchingUnavailable(
+                'Could not download the pre-trained semantic model.'
+            ),
+        ):
+            response = self.client.get('/applicant/jobs.php')
 
-        self.assertEqual(profile_fit['score'], 38)
-        self.assertEqual(profile_fit['matched_skills'], ['Python'])
-        self.assertEqual(profile_fit['missing_skills'], ['Django', 'React'])
-        self.assertEqual(profile_fit['experience_required'], 4)
-        self.assertEqual(profile_fit['experience_coverage'], 50)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context['match_model_status']['ready'])
+        self.assertContains(response, 'Could not download the pre-trained semantic model.')
 
-    def test_profile_fit_requires_profile_evidence_and_explicit_criteria(self):
+    def test_semantic_match_requires_profile_evidence(self):
         applicant = Applicant.objects.create(user=User.objects.create(
             email='empty-profile@example.com',
             password=hash_password('test-password'),
@@ -717,107 +683,35 @@ class MultiBizConversionTests(TestCase):
             status='active',
         )
 
-        profile_fit = compute_profile_fit(applicant, job)
-        self.assertIsNone(profile_fit['score'])
-        self.assertIn('Add skills', profile_fit['reason'])
-        profile_fit = compute_profile_fit(self.applicant, job)
-        self.assertIsNone(profile_fit['score'])
-        self.assertIn('no explicit', profile_fit['reason'])
+        result = compute_semantic_match(applicant, job)
+        self.assertIsNone(result['score'])
+        self.assertIn('Add skills', result['reason'])
 
-        session = self.client.session
-        session['user_id'] = applicant.user_id
-        session['role'] = 'applicant'
-        session.save()
-        with patch(
-            'app.views.views_applicant.get_match_classifier',
-            return_value=(object(), {'ready': True, 'reason': ''}),
-        ), patch(
-            'app.views.views_applicant.predict_match_score',
-        ) as predict_score:
-            response = self.client.get('/applicant/jobs.php')
-
-        self.assertEqual(response.status_code, 200)
-        blank_profile_result = next(
-            item for item in response.context['jobs']
-            if item['job_id'] == self.job.job_id
-        )
-        self.assertIsNone(blank_profile_result['match_score'])
-        self.assertIn('Add skills', blank_profile_result['match_reason'])
-        predict_score.assert_not_called()
-
-    def test_profile_fit_includes_mapped_qualification_coverage(self):
+    def test_semantic_match_uses_job_description_skills_and_mapped_qualifications(self):
         JobQualificationMapping.objects.create(
             job=self.job,
             qualification=self.qualification,
         )
 
-        profile_fit = compute_profile_fit(self.applicant, self.job)
+        groups = dict(_criteria_groups(self.job))
 
-        self.assertEqual(profile_fit['score'], 100)
-        self.assertEqual(
-            profile_fit['matched_qualifications'],
-            ['Information Technology'],
-        )
+        self.assertIn('Python', groups['Required skills'])
+        self.assertIn('Information Technology', groups['Qualifications'])
+        self.assertTrue(groups['Role and requirements'])
 
-    def test_trained_model_score_takes_precedence_over_profile_fit(self):
+    def test_semantic_match_is_labeled_across_job_details_apply_and_applications(self):
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
         session.save()
 
         with patch(
-            'app.views.views_applicant.get_match_classifier',
-            return_value=(object(), {'ready': True, 'reason': ''}),
-        ), patch(
-            'app.views.views_applicant.predict_match_score',
-            return_value=73,
-        ), patch(
-            'app.views.views_applicant.predict_match_class',
-            return_value='medium',
-        ):
-            response = self.client.get('/applicant/jobs.php')
-
-        self.assertEqual(response.status_code, 200)
-        result = next(
-            item for item in response.context['jobs']
-            if item['job_id'] == self.job.job_id
-        )
-        self.assertEqual(result['match_score'], 73)
-        self.assertEqual(result['match_score_type'], 'model')
-        self.assertIsNone(result['profile_fit'])
-
-    def test_profile_fit_is_used_if_ready_model_cannot_score(self):
-        session = self.client.session
-        session['user_id'] = self.applicant_user.user_id
-        session['role'] = 'applicant'
-        session.save()
-
-        with patch(
-            'app.views.views_applicant.get_match_classifier',
-            return_value=(object(), {'ready': True, 'reason': ''}),
-        ), patch(
-            'app.views.views_applicant.predict_match_score',
-            return_value=None,
-        ):
-            response = self.client.get('/applicant/jobs.php')
-
-        self.assertEqual(response.status_code, 200)
-        result = next(
-            item for item in response.context['jobs']
-            if item['job_id'] == self.job.job_id
-        )
-        self.assertEqual(result['match_score_type'], 'profile_fit')
-        self.assertEqual(result['match_score'], 100)
-
-    def test_profile_fit_is_labeled_across_job_details_apply_and_applications(self):
-        session = self.client.session
-        session['user_id'] = self.applicant_user.user_id
-        session['role'] = 'applicant'
-        session.save()
-
-        with patch(
-            'app.views.views_applicant.get_match_classifier',
-            return_value=(None, {'ready': False, 'reason': 'Needs more reviewed examples.'}),
+            'app.views.views_applicant.compute_semantic_match',
+            return_value={
+                'score': 68.4,
+                'reason': '',
+                'breakdown': [{'label': 'Required skills', 'score': 72.0}],
+            },
         ):
             details = self.client.get(
                 f'/applicant/job_details.php?id={self.job.job_id}'
@@ -833,13 +727,13 @@ class MultiBizConversionTests(TestCase):
             applications = self.client.get('/applicant/applications.php')
 
         self.assertEqual(details.status_code, 200)
-        self.assertEqual(details.context['match_score_type'], 'profile_fit')
-        self.assertContains(details, 'profile-fit estimate')
+        self.assertEqual(details.context['match_score_type'], 'semantic_model')
+        self.assertContains(details, 'pre-trained AI relevance')
         self.assertEqual(apply.status_code, 200)
-        self.assertEqual(apply.context['match_score_type'], 'profile_fit')
-        self.assertContains(apply, 'not a trained ML prediction')
+        self.assertEqual(apply.context['match_score_type'], 'semantic_model')
+        self.assertContains(apply, 'Meaning-based relevance')
         self.assertEqual(applications.status_code, 200)
-        self.assertContains(applications, 'profile fit')
+        self.assertContains(applications, 'AI relevance')
 
     def test_admin_analytics_renders_logistic_regression_evaluation_status(self):
         session = self.client.session

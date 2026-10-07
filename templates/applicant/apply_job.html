@@ -563,7 +563,7 @@ body { background: #d8e0eb; }
                 <div class="studio-job"><div class="studio-avatar">{{ job.employer.company_name|slice:":1"|upper|default:"M" }}</div><div><h1>{{ job.title }}</h1><p><i class="fas fa-building"></i> {{ job.employer.company_name|default:"Multibiz Partner" }} · <i class="fas fa-location-dot"></i> {{ job.location }}</p></div></div>
             </div>
             <span class="studio-match"><i class="fas fa-bolt"></i>
-                {% if match_score != None %}{{ match_score|floatformat:0 }}% {% if match_score_type == 'model' %}trained ML match estimate{% else %}profile-fit estimate{% endif %}{% else %}Match estimate unavailable{% endif %}
+                {% if match_score != None %}{{ match_score|floatformat:0 }}% pre-trained AI relevance{% else %}{{ match_reason|default:"AI estimate unavailable" }}{% endif %}
             </span>
         </header>
         {% if error %}
@@ -584,7 +584,7 @@ body { background: #d8e0eb; }
                     <div class="studio-section"><div class="studio-section-title"><span class="studio-step">2</span> Candidate Pitch and Cover Letter</div><textarea name="cover_letter" placeholder="Introduce yourself, explain your interest in this role, and summarize relevant achievements..."></textarea><small style="display:block;margin-top:.3rem;color:#64748b;font-size:.7rem">Optional cover letter</small></div>
                     <div class="studio-actions"><a class="studio-btn studio-btn-cancel" href="job_details.php?id={{ job.job_id }}"><i class="fas fa-xmark"></i> Cancel</a><button class="studio-btn studio-btn-submit" type="submit"><i class="fas fa-paper-plane"></i> Submit Application</button></div>
                 </section>
-                <aside class="studio-card studio-diagnostics"><div><div class="studio-card-heading"><h2><i class="fas fa-brain" style="color:#0b5bd3"></i> Job Match Estimate</h2><span class="studio-match">{% if match_score_type == 'model' %}Trained model{% else %}Profile fit{% endif %}</span></div><div class="studio-score-grid"><div class="studio-score"><label>{% if match_score_type == 'model' %}Estimated probability of high match{% else %}Coverage of explicit job criteria{% endif %}</label><strong>{% if match_score != None %}{{ match_score|floatformat:0 }}%{% else %}Unavailable{% endif %}</strong><div class="studio-progress"><span></span></div></div></div><div class="studio-diagnostic"><h3><i class="fas fa-file-pdf" style="color:#dc3545"></i> Resume</h3><p>{% if profile.resume_file %}<span style="color:#2e7d32">Profile master resume attached.</span>{% else %}<span style="color:#b7791f">Please attach a resume to complete your application.</span>{% endif %}<br>{% if match_score_type == 'profile_fit' %}<span style="color:#1866a3">This is a transparent profile-fit estimate, not a trained ML prediction. Genuine admin-reviewed outcomes are needed to train the model.</span>{% else %}<span style="color:#1866a3">The model uses TF-IDF features and Logistic Regression trained on admin-reviewed application labels.</span>{% endif %}</p></div><div class="studio-diagnostic"><h3><i class="fas fa-pen-nib" style="color:#0b5bd3"></i> Cover Letter Diagnostics</h3><p>Add a focused cover letter to strengthen your application.</p></div></div></aside>
+                <aside class="studio-card studio-diagnostics"><div><div class="studio-card-heading"><h2><i class="fas fa-brain" style="color:#0b5bd3"></i> Pre-trained AI Match</h2><span class="studio-match">all-MiniLM-L6-v2</span></div><div class="studio-score-grid"><div class="studio-score"><label>Semantic relevance to this job (not hiring probability)</label><strong>{% if match_score != None %}{{ match_score|floatformat:0 }}%{% else %}Unavailable{% endif %}</strong><div class="studio-progress"><span></span></div></div></div><div class="studio-diagnostic"><h3><i class="fas fa-file-pdf" style="color:#dc3545"></i> Resume</h3><p>{% if profile.resume_file %}<span style="color:#2e7d32">Profile master resume attached.</span>{% else %}<span style="color:#b7791f">Please attach a resume to complete your application.</span>{% endif %}<br><span style="color:#1866a3">The pre-trained sentence-transformer compares the meaning of your profile/resume with the job. It runs within this app and does not require admin-reviewed outcomes or send resume text to an AI API.</span></p></div><div class="studio-diagnostic"><h3><i class="fas fa-pen-nib" style="color:#0b5bd3"></i> Cover Letter Diagnostics</h3><p>Add a focused cover letter to strengthen your application.</p></div></div></aside>
             </div>
         </form>
     </div>
@@ -620,7 +620,7 @@ body { background: #d8e0eb; }
                 {% if match_score != None %}{{ match_score|floatformat:1 }}%{% else %}Unavailable{% endif %}
             </div>
             <p class="match-feedback">
-                {% if match_score_type == 'model' %}Model-estimated probability of the high-match class.{% elif match_score_type == 'profile_fit' %}Coverage of the explicit skills, experience, and mapped qualification criteria for this job. Each criterion counts equally; this is not a trained ML prediction.{% else %}{{ match_reason }}{% endif %}
+                {% if match_score != None %}Meaning-based relevance between your profile/resume and the job; not a probability of being hired.{% else %}{{ match_reason }}{% endif %}
             </p>
             {% if resume_feedback %}
                 <p class="resume-feedback">
@@ -629,7 +629,7 @@ body { background: #d8e0eb; }
             {% endif %}
             
             <div class="score-breakdown">
-                <p><i class="fas fa-info-circle"></i> {% if match_score_type == 'model' %}The model uses TF-IDF features from applicant and job text, trained on admin-reviewed application outcomes.{% else %}When available, a trained ML estimate replaces this temporary profile-fit estimate after enough genuine admin-reviewed examples are collected.{% endif %}</p>
+                <p><i class="fas fa-info-circle"></i> The pre-trained all-MiniLM-L6-v2 sentence-transformer runs inside this app and does not need application outcome labels.</p>
             </div>
         </div>
         

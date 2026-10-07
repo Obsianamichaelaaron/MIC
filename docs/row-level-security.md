@@ -7,7 +7,11 @@ deny behavior applies where no policy grants access.
 
 Each PostgreSQL web request assumes the non-login `mic_app_rls` role locally
 for its request transaction. This also works with transaction-pooled
-connections; the role resets when the transaction ends.
+connections; the role resets when the transaction ends. The Django development
+server checks migrations inside its own transaction after locally assuming
+this restricted role, which is compatible with transaction-pooled connections.
+The role has explicit `SELECT` access to migration names and timestamps, but
+only administrators can modify the migration ledger.
 
 `DATABASE_URL` is used only by management commands and migrations. The web
 runtime requires a separate `RLS_DATABASE_URL`; it fails closed if that value

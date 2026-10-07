@@ -22,9 +22,9 @@ INSTALLED_APPS = [
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
+    'app',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'app',
 ]
 
 MIDDLEWARE = [
@@ -127,14 +127,13 @@ if database_url and not is_rls_management_command:
 
     import dj_database_url
 
-    DATABASES = {
-        'default': dj_database_url.parse(
-            rls_database_url,
-            conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '600')),
-            conn_health_checks=True,
-            ssl_require=True,
-        )
-    }
+    rls_database = dj_database_url.parse(
+        rls_database_url,
+        conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '600')),
+        conn_health_checks=True,
+        ssl_require=True,
+    )
+    DATABASES = {'default': rls_database}
     RLS_USE_RESTRICTED_ROLE = True
 elif database_url:
     import dj_database_url
