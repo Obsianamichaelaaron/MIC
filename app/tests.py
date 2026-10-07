@@ -809,6 +809,27 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(response, 'High employability only')
         self.assertNotContains(response, 'ML unavailable')
 
+    def test_legacy_unavailable_filter_redirects_to_automatic_candidate_list(self):
+        Application.objects.create(job=self.job, applicant=self.applicant)
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.get(
+            f'/admin/jobs/{self.job.job_id}/candidates/?qual=unavailable&sort=score'
+        )
+
+        self.assertRedirects(
+            response,
+            f'/admin/jobs/{self.job.job_id}/candidates/',
+            fetch_redirect_response=False,
+        )
+        candidate_list = self.client.get(response['Location'])
+        self.assertEqual(candidate_list.status_code, 200)
+        self.assertEqual(candidate_list.context['counts']['qualified'], 1)
+        self.assertContains(candidate_list, 'High Employability')
+
     def test_admin_dossier_shows_automatic_tier_without_manual_assessment(self):
         application = Application.objects.create(
             job=self.job,

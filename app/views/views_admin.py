@@ -2066,6 +2066,8 @@ def job_candidates_view(request, job_id):
     job.company_name = job.employer.company_name if job.employer else 'MultiBiz Partner'
 
     selected_qual   = request.GET.get('qual', '').strip()
+    if selected_qual == 'unavailable':
+        return redirect('admin_job_candidates', job_id=job_id)
     selected_status = request.GET.get('status', '').strip()
     query           = request.GET.get('q', '').strip()
     selected_sort   = request.GET.get('sort', 'score').strip()
