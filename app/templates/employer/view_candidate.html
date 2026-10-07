@@ -201,6 +201,26 @@
     border-color: #0056b3;
     box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.12);
 }
+.employer-action-form .employer-form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    line-height: 1.4;
+}
+.employer-action-form .form-select-custom {
+    box-sizing: border-box;
+    min-height: 46px;
+    line-height: 1.4;
+}
+.employer-action-form textarea.form-control-custom {
+    display: block;
+    box-sizing: border-box;
+    min-height: 112px;
+    line-height: 1.5;
+    resize: vertical;
+}
+.employer-action-form button[type="submit"] {
+    min-height: 46px;
+}
 
 .workflow-stepper {
     display: flex;
@@ -427,12 +447,12 @@
                     <div class="p-3.5 border rounded-3 bg-white shadow-sm mb-3">
                         <h6 class="fw-bold text-dark mb-3 pb-2 border-bottom"><i class="fa-solid fa-gavel text-primary me-1"></i> Hiring Stage & Actions</h6>
                         
-                        <form method="POST" action="" class="d-flex flex-column gap-3">
+                        <form method="POST" action="" class="employer-action-form d-flex flex-column gap-3">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="update_status">
                             
                             <div>
-                                <label class="form-label small fw-semibold text-dark">Update Employer Status:</label>
+                                <label class="employer-form-label form-label small fw-semibold text-dark">Update Employer Status:</label>
                                 <select name="employer_status" class="form-select-custom">
                                     <option value="for_review" {% if application.employer_status == 'for_review' %}selected{% endif %}>For Review</option>
                                     <option value="qualified" {% if application.employer_status == 'qualified' %}selected{% endif %}>Qualified</option>
@@ -444,7 +464,7 @@
                             </div>
 
                             <div>
-                                <label class="form-label small fw-semibold text-dark">Employer Feedback / Remarks:</label>
+                                <label class="employer-form-label form-label small fw-semibold text-dark">Employer Feedback / Remarks:</label>
                                 <textarea name="remarks" rows="3" class="form-control-custom" placeholder="Optional comments regarding candidate qualifications or next steps..."></textarea>
                             </div>
 
