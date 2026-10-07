@@ -268,6 +268,14 @@
 
 <div class="portal-dashboard">
     <div class="portal-shell">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show mb-3" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
         
         <!-- ── Top Enterprise Hero Banner ── -->
         <div class="employer-hero-card">

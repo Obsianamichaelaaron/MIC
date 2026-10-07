@@ -1,6 +1,7 @@
 import os
 import datetime
 from decimal import Decimal
+from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
@@ -811,10 +812,22 @@ def view_candidate_view(request, application_id=None):
                 application.save()
 
                 # In-App Notification
+                notification_title = f"Application Update: {job.title}"
+                notification_message = (
+                    f"Your application status at {employer.company_name} "
+                    f"was updated to '{status_label}'."
+                )
+                if new_status == 'hired':
+                    applicant_name = candidate_user.full_name or candidate_user.email
+                    notification_title = f"Congratulations, {applicant_name}!"
+                    notification_message = (
+                        f"{applicant_name} has been hired for {job.title} "
+                        f"at {employer.company_name}."
+                    )
                 _notify_applicant_for_employer_application(
                     application,
-                    f"Application Update: {job.title}",
-                    f"Your application status at {employer.company_name} was updated to '{status_label}'.",
+                    notification_title,
+                    notification_message,
                 )
 
                 # Send email update
@@ -829,6 +842,14 @@ def view_candidate_view(request, application_id=None):
                     )
                 except Exception as e:
                     print(f"[Employer Status Update Mailer] Error: {e}")
+
+                if new_status == 'hired':
+                    applicant_name = candidate_user.full_name or candidate_user.email
+                    messages.success(
+                        request,
+                        f"{applicant_name} has been hired.",
+                    )
+                    return redirect('employer_dashboard')
 
                 success_msg = f"Candidate moved to '{status_label}' successfully!"
 

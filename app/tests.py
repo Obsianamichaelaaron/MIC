@@ -1587,6 +1587,44 @@ class MultiBizConversionTests(TestCase):
         self.assertNotIn('>For Interview</option>', status_select)
         self.assertNotIn('value="for_interview"', status_select)
 
+    def test_hiring_applicant_redirects_to_dashboard_with_named_notification(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='interviewed',
+            employer_status='for_interview',
+            forwarded_to_employer=True,
+        )
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session['email'] = self.employer_user.email
+        session.save()
+
+        with patch('app.views.views_employer.send_application_status_update_email'):
+            response = self.client.post(
+                f'/employer/view_candidate.php?id={application.application_id}',
+                {
+                    'action': 'update_status',
+                    'employer_status': 'hired',
+                    'remarks': 'Offer accepted.',
+                },
+                follow=True,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.redirect_chain[-1][0], '/employer/dashboard/')
+        self.assertContains(response, 'Job Seeker has been hired.')
+        application.refresh_from_db()
+        self.assertEqual(application.employer_status, 'hired')
+        self.assertEqual(application.status, 'accepted')
+        hire_notification = Notification.objects.get(
+            user=self.applicant_user,
+            title='Congratulations, Job Seeker!',
+        )
+        self.assertIn('Job Seeker has been hired', hire_notification.message)
+        self.assertIn(self.job.title, hire_notification.message)
+
     def test_chat_messaging_system(self):
         """Test real-time messaging between employer and applicant"""
         # Log in as employer
