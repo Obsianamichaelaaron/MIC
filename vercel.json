@@ -10,6 +10,9 @@
           "templates/**",
           "app/templates/**",
           "static/**"
+        ],
+        "excludeFiles": [
+          "public_html (1)/**"
         ]
       }
     }
