@@ -1445,6 +1445,7 @@ class MultiBizConversionTests(TestCase):
             )
             self.assertEqual(invalid_response.status_code, 200)
             self.assertContains(invalid_response, 'Please provide a valid interview end time.')
+            self.assertContains(invalid_response, '> Schedule Interview</h6>')
             self.assertFalse(InterviewSchedule.objects.filter(application=application).exists())
 
             response = self.client.post(
@@ -1464,6 +1465,7 @@ class MultiBizConversionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Interview successfully scheduled')
+        self.assertNotContains(response, '> Schedule Interview</h6>')
         schedule = InterviewSchedule.objects.get(application=application)
         self.assertEqual(schedule.interview_date.isoformat(), '2026-10-15')
         self.assertEqual(schedule.start_time.strftime('%H:%M'), '10:30')

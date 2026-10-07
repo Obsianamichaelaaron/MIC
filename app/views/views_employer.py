@@ -904,6 +904,10 @@ def view_candidate_view(request, application_id=None):
 
     # Scheduled interviews
     interviews = InterviewSchedule.objects.filter(application=application).order_by('-interview_date')
+    can_schedule_interview = (
+        not interviews.exists()
+        and application.employer_status not in ('for_interview', 'interview_completed', 'hired')
+    )
     
     # Chatbot assessment answers
     chatbot_answers = ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number')
@@ -926,6 +930,7 @@ def view_candidate_view(request, application_id=None):
         'job': job,
         'employer': employer,
         'interviews': interviews,
+        'can_schedule_interview': can_schedule_interview,
         'chatbot_answers': chatbot_answers,
         'ml_score': score_info['ml_ranking_score'],
         'tier': score_info['ranking_category'],

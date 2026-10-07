@@ -454,6 +454,7 @@
                         </form>
                     </div>
 
+                    {% if can_schedule_interview %}
                     <!-- Interview Scheduling Card -->
                     <div class="p-3.5 border rounded-3 bg-white shadow-sm">
                         <h6 class="fw-bold text-dark mb-3 pb-2 border-bottom"><i class="fa-solid fa-calendar-plus text-primary me-1"></i> Schedule Interview</h6>
@@ -476,6 +477,7 @@
                                     <label class="form-label small fw-semibold text-dark">End Time:</label>
                                     <input type="time" name="end_time" required class="form-control-custom">
                                 </div>
+                                {% endif %}
                             </div>
 
                             <div>
