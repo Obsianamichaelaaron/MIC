@@ -374,11 +374,15 @@
                                             <h5 class="mb-0 fw-bold text-dark" style="font-size:1rem;">
                                                 {{ app.applicant.user.first_name }} {{ app.applicant.user.last_name }}
                                             </h5>
-                                            {% if app.qualification_status == 'qualified' %}
+                                            {% if app.match_score == None %}
+                                                <span class="badge-match badge-match-good">
+                                                    <i class="fa-solid fa-circle-minus"></i> Score unavailable
+                                                </span>
+                                            {% elif app.match_score > 60 %}
                                                 <span class="badge-match badge-match-excellent">
                                                     <i class="fa-solid fa-circle-check"></i> {{ app.match_score|floatformat:0 }}% High Employability
                                                 </span>
-                                            {% elif app.qualification_status == 'under_qualified' %}
+                                            {% elif app.match_score >= 40 %}
                                                 <span class="badge-match badge-match-average">
                                                     <i class="fa-solid fa-triangle-exclamation"></i> {{ app.match_score|floatformat:0 }}% Medium Employability
                                                 </span>

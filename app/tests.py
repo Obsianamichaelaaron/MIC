@@ -1178,6 +1178,18 @@ class MultiBizConversionTests(TestCase):
             'qualified',
         )
 
+        with patch(
+            'app.views.views_employer.compute_job_match_result',
+            return_value={
+                'match_score': 89.0,
+                'qualification_status': 'not_qualified',
+                'match_class': 'low',
+            },
+        ):
+            inconsistent_score_response = self.client.get('/employer/candidates.php')
+        self.assertContains(inconsistent_score_response, '89% High Employability')
+        self.assertNotContains(inconsistent_score_response, '89% Low Employability')
+
         application.refresh_from_db()
         self.assertEqual(application.match_score, Decimal('0.00'))
 
