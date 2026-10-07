@@ -769,14 +769,14 @@
             </div>
             <div class="cand-kpi-card kpi-accepted">
                 <div class="cand-kpi-info">
-                    <span class="cand-kpi-label">Qualified (&gt;60%)</span>
+                    <span class="cand-kpi-label">High Match</span>
                     <span class="cand-kpi-value">{{ total_qualified }}</span>
                 </div>
                 <div class="cand-kpi-icon"><i class="fas fa-circle-check"></i></div>
             </div>
             <div class="cand-kpi-card kpi-interviewed">
                 <div class="cand-kpi-info">
-                    <span class="cand-kpi-label">High Match (≥85%)</span>
+                    <span class="cand-kpi-label">Low Match</span>
                     <span class="cand-kpi-value">{{ total_high_match }}</span>
                 </div>
                 <div class="cand-kpi-icon"><i class="fas fa-crown"></i></div>
@@ -849,21 +849,20 @@
                     <div class="cand-date"><i class="fas fa-users me-1"></i>{{ js.count_all }} total applicant{{ js.count_all|pluralize }}</div>
                 </div>
 
-                <!-- Col 3: Qualified -->
+                <!-- Col 3: High match -->
                 <div class="cand-col-score">
-                    <div class="cand-col-label">High Employability (&gt;60%)</div>
+                    <div class="cand-col-label">HIGH MATCH</div>
                     <div class="cand-score-val" style="color:#059669;">{{ js.count_qualified }}</div>
                     <div class="cand-tier-breakdown">
-                        <div class="cand-score-sub" style="color:#b45309;">Under-Qualified (40–60%): {{ js.count_under_qualified }}</div>
-                        <div class="cand-score-sub" style="color:#b91c1c;">Not Qualified (&lt;40%): {{ js.count_not_qualified }}</div>
+                        <div class="cand-score-sub" style="color:#b45309;">Under-Qualified: {{ js.count_under_qualified }}</div>
+                        <div class="cand-score-sub" style="color:#b91c1c;">Not Qualified: {{ js.count_not_qualified }}</div>
                     </div>
                 </div>
 
-                <!-- Col 4: High Match -->
+                <!-- Col 4: Low match -->
                 <div class="cand-col-score">
-                    <div class="cand-col-label">High Match</div>
+                    <div class="cand-col-label">Low Match</div>
                     <div class="cand-score-val" style="color:#7c3aed;">{{ js.count_high_match }}</div>
-                    <div class="cand-score-sub" style="color:#7c3aed;">≥ 85%</div>
                 </div>
 
                 <!-- Col 5: Forwarded -->

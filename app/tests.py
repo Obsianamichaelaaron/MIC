@@ -791,7 +791,13 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(summary['count_high_match'], 1)
         self.assertEqual(summary['count_under_qualified'], 1)
         self.assertEqual(summary['count_not_qualified'], 1)
-        self.assertContains(response, 'Not Qualified (&lt;40%)')
+        self.assertContains(response, 'HIGH MATCH')
+        self.assertContains(response, 'Low Match')
+        self.assertContains(response, 'Under-Qualified: 1')
+        self.assertContains(response, 'Not Qualified: 1')
+        self.assertNotContains(response, '40–60%')
+        self.assertNotContains(response, '&lt;40%')
+        self.assertNotContains(response, '≥ 85%')
 
     def test_legacy_unavailable_filter_redirects_to_automatic_candidate_list(self):
         Application.objects.create(job=self.job, applicant=self.applicant)
