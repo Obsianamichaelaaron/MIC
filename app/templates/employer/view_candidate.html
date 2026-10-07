@@ -344,19 +344,15 @@
                             </div>
                             {% if qualification_status == 'qualified' %}
                                 <span class="badge-match badge-match-excellent fs-6">
-                                    <i class="fa-solid fa-circle-check"></i> {{ application.match_score|floatformat:0 }}% Qualified
+                                    <i class="fa-solid fa-circle-check"></i> {{ application.match_score|floatformat:0 }}% High Employability
                                 </span>
                             {% elif qualification_status == 'under_qualified' %}
                                 <span class="badge-match badge-match-average fs-6">
-                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ application.match_score|floatformat:0 }}% Under-Qualified
-                                </span>
-                            {% elif qualification_status == 'unclassified' %}
-                                <span class="badge-match badge-match-good fs-6">
-                                    <i class="fa-solid fa-circle-minus"></i> {{ application.match_score|floatformat:0 }}% Unclassified
+                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ application.match_score|floatformat:0 }}% Medium Employability
                                 </span>
                             {% else %}
                                 <span class="badge-match badge-match-low fs-6">
-                                    <i class="fa-solid fa-circle-xmark"></i> {{ application.match_score|floatformat:0 }}% Not Qualified
+                                    <i class="fa-solid fa-circle-xmark"></i> {{ application.match_score|floatformat:0 }}% Low Employability
                                 </span>
                             {% endif %}
                         </div>

@@ -376,23 +376,19 @@
                                             </h5>
                                             {% if app.qualification_status == 'unavailable' %}
                                                 <span class="badge-match badge-match-good">
-                                                    <i class="fa-solid fa-circle-minus"></i> ML score unavailable
+                                                    <i class="fa-solid fa-circle-minus"></i> Score unavailable
                                                 </span>
                                             {% elif app.qualification_status == 'qualified' %}
                                                 <span class="badge-match badge-match-excellent">
-                                                    <i class="fa-solid fa-circle-check"></i> {{ app.match_score|floatformat:0 }}% Qualified
+                                                    <i class="fa-solid fa-circle-check"></i> {{ app.match_score|floatformat:0 }}% High Employability
                                                 </span>
                                             {% elif app.qualification_status == 'under_qualified' %}
                                                 <span class="badge-match badge-match-average">
-                                                    <i class="fa-solid fa-triangle-exclamation"></i> Predicted Medium
-                                                </span>
-                                            {% elif app.qualification_status == 'unclassified' %}
-                                                <span class="badge-match badge-match-good">
-                                                    <i class="fa-solid fa-circle-minus"></i> Unclassified
+                                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ app.match_score|floatformat:0 }}% Medium Employability
                                                 </span>
                                             {% else %}
                                                 <span class="badge-match badge-match-low">
-                                                    <i class="fa-solid fa-circle-xmark"></i> Predicted Low
+                                                    <i class="fa-solid fa-circle-xmark"></i> {{ app.match_score|floatformat:0 }}% Low Employability
                                                 </span>
                                             {% endif %}
                                         </div>

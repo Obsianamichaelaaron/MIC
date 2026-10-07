@@ -391,13 +391,13 @@ def send_application_status_update_email(to_email: str, applicant_name: str, job
         score_text = f"{float(match_score):.0f}%"
         qualification_summary = (
             f"Screening result: {qualification_labels[status_clean]}\n"
-            f"AI match score: {score_text}\n"
+            f"Employability score: {score_text}\n"
             "This is an initial qualifications screening, not a final hiring decision. "
             "The employer makes the final decision."
         )
         message_body = f"""
         <p style='font-size:15px;'>Your application for <strong>{safe_job}</strong> at <strong>{safe_company}</strong> has been screened.</p>
-        <p><strong>Result: {qualification_labels[status_clean]}</strong><br>AI match score: <strong>{score_text}</strong></p>
+        <p><strong>Result: {qualification_labels[status_clean]}</strong><br>Employability score: <strong>{score_text}</strong></p>
         <p>This result reflects the initial qualifications screening only and is not a final hiring decision. The employer makes the final decision.</p>
         """
     else:
@@ -883,7 +883,7 @@ def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str,
     safe_title = html.escape(job_title or 'Job Position')
     safe_notes = html.escape(admin_notes or '').replace('\n', '<br>') if admin_notes else ''
     match_score_html = (
-        f"<p style='margin:4px 0 0;color:#64748b;font-size:13px;'>ML-estimated high-match probability: <strong>{match_score:.0f}%</strong></p>"
+        f"<p style='margin:4px 0 0;color:#64748b;font-size:13px;'>Applicant employability score: <strong>{match_score:.0f}%</strong></p>"
         if match_score is not None else
         "<p style='margin:4px 0 0;color:#64748b;font-size:13px;'>ML match score: unavailable</p>"
     )

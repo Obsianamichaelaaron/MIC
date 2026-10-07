@@ -189,12 +189,12 @@
         <div class="col-6 col-md-4 col-xl-2">
             <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 h-100 d-flex flex-column justify-content-between">
                 <div class="d-flex justify-content-between align-items-start">
-                    <span class="text-muted small fw-semibold">Match Model</span>
+                    <span class="text-muted small fw-semibold">Candidate Tiers</span>
                     <i class="fa-solid fa-wand-magic-sparkles text-primary" style="font-size: 0.9rem;"></i>
                 </div>
                 <div>
                     <div class="fs-5 fw-bold text-primary mt-1">
-                        {% if match_model_evaluation.ready %}Ready{% else %}Not ready{% endif %}
+                        Automatic
                     </div>
                 </div>
             </div>
@@ -344,21 +344,23 @@
                         <div class="p-3 bg-light rounded-4 border">
                             <div class="d-flex align-items-center gap-2 mb-2">
                                 <i class="fa-solid fa-brain text-primary fs-5"></i>
-                                <span class="fw-bold text-dark small">Match Model Readiness</span>
+                                <span class="fw-bold text-dark small">Automatic Employability Tiers</span>
                             </div>
                             
                             <div class="d-flex flex-column gap-2">
                                 <div class="d-flex justify-content-between align-items-center small p-2 bg-white rounded-3 border">
-                                    <span class="text-muted">Reviewed training examples:</span>
-                                    <span class="fw-bold text-primary">{{ match_training_count }}</span>
+                                    <span class="text-muted">High (&gt;60):</span>
+                                    <span class="fw-bold text-primary">{{ automatic_tier_counts.high }}</span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center small p-2 bg-white rounded-3 border">
-                                    <span class="text-muted">Model evaluation:</span>
-                                    <span class="fw-bold {% if match_model_evaluation.ready %}text-success{% else %}text-warning{% endif %}">
-                                        {% if match_model_evaluation.ready %}Ready{% else %}Not ready{% endif %}
-                                    </span>
+                                    <span class="text-muted">Medium (40–60):</span>
+                                    <span class="fw-bold text-primary">{{ automatic_tier_counts.medium }}</span>
                                 </div>
-                                <div class="small text-muted">{{ match_model_evaluation.reason }}</div>
+                                <div class="d-flex justify-content-between align-items-center small p-2 bg-white rounded-3 border">
+                                    <span class="text-muted">Low (&lt;40):</span>
+                                    <span class="fw-bold text-primary">{{ automatic_tier_counts.low }}</span>
+                                </div>
+                                <div class="small text-muted">Tiers are assigned from each applicant's employability score; no manual training labels are needed.</div>
                             </div>
                         </div>
                     </div>
@@ -387,7 +389,7 @@ document.addEventListener('DOMContentLoaded', function() {
         pipeline_data: [0, 0, 0, 0, 0, 0],
         job_type_labels: ['Full-Time', 'Part-Time', 'Contract', 'Internship'],
         job_type_data: [0, 0, 0, 0],
-        match_tier_labels: ['High reviewed outcome', 'Medium reviewed outcome', 'Low reviewed outcome'],
+        match_tier_labels: ['High employability', 'Medium employability', 'Low employability'],
         match_tier_data: [0, 0, 0]
     };
 

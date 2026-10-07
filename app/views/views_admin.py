@@ -31,7 +31,6 @@ from app.services.mailer import (
     send_applicant_forwarded_to_employer_email, send_interview_scheduled_email
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
-from app.services.ml_job_matching import REVIEW_LABELS, evaluate_match_model
 
 LANDING_CMS_DEFAULTS = {
     'hero': {
@@ -88,6 +87,18 @@ LANDING_CMS_DEFAULTS = {
 }
 
 
+def _automatic_tier_counts():
+    applications = Application.objects.all()
+    return {
+        'high': applications.filter(applicant__employability_score__gt=60).count(),
+        'medium': applications.filter(
+            applicant__employability_score__gte=40,
+            applicant__employability_score__lte=60,
+        ).count(),
+        'low': applications.filter(applicant__employability_score__lt=40).count(),
+    }
+
+
 def _ensure_landing_cms_content():
     for section_key, fields in LANDING_CMS_DEFAULTS.items():
         section, _ = CmsSection.objects.get_or_create(
@@ -119,9 +130,7 @@ def dashboard_view(request):
     unread_inquiries = ContactInquiry.objects.filter(is_read=False).count()
     total_audit_logs = AuditTrail.objects.count()
     thirty_days_ago = timezone.now() - timedelta(days=30)
-    match_model_evaluation = evaluate_match_model()
-    match_class_counts = match_model_evaluation.get('class_counts', {})
-    match_training_count = sum(match_class_counts.values())
+    match_class_counts = _automatic_tier_counts()
     new_users_30d = User.objects.filter(created_at__gte=thirty_days_ago).count()
     new_apps_30d = Application.objects.filter(applied_at__gte=thirty_days_ago).count()
     total_admins = User.objects.filter(role='admin').count()
@@ -166,7 +175,7 @@ def dashboard_view(request):
             JobPosting.objects.filter(employment_type='contract').count(),
             JobPosting.objects.filter(employment_type='internship').count(),
         ],
-        'match_tier_labels': ['High reviewed outcome', 'Medium reviewed outcome', 'Low reviewed outcome'],
+        'match_tier_labels': ['High employability', 'Medium employability', 'Low employability'],
         'match_tier_data': [
             match_class_counts.get('high', 0),
             match_class_counts.get('medium', 0),
@@ -211,8 +220,7 @@ def dashboard_view(request):
         'total_applications': total_applications,
         'unread_inquiries': unread_inquiries,
         'total_audit_logs': total_audit_logs,
-        'match_model_evaluation': match_model_evaluation,
-        'match_training_count': match_training_count,
+        'automatic_tier_counts': match_class_counts,
         'new_users_30d': new_users_30d,
         'new_apps_30d': new_apps_30d,
         'total_admins': total_admins,
@@ -1161,28 +1169,7 @@ def view_candidate_view(request, application_id=None):
     if request.method == 'POST':
         action = request.POST.get('action')
 
-        if action == 'save_admin_qualification':
-            admin_qualification = request.POST.get('admin_qualification', '')
-            if admin_qualification not in REVIEW_LABELS:
-                error_msg = 'Choose a valid high, medium, or low assessment after reviewing the application.'
-            else:
-                application.admin_qualification = admin_qualification
-                application.save(update_fields=['admin_qualification', 'updated_at'])
-                log_audit_trail(
-                    request,
-                    admin_id,
-                    'save_admin_qualification',
-                    f"Recorded {admin_qualification} ML training label for application {application.application_id}.",
-                    'application',
-                    application.application_id,
-                    candidate_user.email,
-                )
-                success_msg = (
-                    'Admin assessment saved for model training. '
-                    'Predictions remain unavailable until every class has enough reviewed examples.'
-                )
-
-        elif action == 'update_status':
+        if action == 'update_status':
             new_status = request.POST.get('status')
             remarks = request.POST.get('remarks', '').strip()
 
@@ -1243,14 +1230,12 @@ def view_candidate_view(request, application_id=None):
 
         elif action == 'forward_to_employer':
             admin_notes = request.POST.get('admin_notes', '').strip()
-            admin_qualification = request.POST.get('admin_qualification', 'qualified')
             match_result = compute_job_match_result(applicant, job)
             
             application.forwarded_to_employer = True
             application.forwarded_at = timezone.now()
             application.forwarded_by_admin = admin_user
             application.admin_notes = admin_notes
-            application.admin_qualification = admin_qualification
             if not application.employer_status or application.employer_status == 'for_review':
                 application.employer_status = 'for_review'
             if application.status in ['pending', 'reviewed']:
@@ -1338,7 +1323,6 @@ def forward_candidate_api(request):
     admin_user = get_object_or_404(User, pk=admin_id)
     app_id = request.POST.get('application_id')
     admin_notes = request.POST.get('admin_notes', '').strip()
-    admin_qualification = request.POST.get('admin_qualification', 'qualified')
 
     application = get_object_or_404(
         Application.objects.select_related('applicant', 'applicant__user', 'job', 'job__employer', 'job__employer__user'),
@@ -1349,7 +1333,6 @@ def forward_candidate_api(request):
     application.forwarded_at = timezone.now()
     application.forwarded_by_admin = admin_user
     application.admin_notes = admin_notes
-    application.admin_qualification = admin_qualification
     if not application.employer_status or application.employer_status == 'for_review':
         application.employer_status = 'for_review'
     if application.status in ['pending', 'reviewed']:
@@ -1364,8 +1347,6 @@ def forward_candidate_api(request):
     else:
         application.remarks_history = entry
 
-    application.save()
-
     emp_user = application.job.employer.user if (application.job and application.job.employer and application.job.employer.user) else None
     cand_user = application.applicant.user if (application.applicant and application.applicant.user) else None
     candidate_name = f"{cand_user.first_name} {cand_user.last_name}".strip() if cand_user else "Candidate"
@@ -1375,6 +1356,7 @@ def forward_candidate_api(request):
         compute_job_match_result(application.applicant, application.job)
         if application.applicant and application.job else {'match_score': None}
     )
+    application.save()
 
     if emp_user:
         Notification.objects.create(
@@ -1449,7 +1431,7 @@ def batch_forward_candidates_api(request):
                 if any(not result['ready'] for _, result in scored_apps):
                     return JsonResponse({
                         'success': False,
-                        'message': 'ML scores are unavailable for one or more applicants. No candidates were forwarded.',
+                        'message': 'Employability scores are unavailable for one or more applicants. No candidates were forwarded.',
                     }, status=409)
                 apps = [
                     application for application, result in scored_apps
@@ -2075,7 +2057,7 @@ def export_candidates_csv_view(request, job_id=None):
 def job_candidates_view(request, job_id):
     """
     Renders the dedicated Candidate Management dossier for a specific job posting,
-    including AI match scores, qualification segmentation (Qualified, Under-Qualified, Not Qualified),
+    including automatic employability scores and High, Medium, and Low tiers,
     and direct Excel & Google Drive export capabilities.
     """
     job = get_object_or_404(JobPosting.objects.select_related('employer'), pk=job_id)
@@ -2205,7 +2187,7 @@ def notify_qualified_applicants_view(request, job_id):
         for app in apps
     ]
     if any(not result['ready'] for _, result in scored_apps):
-        return redirect(f'/admin/jobs/{job_id}/candidates/?notified=model_unavailable')
+        return redirect(f'/admin/jobs/{job_id}/candidates/?notified=score_unavailable')
 
     count = 0
     for app, result in scored_apps:
@@ -2241,9 +2223,9 @@ def forward_qualified_candidates_view(request, job_id):
         if request.headers.get('x-requested-with') == 'XMLHttpRequest':
             return JsonResponse({
                 'success': False,
-                'message': 'ML scores are unavailable for one or more applicants. No candidates were forwarded.',
+                'message': 'Employability scores are unavailable for one or more applicants. No candidates were forwarded.',
             }, status=409)
-        return redirect(f'/admin/jobs/{job_id}/candidates/?notified=model_unavailable')
+        return redirect(f'/admin/jobs/{job_id}/candidates/?notified=score_unavailable')
 
     count = 0
     now_ts = timezone.now()
@@ -2305,10 +2287,10 @@ def notify_single_applicant_view(request, application_id):
         log_audit_trail(
             request,
             admin_id,
-            'notify_single_applicant_unavailable',
+            'notify_single_applicant_score_unavailable',
             f"Skipped screening notification for application #{application_id}: {match_result['reason']}",
         )
-        return redirect(f'/admin/jobs/{app.job.job_id}/candidates/?notified=model_unavailable')
+        return redirect(f'/admin/jobs/{app.job.job_id}/candidates/?notified=score_unavailable')
 
     if app.status == 'pending':
         app.status = 'reviewed'
@@ -2325,7 +2307,7 @@ def notify_single_applicant_view(request, application_id):
     }[qualification_status]
     notice_message = (
         f"Your application for {app.job.title} was screened as {qualification_label} "
-        f"with an AI match score of {match_score:.0f}%. This is an initial screening result, "
+        f"with an employability score of {match_score:.0f}%. This is an initial screening result, "
         "not a final hiring decision."
     )
     Notification.objects.create(
@@ -2375,7 +2357,7 @@ def analytics_view(request):
     thirty_days_ago = timezone.now() - timedelta(days=30)
     status_counts = Application.objects.values('status').annotate(count=Count('application_id')).order_by('status')
     jobs_by_type = JobPosting.objects.values('employment_type').annotate(count=Count('job_id')).order_by('employment_type')
-    match_model_evaluation = evaluate_match_model()
+    automatic_tier_counts = _automatic_tier_counts()
 
     top_qualifications = Qualification.objects.annotate(
         job_count=Count('jobqualificationmapping')
@@ -2400,7 +2382,7 @@ def analytics_view(request):
         'new_apps_30d': Application.objects.filter(applied_at__gte=thirty_days_ago).count(),
         'status_counts': status_counts,
         'jobs_by_type': jobs_by_type,
-        'match_model_evaluation': match_model_evaluation,
+        'automatic_tier_counts': automatic_tier_counts,
         'top_qualifications': top_qualifications,
     }
     return render(request, 'admin/analytics.html', context)

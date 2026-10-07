@@ -392,19 +392,16 @@
                         All <span class="badge bg-white text-dark ms-1.5">{{ counts.all }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?qual=qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
-                        Predicted High <span class="badge bg-success text-white ms-1.5">{{ counts.qualified }}</span>
+                        High Employability <span class="badge bg-success text-white ms-1.5">{{ counts.qualified }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?forwarded=yes{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if forwarded_filter == 'yes' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         <i class="fa-solid fa-paper-plane me-1"></i> Sent to Employer <span class="badge bg-info text-white ms-1.5">{{ counts.forwarded }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?qual=under_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'under_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
-                        Predicted Medium <span class="badge bg-warning text-dark ms-1.5">{{ counts.under_qualified }}</span>
-                    </a>
-                    <a href="{% url 'admin_job_candidates' job.id %}?qual=unavailable{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'unavailable' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
-                        ML unavailable <span class="badge bg-secondary text-white ms-1.5">{{ counts.unavailable }}</span>
+                        Medium Employability <span class="badge bg-warning text-dark ms-1.5">{{ counts.under_qualified }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?qual=not_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'not_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
-                        Predicted Low <span class="badge bg-danger text-white ms-1.5">{{ counts.not_qualified }}</span>
+                        Low Employability <span class="badge bg-danger text-white ms-1.5">{{ counts.not_qualified }}</span>
                     </a>
                 </div>
             </div>
@@ -484,10 +481,10 @@
                 <div class="col-xl-4 col-lg-4 col-md-6">
                     <div class="p-2.5 bg-light rounded-3 border">
                         <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="small fw-bold text-dark">ML High-Match Probability</span>
+                            <span class="small fw-bold text-dark">Automatic Employability Rating</span>
                             {% if cand.match_score != None %}
                                 <span class="badge {% if cand.ml_match_class == 'high' %}bg-success{% elif cand.ml_match_class == 'medium' %}bg-warning text-dark{% else %}bg-danger{% endif %} rounded-pill px-2.5 py-0.5 fw-bold">
-                                    {{ cand.match_score|floatformat:0 }}% · {{ cand.ml_match_class|title }} match
+                                    {{ cand.match_score|floatformat:0 }}% · {{ cand.ml_match_class|title }}
                                 </span>
                             {% else %}
                                 <span class="badge bg-secondary rounded-pill px-2.5 py-0.5 fw-bold">Unavailable</span>
@@ -532,19 +529,19 @@
                     <div class="d-flex flex-column gap-1.5 align-items-center justify-content-center">
                         {% if cand.qualification_status == 'qualified' %}
                             <div class="status-badge-pill badge-qual-qualified">
-                                <i class="fa-solid fa-circle-check"></i> Qualified
+                                <i class="fa-solid fa-circle-check"></i> High Employability
                             </div>
                         {% elif cand.qualification_status == 'under_qualified' %}
                             <div class="status-badge-pill badge-qual-under">
-                                <i class="fa-solid fa-triangle-exclamation"></i> Predicted Medium
+                                <i class="fa-solid fa-triangle-exclamation"></i> Medium Employability
                             </div>
                         {% elif cand.qualification_status == 'unavailable' %}
                             <div class="status-badge-pill badge-qual-unclassified">
-                                <i class="fa-solid fa-circle-minus"></i> ML unavailable
+                                <i class="fa-solid fa-circle-minus"></i> Score unavailable
                             </div>
                         {% else %}
                             <div class="status-badge-pill badge-qual-not">
-                                <i class="fa-solid fa-circle-xmark"></i> Predicted Low
+                                <i class="fa-solid fa-circle-xmark"></i> Low Employability
                             </div>
                         {% endif %}
 
@@ -642,7 +639,7 @@
                 <div id="sendScopeOptions" style="display:grid;grid-template-columns:1fr;gap:.5rem;background:#f8fafc;padding:.85rem;border-radius:10px;border:1px solid #e2e8f0;">
                     <label style="display:flex;align-items:center;gap:.65rem;font-size:.86rem;color:#15803d;cursor:pointer;font-weight:600;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
                         <input type="radio" name="sendScope" value="qualified" checked style="accent-color:#16a34a;">
-                        <span><strong>High-match predictions only</strong> <span class="badge bg-success ms-1">{{ counts.qualified }}</span></span>
+                        <span><strong>High employability only</strong> <span class="badge bg-success ms-1">{{ counts.qualified }}</span></span>
                     </label>
                     <label style="display:flex;align-items:center;gap:.65rem;font-size:.86rem;color:#1e293b;cursor:pointer;font-weight:600;padding:.4rem .5rem;border-radius:7px;transition:background .15s;">
                         <input type="radio" name="sendScope" value="all" style="accent-color:#1866a3;">
