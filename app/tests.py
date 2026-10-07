@@ -1001,6 +1001,8 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['total_jobs'], 2)
         self.assertEqual(response.context['total_applicants'], 3)
+        self.assertEqual(response.context['total_applications'], 4)
+        self.assertContains(response, 'Total Applications')
         merged_summary = next(
             summary for summary in response.context['job_summaries']
             if len(summary['job_ids']) == 2

@@ -1141,6 +1141,7 @@ def candidates_view(request):
 
     job_summaries = []
     total_applicants = 0
+    total_applications = 0
     total_qualified = 0
     total_high_match = 0
     total_forwarded = 0
@@ -1153,6 +1154,7 @@ def candidates_view(request):
             .select_related('applicant', 'job')
             .order_by('-applied_at', '-application_id')
         )
+        total_applications += len(all_apps)
         apps = []
         seen_applicants = set()
         for application in all_apps:
@@ -1222,6 +1224,7 @@ def candidates_view(request):
         'job_summaries': job_summaries,
         'search': search,
         'total_applicants': total_applicants,
+        'total_applications': total_applications,
         'total_qualified': total_qualified,
         'total_high_match': total_high_match,
         'total_forwarded': total_forwarded,
