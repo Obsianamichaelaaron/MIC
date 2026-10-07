@@ -12,7 +12,7 @@ from django.core import mail
 from django.urls import reverse
 from app.models import (
     User, Applicant, Employer, JobPosting, Application,
-    Qualification, Skill, ContactInquiry, Message, AuditTrail,
+    Qualification, JobQualificationMapping, Skill, ContactInquiry, Message, AuditTrail,
     Notification, CmsHeroSlide, CmsBrand, CmsTestimonial
 )
 from app.auth_utils import verify_password, hash_password
@@ -25,6 +25,7 @@ from app.services.ml_job_matching import (
     train_match_classifier,
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
+from app.services.profile_fit import compute_profile_fit
 from app.services.qualification import classify_match_score
 from app.services.database_rls import set_authenticated_rls_context
 
@@ -403,7 +404,7 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(dashboard.context['applicant'].pk, second_applicant.pk)
         self.assertEqual(dashboard.context['candidate_skills'], ['Rust', 'Go'])
 
-    def test_dashboard_recommendations_require_resume_and_show_top_four(self):
+    def test_dashboard_recommendations_show_top_four_with_profile_data(self):
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
@@ -433,10 +434,6 @@ class MultiBizConversionTests(TestCase):
             'app.views.views_applicant.predict_match_class',
             return_value='high',
         ):
-            response = self.client.get('/applicant/dashboard.php')
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.context['recommended_jobs'], [])
-
             self.applicant.resume_file = 'resumes/test-resume.pdf'
             self.applicant.save(update_fields=['resume_file'])
             response = self.client.get('/applicant/dashboard.php')
@@ -449,7 +446,7 @@ class MultiBizConversionTests(TestCase):
             [99, 83, 39, 22],
         )
 
-    def test_browse_job_ml_scores_wait_until_resume_uploaded(self):
+    def test_browse_job_uses_ready_model_with_profile_data_without_resume(self):
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
@@ -469,9 +466,9 @@ class MultiBizConversionTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(
                 [item['match_score'] for item in response.context['scored_jobs']],
-                [None],
+                [68],
             )
-            score_match.assert_not_called()
+            score_match.assert_called_once()
 
             self.applicant.resume_file = 'resumes/test-resume.pdf'
             self.applicant.save(update_fields=['resume_file'])
@@ -482,7 +479,7 @@ class MultiBizConversionTests(TestCase):
             [item['match_score'] for item in response.context['scored_jobs']],
             [68],
         )
-        score_match.assert_called_once()
+        self.assertEqual(score_match.call_count, 2)
 
     def test_tfidf_logistic_regression_model_uses_three_classes_and_holdout_metrics(self):
         samples = [
@@ -658,7 +655,7 @@ class MultiBizConversionTests(TestCase):
         self.assertIsInstance(response.context['jobs'][0]['match_score'], float)
         self.assertContains(response, 'ML ')
 
-    def test_job_list_shows_model_unavailable_without_fallback_when_untrained(self):
+    def test_job_list_shows_profile_fit_until_model_is_trained(self):
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
@@ -678,15 +675,171 @@ class MultiBizConversionTests(TestCase):
             result for result in response.context['jobs']
             if result['job_id'] == self.job.job_id
         )
-        self.assertIsNone(job_result['match_score'])
-        self.assertIsNone(job_result['match_score_type'])
+        self.assertEqual(job_result['match_score'], 100)
+        self.assertEqual(job_result['match_score_type'], 'profile_fit')
         self.assertIsNone(job_result['ml_match_class'])
-        self.assertEqual(response.context['min_match'], '')
+        self.assertEqual(response.context['min_match'], '80')
         self.assertEqual(len(response.context['jobs']), 1)
-        self.assertContains(response, 'Model training needed')
-        self.assertContains(response, 'No estimate is shown until the supervised model is ready')
-        self.assertContains(response, 'ML estimate unavailable')
-        self.assertContains(response, 'Match filter unavailable until model training')
+        self.assertContains(response, 'Profile Fit Estimate')
+        self.assertContains(response, '100% profile fit')
+        self.assertContains(response, 'not a trained ML prediction')
+
+    def test_profile_fit_uses_skill_and_explicit_experience_coverage(self):
+        self.applicant.skills = 'Python'
+        self.applicant.qualifications = ''
+        self.applicant.education_level = ''
+        self.applicant.experience_years = 2
+        self.applicant.save()
+        self.job.skills_required = 'Python, Django, React'
+        self.job.requirements = 'At least 4 years of professional experience.'
+        self.job.save()
+
+        profile_fit = compute_profile_fit(self.applicant, self.job)
+
+        self.assertEqual(profile_fit['score'], 38)
+        self.assertEqual(profile_fit['matched_skills'], ['Python'])
+        self.assertEqual(profile_fit['missing_skills'], ['Django', 'React'])
+        self.assertEqual(profile_fit['experience_required'], 4)
+        self.assertEqual(profile_fit['experience_coverage'], 50)
+
+    def test_profile_fit_requires_profile_evidence_and_explicit_criteria(self):
+        applicant = Applicant.objects.create(user=User.objects.create(
+            email='empty-profile@example.com',
+            password=hash_password('test-password'),
+            role='applicant',
+            status='active',
+        ))
+        job = JobPosting.objects.create(
+            employer=self.employer,
+            title='Unspecified Role',
+            skills_required='',
+            requirements='',
+            status='active',
+        )
+
+        profile_fit = compute_profile_fit(applicant, job)
+        self.assertIsNone(profile_fit['score'])
+        self.assertIn('Add skills', profile_fit['reason'])
+        profile_fit = compute_profile_fit(self.applicant, job)
+        self.assertIsNone(profile_fit['score'])
+        self.assertIn('no explicit', profile_fit['reason'])
+
+        session = self.client.session
+        session['user_id'] = applicant.user_id
+        session['role'] = 'applicant'
+        session.save()
+        with patch(
+            'app.views.views_applicant.get_match_classifier',
+            return_value=(object(), {'ready': True, 'reason': ''}),
+        ), patch(
+            'app.views.views_applicant.predict_match_score',
+        ) as predict_score:
+            response = self.client.get('/applicant/jobs.php')
+
+        self.assertEqual(response.status_code, 200)
+        blank_profile_result = next(
+            item for item in response.context['jobs']
+            if item['job_id'] == self.job.job_id
+        )
+        self.assertIsNone(blank_profile_result['match_score'])
+        self.assertIn('Add skills', blank_profile_result['match_reason'])
+        predict_score.assert_not_called()
+
+    def test_profile_fit_includes_mapped_qualification_coverage(self):
+        JobQualificationMapping.objects.create(
+            job=self.job,
+            qualification=self.qualification,
+        )
+
+        profile_fit = compute_profile_fit(self.applicant, self.job)
+
+        self.assertEqual(profile_fit['score'], 100)
+        self.assertEqual(
+            profile_fit['matched_qualifications'],
+            ['Information Technology'],
+        )
+
+    def test_trained_model_score_takes_precedence_over_profile_fit(self):
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        with patch(
+            'app.views.views_applicant.get_match_classifier',
+            return_value=(object(), {'ready': True, 'reason': ''}),
+        ), patch(
+            'app.views.views_applicant.predict_match_score',
+            return_value=73,
+        ), patch(
+            'app.views.views_applicant.predict_match_class',
+            return_value='medium',
+        ):
+            response = self.client.get('/applicant/jobs.php')
+
+        self.assertEqual(response.status_code, 200)
+        result = next(
+            item for item in response.context['jobs']
+            if item['job_id'] == self.job.job_id
+        )
+        self.assertEqual(result['match_score'], 73)
+        self.assertEqual(result['match_score_type'], 'model')
+        self.assertIsNone(result['profile_fit'])
+
+    def test_profile_fit_is_used_if_ready_model_cannot_score(self):
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        with patch(
+            'app.views.views_applicant.get_match_classifier',
+            return_value=(object(), {'ready': True, 'reason': ''}),
+        ), patch(
+            'app.views.views_applicant.predict_match_score',
+            return_value=None,
+        ):
+            response = self.client.get('/applicant/jobs.php')
+
+        self.assertEqual(response.status_code, 200)
+        result = next(
+            item for item in response.context['jobs']
+            if item['job_id'] == self.job.job_id
+        )
+        self.assertEqual(result['match_score_type'], 'profile_fit')
+        self.assertEqual(result['match_score'], 100)
+
+    def test_profile_fit_is_labeled_across_job_details_apply_and_applications(self):
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        with patch(
+            'app.views.views_applicant.get_match_classifier',
+            return_value=(None, {'ready': False, 'reason': 'Needs more reviewed examples.'}),
+        ):
+            details = self.client.get(
+                f'/applicant/job_details.php?id={self.job.job_id}'
+            )
+            apply = self.client.get(
+                f'/applicant/apply_job.php?id={self.job.job_id}'
+            )
+            Application.objects.create(
+                job=self.job,
+                applicant=self.applicant,
+                status='pending',
+            )
+            applications = self.client.get('/applicant/applications.php')
+
+        self.assertEqual(details.status_code, 200)
+        self.assertEqual(details.context['match_score_type'], 'profile_fit')
+        self.assertContains(details, 'profile-fit estimate')
+        self.assertEqual(apply.status_code, 200)
+        self.assertEqual(apply.context['match_score_type'], 'profile_fit')
+        self.assertContains(apply, 'not a trained ML prediction')
+        self.assertEqual(applications.status_code, 200)
+        self.assertContains(applications, 'profile fit')
 
     def test_admin_analytics_renders_logistic_regression_evaluation_status(self):
         session = self.client.session

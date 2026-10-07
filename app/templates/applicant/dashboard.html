@@ -790,9 +790,9 @@
                                         </div>
                                         <div class="d-flex flex-column align-items-end gap-1">
                                             {% if item.match_score != None %}
-                                                <span class="portal-match"><i class="fas fa-chart-line"></i> {{ item.match_score|floatformat:1 }}% ML score</span>
+                                                <span class="portal-match" title="{% if item.match_score_type == 'model' %}Trained ML match estimate{% else %}Coverage of explicit job criteria; each criterion counts equally; not a trained ML prediction{% endif %}"><i class="fas fa-chart-line"></i> {{ item.match_score|floatformat:1 }}% {% if item.match_score_type == 'model' %}ML score{% else %}profile fit{% endif %}</span>
                                             {% else %}
-                                                <span class="portal-match">ML model not ready</span>
+                                                <span class="portal-match" title="{{ item.match_reason }}">{{ item.match_reason|default:"Estimate unavailable" }}</span>
                                             {% endif %}
                                             {% if item.ml_match_class %}
                                                 <span class="small text-primary fw-semibold">ML {{ item.ml_match_class|title }}</span>

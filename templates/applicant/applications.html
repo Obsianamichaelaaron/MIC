@@ -537,9 +537,9 @@
                             <td><div class="application-job"><div class="company-avatar-box">{{ app.job.employer.company_name|slice:":1"|upper|default:"M" }}</div><div><strong><a href="job_details.php?id={{ app.job.job_id }}" style="color:inherit;text-decoration:none">{{ app.job.title }}</a></strong><small><i class="fas fa-building"></i> {{ app.job.employer.company_name|default:"Multibiz Partner" }} · {{ app.job.location }}</small></div></div></td>
                             <td>
                                 {% if app.match_score != None %}
-                                    <span class="application-match"><i class="fas fa-bolt"></i> {{ app.match_score|floatformat:0 }}% ML</span>
+                                    <span class="application-match" title="{% if app.match_score_type == 'model' %}Trained ML match estimate{% else %}Coverage of explicit job criteria; each criterion counts equally; not a trained ML prediction{% endif %}"><i class="fas fa-bolt"></i> {{ app.match_score|floatformat:0 }}% {% if app.match_score_type == 'model' %}ML{% else %}profile fit{% endif %}</span>
                                 {% else %}
-                                    <span class="application-match text-muted">ML unavailable</span>
+                                    <span class="application-match text-muted" title="{{ app.match_reason }}">Estimate unavailable</span>
                                 {% endif %}
                             </td>
                             <td>{{ app.applied_at|date:"M d, Y" }}<small style="display:block;color:#687386;font-size:.68rem">{{ app.applied_at|timesince }} ago</small></td>

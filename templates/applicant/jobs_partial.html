@@ -1,7 +1,7 @@
 <span id="jobsCount">{{ jobs|length }}</span>
 {% if not match_model_status.ready %}
     <div class="small text-muted mb-2" role="status">
-        {{ match_model_status.reason }} No trained-model estimate is available yet. The model uses applicant resume/profile information and job details after sufficient reviewed examples are collected.
+        The model is still training. Profile-fit percentages below cover explicit job criteria and are not trained ML predictions; genuine admin-reviewed examples are needed before model estimates are available.
     </div>
 {% endif %}
 <div id="activeFilters">
@@ -81,10 +81,14 @@
                                         data-match-score="{{ job.match_score }}">
                                     <i class="fas fa-star"></i> {{ job.match_score|floatformat:1 }}% ML estimate
                                 </button>
+                            {% elif job.match_score != None and job.match_score_type == 'profile_fit' %}
+                                <span class="btn-match-score match-score-pill" title="Coverage of explicit job criteria; not a trained ML prediction">
+                                    <i class="fas fa-chart-bar"></i> {{ job.match_score|floatformat:0 }}% profile fit
+                                </span>
                             {% elif match_model_status.ready %}
                                 <span class="small text-muted">Add profile skills or a resume to get an ML estimate.</span>
                             {% else %}
-                                <span class="small text-muted">ML estimate unavailable</span>
+                                <span class="small text-muted" title="{{ job.match_reason }}">{{ job.match_reason|default:"Estimate unavailable" }}</span>
                             {% endif %}
                         </div>
                     </div>

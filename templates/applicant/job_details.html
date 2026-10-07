@@ -328,6 +328,28 @@
                 <span><i class="fas fa-money-bill-wave"></i> {{ job.salary_range }}</span>
             {% endif %}
         </div>
+        {% if match_score != None %}
+            <div role="status" style="margin: 1rem 0; padding: 1rem; border-radius: 8px; background: #eff6ff; color: #1e3a8a;">
+                <strong>
+                    {% if match_score_type == 'model' %}
+                        {{ match_score|floatformat:0 }}% trained ML match estimate
+                    {% else %}
+                        {{ match_score|floatformat:0 }}% profile-fit estimate
+                    {% endif %}
+                </strong>
+                {% if match_score_type == 'profile_fit' %}
+                    <div class="small" style="margin-top: .35rem;">Coverage of the job's stated skills, experience requirement, and mapped qualifications. Each criterion counts equally; this is not a trained ML prediction.</div>
+                    {% if profile_fit.matched_skills %}
+                        <div class="small" style="margin-top: .25rem;">Matched skills: {{ profile_fit.matched_skills|join:", " }}</div>
+                    {% endif %}
+                    {% if profile_fit.missing_skills %}
+                        <div class="small" style="margin-top: .25rem;">Skills not found in your profile: {{ profile_fit.missing_skills|join:", " }}</div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="small text-muted" role="status" style="margin: 1rem 0;">{{ match_reason }}</div>
+        {% endif %}
 
         <div class="details-layout" style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem;">
             <div class="details-main">

@@ -22,13 +22,58 @@ from app.services.resume_storage import (
     store_profile_picture,
     store_verified_resume,
 )
-from app.services.ml_ranking import compute_job_match_result, compute_job_match_score
+from app.services.ml_ranking import compute_job_match_score
 from app.services.ml_job_matching import (
     get_match_classifier,
     predict_match_class,
     predict_match_score,
 )
+from app.services.profile_fit import compute_profile_fit
 from app.services.mailer import send_application_submitted_email
+
+
+def get_applicant_job_match(
+    applicant: Applicant,
+    job: JobPosting,
+    model,
+    resume_text: str = '',
+) -> dict[str, object]:
+    """Prefer the trained prediction; otherwise return explicit-criteria coverage."""
+    has_profile_evidence = any((
+        resume_text,
+        applicant.skills,
+        applicant.qualifications,
+        applicant.education_level,
+        (applicant.experience_years or 0) > 0,
+    ))
+    if model and has_profile_evidence:
+        model_score = predict_match_score(model, applicant, job, resume_text)
+        if model_score is not None:
+            return {
+                'score': model_score,
+                'score_type': 'model',
+                'match_class': predict_match_class(model, applicant, job, resume_text),
+                'profile_fit': None,
+                'reason': '',
+            }
+
+    profile_fit = compute_profile_fit(applicant, job, resume_text)
+    if profile_fit['score'] is None:
+        return {
+            'score': None,
+            'score_type': None,
+            'match_class': None,
+            'profile_fit': None,
+            'reason': profile_fit['reason'],
+        }
+    return {
+        'score': profile_fit['score'],
+        'score_type': 'profile_fit',
+        'match_class': None,
+        'profile_fit': profile_fit,
+        'reason': '',
+    }
+
 
 @require_role('applicant')
 def dashboard_view(request):
@@ -110,38 +155,35 @@ def dashboard_view(request):
 
     # Recommendations are personalized from applicant information parsed from their resume.
     recommendations = []
-    if applicant.resume_file:
-        all_jobs = JobPosting.objects.filter(status='active').select_related('employer').order_by('-posted_at')
-        match_classifier, _ = get_match_classifier(exclude_applicant_id=applicant.pk)
-        resume_text = ResumeAnalysis.objects.filter(
-            applicant=applicant
-        ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
-        for job in all_jobs:
-            score = (
-                predict_match_score(match_classifier, applicant, job, resume_text)
-                if match_classifier else None
-            )
-            recommendations.append({
-                'job': job,
-                'job_id': job.job_id,
-                'title': job.title,
-                'location': job.location,
-                'employment_type': job.employment_type,
-                'company_name': job.employer.company_name if job.employer else 'MultiBiz Partner',
-                'calculated_match_score': score,
-                'ml_match_class': (
-                    predict_match_class(match_classifier, applicant, job, resume_text)
-                    if match_classifier else None
-                ),
-            })
-        recommendations.sort(
-            key=lambda x: (
-                x['calculated_match_score'] is not None,
-                x['calculated_match_score'] or 0,
-            ),
-            reverse=True,
-        )
-        recommendations = recommendations[:4]
+    all_jobs = JobPosting.objects.filter(status='active').select_related(
+        'employer'
+    ).prefetch_related('qualification_mappings__qualification').order_by('-posted_at')
+    match_classifier, _ = get_match_classifier(exclude_applicant_id=applicant.pk)
+    resume_text = ResumeAnalysis.objects.filter(
+        applicant=applicant
+    ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
+    for job in all_jobs:
+        match = get_applicant_job_match(applicant, job, match_classifier, resume_text)
+        recommendations.append({
+            'job': job,
+            'job_id': job.job_id,
+            'title': job.title,
+            'location': job.location,
+            'employment_type': job.employment_type,
+            'company_name': job.employer.company_name if job.employer else 'MultiBiz Partner',
+            'calculated_match_score': match['score'],
+            'match_score_type': match['score_type'],
+            'ml_match_class': match['match_class'],
+            'match_reason': match['reason'],
+        })
+    recommendations.sort(
+        key=lambda x: (
+            x['calculated_match_score'] is not None,
+            x['calculated_match_score'] or 0,
+        ),
+        reverse=True,
+    )
+    recommendations = recommendations[:4]
 
     # Feedback list
     feedback_list = []
@@ -175,9 +217,11 @@ def dashboard_view(request):
         applicant=applicant
     ).select_related('job', 'job__employer').order_by('-applied_at')[:5]
     for application in applications:
-        result = compute_job_match_result(applicant, application.job)
-        application.match_score = result['match_score']
-        application.qualification_status = result['qualification_status']
+        result = get_applicant_job_match(applicant, application.job, match_classifier, resume_text)
+        application.match_score = result['score']
+        application.match_score_type = result['score_type']
+        application.match_reason = result['reason']
+        application.qualification_status = result['match_class']
 
     # Upcoming interviews
     interviews = InterviewSchedule.objects.filter(
@@ -200,7 +244,9 @@ def dashboard_view(request):
             recommended_jobs.append({
                 'job': recommended_job,
                 'match_score': recommendation['calculated_match_score'],
+                'match_score_type': recommendation['match_score_type'],
                 'ml_match_class': recommendation['ml_match_class'],
+                'match_reason': recommendation['match_reason'],
                 'matched_skills': [],
                 'missing_skills': [],
             })
@@ -280,7 +326,9 @@ def jobs_view(request):
     selected_qualification_id = last_answer.qualification_id if (last_answer and last_answer.qualification_id) else None
 
     # Query active jobs
-    jobs_qs = JobPosting.objects.filter(status='active').select_related('employer')
+    jobs_qs = JobPosting.objects.filter(status='active').select_related(
+        'employer'
+    ).prefetch_related('qualification_mappings__qualification')
 
     if search:
         jobs_qs = jobs_qs.filter(
@@ -381,19 +429,19 @@ def jobs_view(request):
         resume_text = ''
     for job in all_jobs:
         score_type = None
-        if applicant and match_classifier:
-            score = (
-                predict_match_score(match_classifier, applicant, job, resume_text)
-                if applicant.resume_file else None
-            )
-            if score is not None:
-                score_type = 'model'
-        else:
-            score = None
-        ml_match_class = (
-            predict_match_class(match_classifier, applicant, job, resume_text)
-            if match_classifier and applicant else None
+        match = (
+            get_applicant_job_match(applicant, job, match_classifier, resume_text)
+            if applicant else {
+                'score': None,
+                'score_type': None,
+                'match_class': None,
+                'profile_fit': None,
+                'reason': 'Applicant profile is not available.',
+            }
         )
+        score = match['score']
+        score_type = match['score_type']
+        ml_match_class = match['match_class']
         if score is None:
             score_color = '#687386'
         elif score >= 80:
@@ -444,6 +492,8 @@ def jobs_view(request):
             'match_score': score,
             'match_score_type': score_type,
             'ml_match_class': ml_match_class,
+            'profile_fit': match['profile_fit'],
+            'match_reason': match['reason'],
             'score_color': score_color,
             'qualification_matches': qual_match,
             'is_saved': job.job_id in saved_job_ids,
@@ -451,7 +501,8 @@ def jobs_view(request):
             'has_applied': job.job_id in applied_job_ids,
         })
 
-    if min_match and match_model_status['ready']:
+    match_filter_available = any(item['match_score'] is not None for item in jobs_list)
+    if min_match and match_filter_available:
         try:
             jobs_list = [
                 job_item for job_item in jobs_list
@@ -460,7 +511,7 @@ def jobs_view(request):
             ]
         except ValueError:
             min_match = ''
-    elif not match_model_status['ready']:
+    elif not match_filter_available:
         min_match = ''
 
     # Prioritize qualification matches first if applicant has selected qualification, otherwise sort by match score
@@ -496,6 +547,7 @@ def jobs_view(request):
         'query': search,
         'emp_type': employment_type,
         'min_match': min_match,
+        'match_filter_available': match_filter_available,
     }
 
     if is_ajax:
@@ -513,7 +565,12 @@ def job_details_view(request, job_id=None):
     applicant, _ = Applicant.objects.get_or_create(user_id=user_id)
 
     j_id = job_id or request.GET.get('id') or request.GET.get('job_id')
-    job = get_object_or_404(JobPosting.objects.select_related('employer'), pk=j_id)
+    job = get_object_or_404(
+        JobPosting.objects.select_related('employer').prefetch_related(
+            'qualification_mappings__qualification'
+        ),
+        pk=j_id,
+    )
 
     is_saved = SavedJob.objects.filter(applicant=applicant, job=job).exists()
     application = Application.objects.filter(applicant=applicant, job=job).first()
@@ -538,14 +595,9 @@ def job_details_view(request, job_id=None):
     resume_text = ResumeAnalysis.objects.filter(
         applicant=applicant
     ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
-    match_score = (
-        predict_match_score(match_model, applicant, job, resume_text)
-        if match_model else None
-    )
-    match_class = (
-        predict_match_class(match_model, applicant, job, resume_text)
-        if match_model else None
-    )
+    match = get_applicant_job_match(applicant, job, match_model, resume_text)
+    match_score = match['score']
+    match_class = match['match_class']
 
     # Check if profile is complete (skills & qualifications present or profile_completed flag is True or resume uploaded)
     profile_completed = bool(applicant and (applicant.profile_completed or (applicant.skills and applicant.qualifications) or applicant.resume_file))
@@ -570,7 +622,10 @@ def job_details_view(request, job_id=None):
         'low': 'Low ML match',
     }
     color = match_colors.get(match_class, '#687386')
-    match_rating = match_ratings.get(match_class, 'Model not ready')
+    match_rating = match_ratings.get(
+        match_class,
+        'Profile fit estimate' if match['score_type'] == 'profile_fit' else 'Estimate unavailable',
+    )
 
     similar_jobs = JobPosting.objects.filter(
         status='active'
@@ -588,6 +643,9 @@ def job_details_view(request, job_id=None):
         'applicant_remarks': applicant_remarks,
         'interviews': interviews,
         'match_score': match_score,
+        'match_score_type': match['score_type'],
+        'profile_fit': match['profile_fit'],
+        'match_reason': match['reason'],
         'match_model_status': match_model_status,
         'score': match_score,
         'color': color,
@@ -670,25 +728,23 @@ def apply_job_view(request, job_id=None):
             ).order_by('-analysis_date').values_list(
                 'extracted_text', flat=True
             ).first() or ''
-            match_score = (
-                predict_match_score(match_model, applicant, job, resume_text)
-                if match_model else None
-            )
-            match_class = (
-                predict_match_class(match_model, applicant, job, resume_text)
-                if match_model else None
-            )
+            match = get_applicant_job_match(applicant, job, match_model, resume_text)
+            match_score = match['score']
+            match_class = match['match_class']
             classification = {
                 'high': 'Strong Match',
                 'medium': 'Moderate Match',
                 'low': 'Low Match',
-            }.get(match_class, 'Awaiting model training')
+            }.get(
+                match_class,
+                'Profile fit estimate' if match['score_type'] == 'profile_fit' else 'Awaiting model training',
+            )
 
             Application.objects.create(
                 job=job,
                 applicant=applicant,
                 status='pending',
-                match_score=Decimal(str(match_score or 0)),
+                match_score=Decimal(str(match_score or 0)) if match['score_type'] == 'model' else Decimal('0'),
                 cover_letter=cover_letter,
                 resume_file=resume_path,
                 classification=classification,
@@ -717,10 +773,8 @@ def apply_job_view(request, job_id=None):
     resume_text = ResumeAnalysis.objects.filter(
         applicant=applicant
     ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
-    match_score = (
-        predict_match_score(match_model, applicant, job, resume_text)
-        if match_model else None
-    )
+    match = get_applicant_job_match(applicant, job, match_model, resume_text)
+    match_score = match['score']
 
     context = {
         'page_title': f"Apply for {job.title}",
@@ -730,6 +784,9 @@ def apply_job_view(request, job_id=None):
         'profile': applicant,
         'user': user,
         'match_score': match_score,
+        'match_score_type': match['score_type'],
+        'profile_fit': match['profile_fit'],
+        'match_reason': match['reason'],
         'match_model_status': match_model_status,
         'error': error,
     }
@@ -746,6 +803,7 @@ def applications_view(request):
 
     status_filter = request.GET.get('status', '')
     apps_qs = Application.objects.filter(applicant=applicant).select_related('job', 'job__employer').order_by('-applied_at')
+    apps_qs = apps_qs.prefetch_related('job__qualification_mappings__qualification')
 
     if status_filter:
         apps_qs = apps_qs.filter(status=status_filter)
@@ -758,11 +816,17 @@ def applications_view(request):
     for inv in interviews:
         interviews_map[inv.application_id] = inv
 
+    match_model, _ = get_match_classifier(exclude_applicant_id=applicant.pk)
+    resume_text = ResumeAnalysis.objects.filter(
+        applicant=applicant
+    ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
     apps_list = []
     for app_item in apps_qs:
-        result = compute_job_match_result(applicant, app_item.job)
-        app_item.match_score = result['match_score']
-        app_item.qualification_status = result['qualification_status']
+        result = get_applicant_job_match(applicant, app_item.job, match_model, resume_text)
+        app_item.match_score = result['score']
+        app_item.match_score_type = result['score_type']
+        app_item.match_reason = result['reason']
+        app_item.qualification_status = result['match_class']
         apps_list.append({
             'app': app_item,
             'interview': interviews_map.get(app_item.application_id)
