@@ -23,6 +23,26 @@ from app.services.resume_storage import ResumeStorageError, read_resume
 
 logger = logging.getLogger(__name__)
 
+
+def _unique_public_job_postings(queryset, limit):
+    jobs = []
+    seen_jobs = set()
+    for job in queryset.iterator(chunk_size=100):
+        company_name = ' '.join((job.employer.company_name or '').casefold().split())
+        title = ' '.join((job.title or '').casefold().split())
+        if not company_name or not title:
+            continue
+
+        key = (company_name, title)
+        if key in seen_jobs:
+            continue
+        seen_jobs.add(key)
+        jobs.append(job)
+        if len(jobs) == limit:
+            break
+    return jobs
+
+
 def get_cms_content_dict():
     """
     Builds a dictionary of CMS content key-values grouped by section_key.
@@ -114,9 +134,15 @@ def index_view(request):
     news_articles = list(CmsNews.objects.filter(is_active=True).order_by('-news_date', '-id')[:6])
 
     # Keep landing-page jobs in sync with the applicant-visible active listings.
-    featured_jobs = JobPosting.objects.filter(
-        status='active'
-    ).select_related('employer').order_by('-posted_at')[:6]
+    featured_jobs = _unique_public_job_postings(
+        JobPosting.objects.filter(
+            status='active',
+            employer__company_name__isnull=False,
+        ).exclude(
+            employer__company_name='',
+        ).select_related('employer').order_by('-posted_at', '-job_id'),
+        limit=6,
+    )
 
     context = {
         'page_title': 'MULTIBIZ INTERNATIONAL CORPORATION',
@@ -290,8 +316,11 @@ def careers_view(request):
     location = request.GET.get('location', '').strip()
 
     jobs_qs = JobPosting.objects.filter(
-        status='active'
-    ).select_related('employer').order_by('-posted_at')
+        status='active',
+        employer__company_name__isnull=False,
+    ).exclude(
+        employer__company_name='',
+    ).select_related('employer').order_by('-posted_at', '-job_id')
 
     if search_query:
         jobs_qs = jobs_qs.filter(
@@ -314,20 +343,20 @@ def careers_view(request):
     if location:
         jobs_qs = jobs_qs.filter(location__icontains=location)
 
-    jobs_qs = jobs_qs[:50]
+    jobs = _unique_public_job_postings(jobs_qs, limit=30)
 
     qualifications = Qualification.objects.filter(status='active').order_by('name')
 
     context = {
         'page_title': 'Careers - MULTIBIZ INTERNATIONAL CORPORATION',
         'current_page': 'careers.php',
-        'jobs': jobs_qs,
+        'jobs': jobs,
         'qualifications': qualifications,
         'search_query': search_query,
         'selected_qualification': int(qualification_id) if qualification_id.isdigit() else 0,
         'selected_type': emp_type,
         'selected_location': location,
-        'total_jobs_count': jobs_qs.count(),
+        'total_jobs_count': len(jobs),
         'search': search_query,
         'employment_type': emp_type,
         'location': location,

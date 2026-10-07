@@ -746,6 +746,51 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(response, 'Medium · 40 to 60')
         self.assertContains(response, 'Low · below 40')
 
+    def test_public_careers_shows_up_to_30_unique_jobs_with_company_names(self):
+        for index in range(30):
+            JobPosting.objects.create(
+                employer=self.employer,
+                title=f'Service Role {index}',
+                status='active',
+            )
+        JobPosting.objects.create(
+            employer=self.employer,
+            title='  SENIOR   FULL STACK DEVELOPER ',
+            status='active',
+        )
+
+        response = self.client.get('/careers.php')
+
+        self.assertEqual(response.status_code, 200)
+        jobs = response.context['jobs']
+        self.assertEqual(len(jobs), 30)
+        keys = {
+            (
+                ' '.join(job.employer.company_name.casefold().split()),
+                ' '.join(job.title.casefold().split()),
+            )
+            for job in jobs
+        }
+        self.assertEqual(len(keys), len(jobs))
+        self.assertEqual(response.context['total_jobs_count'], 30)
+        self.assertContains(response, 'MultiBiz Corporation')
+
+    def test_homepage_featured_jobs_are_unique_and_use_employer_names(self):
+        JobPosting.objects.create(
+            employer=self.employer,
+            title='  SENIOR   FULL STACK DEVELOPER ',
+            status='active',
+        )
+
+        response = self.client.get('/')
+
+        self.assertEqual(response.status_code, 200)
+        jobs = response.context['featured_jobs']
+        titles = [' '.join(job.title.casefold().split()) for job in jobs]
+        self.assertEqual(len(titles), len(set(titles)))
+        self.assertEqual(len(jobs), 1)
+        self.assertContains(response, 'MultiBiz Corporation')
+
     def test_admin_job_candidates_page_renders(self):
         session = self.client.session
         session['user_id'] = self.admin_user.user_id
