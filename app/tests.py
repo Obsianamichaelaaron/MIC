@@ -797,6 +797,52 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(admin_ids & matching_title_ids, matching_title_ids)
         self.assertEqual(admin_response.context['counts']['active'], len(careers_ids))
 
+    def test_exact_duplicate_postings_are_grouped_on_careers_and_admin(self):
+        duplicate_fields = {
+            'employer': self.employer,
+            'title': 'Principal Python AI Architect',
+            'description': 'Build AI services for enterprise clients.',
+            'requirements': 'Python and machine learning experience.',
+            'skills_required': 'Python, machine learning',
+            'location': 'Remote',
+            'employment_type': 'full-time',
+            'salary_range': 'PHP 150,000 - 200,000',
+            'positions_available': 1,
+            'status': 'active',
+        }
+        first_job = JobPosting.objects.create(**duplicate_fields)
+        second_job = JobPosting.objects.create(**duplicate_fields)
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        careers_response = self.client.get('/careers.php')
+        admin_response = self.client.get('/admin/jobs.php?status=active')
+
+        self.assertEqual(careers_response.status_code, 200)
+        self.assertEqual(admin_response.status_code, 200)
+        careers_ids = {job.job_id for job in careers_response.context['jobs']}
+        admin_ids = {job.job_id for job in admin_response.context['jobs']}
+        duplicate_ids = {first_job.job_id, second_job.job_id}
+        self.assertEqual(careers_ids, admin_ids)
+        self.assertEqual(len(careers_ids & duplicate_ids), 1)
+        grouped_row = next(job for job in admin_response.context['jobs'] if job.job_id in duplicate_ids)
+        self.assertCountEqual(grouped_row.duplicate_job_ids, duplicate_ids)
+
+        action_response = self.client.post('/admin/jobs.php', {
+            'action': 'toggle_status',
+            'job_id': grouped_row.job_id,
+            'job_ids': ','.join(map(str, grouped_row.duplicate_job_ids)),
+        })
+
+        self.assertEqual(action_response.status_code, 302)
+        self.assertEqual(
+            set(JobPosting.objects.filter(job_id__in=duplicate_ids).values_list('status', flat=True)),
+            {'closed'},
+        )
+
     def test_homepage_featured_jobs_are_unique_and_use_employer_names(self):
         JobPosting.objects.create(
             employer=self.employer,

@@ -383,6 +383,11 @@
                                 <div style="font-weight:700;color:#0f172a;font-size:0.95rem;">
                                     {{ job.title }}
                                 </div>
+                                {% if job.duplicate_job_ids|length > 1 %}
+                                    <div style="font-size:0.72rem;color:#64748b;margin-top:0.15rem;">
+                                        {{ job.duplicate_job_ids|length }} identical postings grouped
+                                    </div>
+                                {% endif %}
                                 <div style="display:flex;gap:0.4rem;align-items:center;margin-top:0.25rem;flex-wrap:wrap;">
                                     <span style="background:#f1f5f9;color:#475569;font-size:0.75rem;padding:0.15rem 0.45rem;border-radius:4px;">
                                         <i class="fas fa-map-marker-alt"></i> {{ job.location }}
@@ -407,7 +412,7 @@
                                 </div>
                             </td>
                             <td>
-                                <a href="/admin/jobs/{{ job.job_id }}/candidates/" class="candidates-counter-pill" title="Screen candidates for this job">
+                                <a href="/admin/jobs/{{ job.job_id }}/candidates/?job_ids={{ job.duplicate_job_ids|join:',' }}" class="candidates-counter-pill" title="Screen candidates for this job">
                                     <i class="fas fa-users-viewfinder"></i> {{ job.applicant_count|default:0 }} Applicants
                                 </a>
                             </td>
@@ -438,6 +443,7 @@
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="approve">
                                             <input type="hidden" name="job_id" value="{{ job.job_id }}">
+                                            <input type="hidden" name="job_ids" value="{{ job.duplicate_job_ids|join:',' }}">
                                             <button type="submit" style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;padding:0.4rem 0.75rem;border-radius:6px;font-weight:700;font-size:0.78rem;cursor:pointer;" title="Approve Request">
                                                 <i class="fas fa-check"></i> Approve
                                             </button>
@@ -447,12 +453,13 @@
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="post_live">
                                             <input type="hidden" name="job_id" value="{{ job.job_id }}">
+                                            <input type="hidden" name="job_ids" value="{{ job.duplicate_job_ids|join:',' }}">
                                             <button type="submit" style="background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;padding:0.4rem 0.75rem;border-radius:6px;font-weight:700;font-size:0.78rem;cursor:pointer;" title="Approve and Publish Live Immediately">
                                                 <i class="fas fa-paper-plane"></i> Post Live
                                             </button>
                                         </form>
 
-                                        <button type="button" data-job-id="{{ job.job_id }}" data-job-title="{{ job.title|escape }}" data-employer="{{ job.employer.company_name|default:'Employer'|escape }}" onclick="openRejectModal(this.getAttribute('data-job-id'), this.getAttribute('data-job-title'), this.getAttribute('data-employer'))" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;padding:0.4rem 0.65rem;border-radius:6px;font-weight:700;font-size:0.78rem;cursor:pointer;" title="Reject Request with Reason">
+                                        <button type="button" data-job-id="{{ job.job_id }}" data-job-ids="{{ job.duplicate_job_ids|join:',' }}" data-job-title="{{ job.title|escape }}" data-employer="{{ job.employer.company_name|default:'Employer'|escape }}" onclick="openRejectModal(this.getAttribute('data-job-id'), this.getAttribute('data-job-ids'), this.getAttribute('data-job-title'), this.getAttribute('data-employer'))" style="background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;padding:0.4rem 0.65rem;border-radius:6px;font-weight:700;font-size:0.78rem;cursor:pointer;" title="Reject Request with Reason">
                                             <i class="fas fa-times"></i> Reject
                                         </button>
                                     {% elif job.status == 'approved' %}
@@ -460,6 +467,7 @@
                                             {% csrf_token %}
                                             <input type="hidden" name="action" value="post_live">
                                             <input type="hidden" name="job_id" value="{{ job.job_id }}">
+                                            <input type="hidden" name="job_ids" value="{{ job.duplicate_job_ids|join:',' }}">
                                             <button type="submit" style="background:#1866a3;color:white;border:none;padding:0.4rem 0.85rem;border-radius:6px;font-weight:700;font-size:0.78rem;cursor:pointer;" title="Publish Live to Applicants">
                                                 <i class="fas fa-paper-plane"></i> Publish Live
                                             </button>
@@ -477,20 +485,22 @@
                                     </a>
 
                                     <!-- Toggle Status Form -->
-                                    <form method="POST" action="" style="display:inline;" onsubmit="return confirm('Toggle status for this job?');">
+                                    <form method="POST" action="" style="display:inline;" onsubmit="return confirm('Toggle status for this job and its exact duplicates?');">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="toggle_status">
                                         <input type="hidden" name="job_id" value="{{ job.job_id }}">
+                                        <input type="hidden" name="job_ids" value="{{ job.duplicate_job_ids|join:',' }}">
                                         <button type="submit" style="background:#f8fafc;color:#475569;border:1px solid #cbd5e1;padding:0.4rem 0.6rem;border-radius:6px;font-size:0.78rem;cursor:pointer;" title="Toggle Active / Closed">
                                             <i class="fas fa-power-off"></i>
                                         </button>
                                     </form>
 
                                     <!-- Delete Job Form -->
-                                    <form method="POST" action="" style="display:inline;" onsubmit="return confirm('Delete this job posting and its applicant records?');">
+                                    <form method="POST" action="" style="display:inline;" onsubmit="return confirm('Delete this job and its exact duplicates, including their applicant records?');">
                                         {% csrf_token %}
                                         <input type="hidden" name="action" value="delete_job">
                                         <input type="hidden" name="job_id" value="{{ job.job_id }}">
+                                        <input type="hidden" name="job_ids" value="{{ job.duplicate_job_ids|join:',' }}">
                                         <button type="submit" style="background:#fff;color:#dc2626;border:1px solid #fecaca;padding:0.4rem 0.6rem;border-radius:6px;font-size:0.78rem;cursor:pointer;" title="Delete">
                                             <i class="fas fa-trash"></i>
                                         </button>
@@ -531,6 +541,7 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="reject">
             <input type="hidden" id="reject_modal_job_id" name="job_id" value="">
+            <input type="hidden" id="reject_modal_job_ids" name="job_ids" value="">
 
             <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:0.75rem 0.9rem;margin-bottom:1rem;font-size:0.85rem;color:#991b1b;">
                 Job: <strong id="reject_modal_job_title"></strong><br>
@@ -588,7 +599,7 @@
                 <select id="jobsModalJobSelect" style="width:100%;padding:.7rem .9rem;border:1.5px solid #cbd5e1;border-radius:10px;font-size:.88rem;color:#1e293b;background:#f8fafc;">
                     <option value="0">All Job Vacancies (All Candidate Submissions)</option>
                     {% for j in jobs %}
-                        <option value="{{ j.job_id }}">{{ j.title }} ({{ j.employer.company_name|default:"Partner" }})</option>
+                        <option value="{{ j.job_id }}" data-job-ids="{{ j.duplicate_job_ids|join:',' }}">{{ j.title }} ({{ j.employer.company_name|default:"Partner" }})</option>
                     {% endfor %}
                 </select>
             </div>
@@ -632,8 +643,9 @@
 </div>
 
 <script>
-function openRejectModal(jobId, jobTitle, employerName) {
+function openRejectModal(jobId, jobIds, jobTitle, employerName) {
     document.getElementById('reject_modal_job_id').value = jobId;
+    document.getElementById('reject_modal_job_ids').value = jobIds;
     document.getElementById('reject_modal_job_title').textContent = jobTitle;
     document.getElementById('reject_modal_employer_name').textContent = employerName;
     document.getElementById('jobRejectModal').classList.add('show');
@@ -675,6 +687,10 @@ function getJobsPageExportUrl() {
     const params = new URLSearchParams();
     if (jobId && jobId !== '0') {
         params.append('job_id', jobId);
+        const selectedOption = select.options[select.selectedIndex];
+        if (selectedOption && selectedOption.dataset.jobIds) {
+            params.append('job_ids', selectedOption.dataset.jobIds);
+        }
     }
     if (qualScope && qualScope !== 'all') {
         params.append('qual', qualScope);

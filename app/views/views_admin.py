@@ -36,25 +36,7 @@ from app.services.mailer import (
     send_applicant_forwarded_to_employer_email, send_interview_scheduled_email
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
-
-
-def _job_posting_duplicate_key(job):
-    def normalize(value):
-        return ' '.join(str(value or '').casefold().split())
-
-    return (
-        job.employer_id,
-        normalize(job.title),
-        normalize(job.description),
-        normalize(job.requirements),
-        normalize(job.skills_required),
-        normalize(job.location),
-        normalize(job.employment_type),
-        normalize(job.salary_range),
-        job.positions_available,
-        normalize(job.status),
-        job.posted_at.date() if job.posted_at else None,
-    )
+from app.services.job_listings import job_posting_duplicate_key as _job_posting_duplicate_key
 
 
 def _resolve_duplicate_job_group(primary_job, raw_job_ids):
@@ -81,6 +63,13 @@ def _resolve_duplicate_job_group(primary_job, raw_job_ids):
     ):
         raise ValueError('The selected jobs are not identical duplicate postings.')
     return jobs
+
+
+def _group_duplicate_job_postings(jobs):
+    groups = {}
+    for job in jobs:
+        groups.setdefault(_job_posting_duplicate_key(job), []).append(job)
+    return list(groups.values())
 
 
 LANDING_CMS_DEFAULTS = {
@@ -867,16 +856,24 @@ def jobs_view(request):
         action = request.POST.get('action')
         job_id = request.POST.get('job_id')
         job = get_object_or_404(JobPosting.objects.select_related('employer', 'employer__user'), pk=job_id)
+        try:
+            duplicate_jobs = _resolve_duplicate_job_group(
+                job,
+                request.POST.get('job_ids', ''),
+            )
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc))
         employer = job.employer
         emp_user = employer.user if employer else None
         company_name = employer.company_name if employer else 'MultiBiz Partner'
 
         if action == 'approve':
-            job.status = 'approved'
-            job.approved_at = timezone.now()
-            job.reviewed_by_admin = admin_user
-            job.admin_notes = request.POST.get('admin_notes', '').strip() or job.admin_notes
-            job.save()
+            for duplicate_job in duplicate_jobs:
+                duplicate_job.status = 'approved'
+                duplicate_job.approved_at = timezone.now()
+                duplicate_job.reviewed_by_admin = admin_user
+                duplicate_job.admin_notes = request.POST.get('admin_notes', '').strip() or duplicate_job.admin_notes
+                duplicate_job.save()
 
             if emp_user:
                 Notification.objects.create(
@@ -889,12 +886,14 @@ def jobs_view(request):
             return redirect('/admin/jobs.php?approved=success')
 
         elif action in ['post_live', 'publish']:
-            job.status = 'active'
-            if not job.approved_at:
-                job.approved_at = timezone.now()
-            job.posted_at = timezone.now()
-            job.reviewed_by_admin = admin_user
-            job.save()
+            now = timezone.now()
+            for duplicate_job in duplicate_jobs:
+                duplicate_job.status = 'active'
+                if not duplicate_job.approved_at:
+                    duplicate_job.approved_at = now
+                duplicate_job.posted_at = now
+                duplicate_job.reviewed_by_admin = admin_user
+                duplicate_job.save()
 
             if emp_user:
                 Notification.objects.create(
@@ -919,10 +918,11 @@ def jobs_view(request):
 
         elif action == 'reject':
             reason = request.POST.get('rejection_reason', '').strip() or "Job request details did not meet criteria."
-            job.status = 'rejected'
-            job.rejection_reason = reason
-            job.reviewed_by_admin = admin_user
-            job.save()
+            for duplicate_job in duplicate_jobs:
+                duplicate_job.status = 'rejected'
+                duplicate_job.rejection_reason = reason
+                duplicate_job.reviewed_by_admin = admin_user
+                duplicate_job.save()
 
             if emp_user:
                 Notification.objects.create(
@@ -946,28 +946,34 @@ def jobs_view(request):
             return redirect('/admin/jobs.php?rejected=success')
 
         elif action == 'toggle_status':
-            job.status = 'closed' if job.status == 'active' else 'active'
-            job.save()
+            new_status = 'closed' if job.status == 'active' else 'active'
+            for duplicate_job in duplicate_jobs:
+                duplicate_job.status = new_status
+                duplicate_job.save()
             log_audit_trail(request, admin_id, 'toggle_job_status', f"Changed status of job {job.title} to {job.status}", 'job', job.job_id, job.title)
             return redirect('/admin/jobs.php')
 
         elif action == 'delete_job':
             title = job.title
-            job.delete()
+            for duplicate_job in duplicate_jobs:
+                duplicate_job.delete()
             log_audit_trail(request, admin_id, 'delete_job', f"Deleted job {title}", 'job', int(job_id), title)
             return redirect('/admin/jobs.php')
 
     jobs_base_qs = JobPosting.objects.select_related('employer', 'employer__user').annotate(
         applicant_count=Count('applications')
     )
+    all_job_groups = _group_duplicate_job_postings(
+        jobs_base_qs.order_by('-posted_at', '-job_id')
+    )
 
     counts = {
-        'all': jobs_base_qs.count(),
-        'pending': jobs_base_qs.filter(status='pending').count(),
-        'approved': jobs_base_qs.filter(status='approved').count(),
-        'active': jobs_base_qs.filter(status='active').count(),
-        'rejected': jobs_base_qs.filter(status='rejected').count(),
-        'closed': jobs_base_qs.filter(status='closed').count(),
+        'all': len(all_job_groups),
+        'pending': sum(group[0].status == 'pending' for group in all_job_groups),
+        'approved': sum(group[0].status == 'approved' for group in all_job_groups),
+        'active': sum(group[0].status == 'active' for group in all_job_groups),
+        'rejected': sum(group[0].status == 'rejected' for group in all_job_groups),
+        'closed': sum(group[0].status == 'closed' for group in all_job_groups),
     }
 
     jobs_qs = jobs_base_qs.order_by('-posted_at', '-job_id')
@@ -983,10 +989,20 @@ def jobs_view(request):
     if status_filter:
         jobs_qs = jobs_qs.filter(status=status_filter)
 
+    visible_job_groups = _group_duplicate_job_postings(jobs_qs)
+    jobs = []
+    for duplicate_jobs in visible_job_groups:
+        job = duplicate_jobs[0]
+        job.duplicate_job_ids = [duplicate_job.job_id for duplicate_job in duplicate_jobs]
+        job.applicant_count = Application.objects.filter(
+            job_id__in=job.duplicate_job_ids,
+        ).values('applicant_id').distinct().count()
+        jobs.append(job)
+
     context = {
         'page_title': 'All Jobs & Requests - MultiBiz Admin',
         'current_page': 'jobs.php',
-        'jobs': jobs_qs,
+        'jobs': jobs,
         'counts': counts,
         'search': search,
         'status_filter': status_filter,

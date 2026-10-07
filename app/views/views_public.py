@@ -19,7 +19,10 @@ from app.models import (
     ContactInquiry, Employer, User,
 )
 from app.services.resume_storage import ResumeStorageError, read_resume
-from app.services.job_listings import unique_public_job_postings
+from app.services.job_listings import (
+    unique_featured_job_postings,
+    unique_public_job_postings,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -116,7 +119,7 @@ def index_view(request):
     news_articles = list(CmsNews.objects.filter(is_active=True).order_by('-news_date', '-id')[:6])
 
     # Keep landing-page jobs in sync with the applicant-visible active listings.
-    featured_jobs = unique_public_job_postings(
+    featured_jobs = unique_featured_job_postings(
         JobPosting.objects.filter(
             status='active',
             employer__company_name__isnull=False,
@@ -322,7 +325,7 @@ def careers_view(request):
     if location:
         jobs_qs = jobs_qs.filter(location__icontains=location)
 
-    jobs = list(jobs_qs)
+    jobs = unique_public_job_postings(jobs_qs)
 
     qualifications = Qualification.objects.filter(status='active').order_by('name')
 
