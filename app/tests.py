@@ -17,13 +17,6 @@ from app.models import (
 )
 from app.auth_utils import verify_password, hash_password
 from app.services.mailer import send_application_status_update_email
-from app.services.ml_job_matching import (
-    MATCH_CLASSES,
-    build_match_text,
-    evaluate_match_model,
-    predict_match_score,
-    train_match_classifier,
-)
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
 from app.services.semantic_job_matching import (
     SemanticMatchingUnavailable,
@@ -474,98 +467,6 @@ class MultiBizConversionTests(TestCase):
             self.assertContains(response, 'not a hiring probability')
             semantic_match.assert_called_once()
 
-    def test_tfidf_logistic_regression_model_uses_three_classes_and_holdout_metrics(self):
-        samples = [
-            {'text': f'{label} match role {index} skill experience', 'label': label}
-            for label in MATCH_CLASSES
-            for index in range(4)
-        ]
-
-        model, status = train_match_classifier(samples)
-        evaluation = evaluate_match_model(samples)
-
-        self.assertTrue(status['ready'])
-        self.assertEqual(tuple(model.named_steps['classifier'].classes_), tuple(sorted(MATCH_CLASSES)))
-        self.assertIn('tfidf', model.named_steps)
-        self.assertEqual(set(model.predict(['high match role skill'])), {'high'})
-        self.assertEqual(len(model.predict_proba(['high match role skill'])[0]), 3)
-        self.assertTrue(evaluation['ready'], evaluation)
-        self.assertEqual(len(evaluation['confusion_rows']), 3)
-        self.assertTrue(all(len(row['cells']) == 3 for row in evaluation['confusion_rows']))
-        self.assertEqual(
-            sum(cell['count'] for row in evaluation['confusion_rows'] for cell in row['cells']),
-            evaluation['test_count'],
-        )
-        matrix = [
-            [cell['count'] for cell in row['cells']]
-            for row in evaluation['confusion_rows']
-        ]
-        total = sum(sum(row) for row in matrix)
-        true_positives = [matrix[index][index] for index in range(3)]
-        expected_accuracy = sum(true_positives) / total
-        expected_precision = sum(
-            true_positives[index] / sum(row[index] for row in matrix)
-            if sum(row[index] for row in matrix) else 0
-            for index in range(3)
-        ) / 3
-        expected_recall = sum(
-            true_positives[index] / sum(matrix[index])
-            for index in range(3)
-        ) / 3
-        expected_f1 = sum(
-            2 * (
-                (true_positives[index] / sum(row[index] for row in matrix)
-                 if sum(row[index] for row in matrix) else 0)
-                * (true_positives[index] / sum(matrix[index]))
-            ) / (
-                (true_positives[index] / sum(row[index] for row in matrix)
-                 if sum(row[index] for row in matrix) else 0)
-                + (true_positives[index] / sum(matrix[index]))
-            )
-            if (
-                (true_positives[index] / sum(row[index] for row in matrix)
-                 if sum(row[index] for row in matrix) else 0)
-                + (true_positives[index] / sum(matrix[index]))
-            ) else 0
-            for index in range(3)
-        ) / 3
-        expected_chance = sum(
-            sum(matrix[index]) * sum(row[index] for row in matrix)
-            for index in range(3)
-        ) / total ** 2
-        expected_kappa = (
-            (expected_accuracy - expected_chance) / (1 - expected_chance)
-            if expected_chance < 1 else 1
-        )
-        self.assertAlmostEqual(evaluation['accuracy'], expected_accuracy)
-        self.assertAlmostEqual(evaluation['precision'], expected_precision)
-        self.assertAlmostEqual(evaluation['recall'], expected_recall)
-        self.assertAlmostEqual(evaluation['f1'], expected_f1)
-        self.assertAlmostEqual(evaluation['kappa'], expected_kappa)
-        for metric in ('accuracy', 'precision', 'recall', 'f1', 'kappa'):
-            self.assertIn(metric, evaluation)
-        self.assertEqual(evaluation['test_count'], 6)
-
-    def test_model_match_score_is_high_class_probability(self):
-        samples = [
-            {'text': f'{label} match role {index} skill experience', 'label': label}
-            for label in MATCH_CLASSES
-            for index in range(4)
-        ]
-        model, status = train_match_classifier(samples)
-
-        self.assertTrue(status['ready'])
-        text = build_match_text(self.applicant, self.job, 'python developer')
-        high_index = list(model.classes_).index('high')
-        expected_score = round(
-            model.predict_proba([text])[0][high_index] * 100,
-            2,
-        )
-        self.assertAlmostEqual(
-            predict_match_score(model, self.applicant, self.job, 'python developer'),
-            expected_score,
-        )
-
     def test_candidate_ml_ranking_adds_no_hand_weighted_bonuses(self):
         base = calculate_candidate_ml_score({'ml_match_score': 42})
         with_profile_bonuses = calculate_candidate_ml_score({
@@ -582,40 +483,22 @@ class MultiBizConversionTests(TestCase):
         )
 
     def test_job_match_result_automatically_uses_employability_score(self):
-        with patch(
-            'app.services.ml_job_matching.get_match_classifier',
-            side_effect=AssertionError('Candidate tiers must not depend on manual ML labels.'),
-        ) as classifier:
-            for score, match_class, status in (
-                ('0', 'low', 'not_qualified'),
-                ('39.99', 'low', 'not_qualified'),
-                ('40', 'medium', 'under_qualified'),
-                ('60', 'medium', 'under_qualified'),
-                ('60.01', 'high', 'qualified'),
-                ('100', 'high', 'qualified'),
-            ):
-                with self.subTest(score=score):
-                    self.applicant.employability_score = Decimal(score)
-                    result = compute_job_match_result(self.applicant, self.job)
-                    self.assertTrue(result['ready'])
-                    self.assertEqual(result['match_score'], float(score))
-                    self.assertEqual(result['match_class'], match_class)
-                    self.assertEqual(result['qualification_status'], status)
-                    self.assertEqual(result['reason'], '')
-            classifier.assert_not_called()
-
-    def test_tfidf_model_waits_for_reviewed_examples_in_all_three_classes(self):
-        samples = [
-            {'text': f'{label} match role {index}', 'label': label}
-            for label, count in [('high', 2), ('medium', 2), ('low', 1)]
-            for index in range(count)
-        ]
-
-        model, status = train_match_classifier(samples)
-
-        self.assertIsNone(model)
-        self.assertFalse(status['ready'])
-        self.assertIn('at least two admin-reviewed examples each', status['reason'])
+        for score, match_class, status in (
+            ('0', 'low', 'not_qualified'),
+            ('39.99', 'low', 'not_qualified'),
+            ('40', 'medium', 'under_qualified'),
+            ('60', 'medium', 'under_qualified'),
+            ('60.01', 'high', 'qualified'),
+            ('100', 'high', 'qualified'),
+        ):
+            with self.subTest(score=score):
+                self.applicant.employability_score = Decimal(score)
+                result = compute_job_match_result(self.applicant, self.job)
+                self.assertTrue(result['ready'])
+                self.assertEqual(result['match_score'], float(score))
+                self.assertEqual(result['match_class'], match_class)
+                self.assertEqual(result['qualification_status'], status)
+                self.assertEqual(result['reason'], '')
 
     def test_job_list_uses_semantic_model_regardless_of_review_labels(self):
         session = self.client.session
