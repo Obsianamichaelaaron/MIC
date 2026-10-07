@@ -8,7 +8,6 @@ Old/
 public_html (1)/
 scratch/
 uploads/
-staticfiles/
 information_schema.sql
 u190037990_mb_db.sql
 db.sqlite3

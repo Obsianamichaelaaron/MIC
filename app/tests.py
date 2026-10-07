@@ -20,6 +20,7 @@ from app.services.mailer import send_application_status_update_email
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
 from app.services.semantic_job_matching import (
     SemanticMatchingUnavailable,
+    _load_wordpiece_tokenizer,
     _criteria_groups,
     compute_semantic_match,
 )
@@ -587,6 +588,65 @@ class MultiBizConversionTests(TestCase):
         result = compute_semantic_match(applicant, job)
         self.assertIsNone(result['score'])
         self.assertIn('Add skills', result['reason'])
+
+    def test_wordpiece_tokenizer_encodes_special_tokens_and_pads(self):
+        vocabulary = {
+            '[PAD]': 0,
+            '[UNK]': 100,
+            '[CLS]': 101,
+            '[SEP]': 102,
+            '[MASK]': 103,
+            'cafe': 200,
+            'eng': 201,
+            '##ineer': 202,
+            '!': 203,
+        }
+        tokenizer_data = {
+            'model': {
+                'type': 'WordPiece',
+                'vocab': vocabulary,
+                'unk_token': '[UNK]',
+                'continuing_subword_prefix': '##',
+                'max_input_chars_per_word': 100,
+            },
+            'normalizer': {
+                'type': 'BertNormalizer',
+                'clean_text': True,
+                'handle_chinese_chars': True,
+                'strip_accents': None,
+                'lowercase': True,
+            },
+            'pre_tokenizer': {'type': 'BertPreTokenizer'},
+            'padding': {
+                'strategy': {'Fixed': 8},
+                'direction': 'Right',
+                'pad_id': 0,
+            },
+            'added_tokens': [
+                {
+                    'id': token_id,
+                    'content': token,
+                    'special': True,
+                    'normalized': False,
+                }
+                for token, token_id in (
+                    ('[PAD]', 0),
+                    ('[UNK]', 100),
+                    ('[CLS]', 101),
+                    ('[SEP]', 102),
+                    ('[MASK]', 103),
+                )
+            ],
+        }
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tokenizer_path = Path(temp_dir) / 'tokenizer.json'
+            tokenizer_path.write_text(json.dumps(tokenizer_data), encoding='utf-8')
+            tokenizer = _load_wordpiece_tokenizer(tokenizer_path)
+
+        ids, attention_mask = tokenizer.encode('CAFÉ engineer! [MASK]')
+
+        self.assertEqual(ids, [101, 200, 201, 202, 203, 103, 102, 0])
+        self.assertEqual(attention_mask, [1, 1, 1, 1, 1, 1, 1, 0])
 
     def test_semantic_match_uses_job_description_skills_and_mapped_qualifications(self):
         JobQualificationMapping.objects.create(
