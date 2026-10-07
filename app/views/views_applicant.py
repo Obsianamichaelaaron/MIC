@@ -1,9 +1,11 @@
+import hashlib
 import os
 import time
 import random
 from decimal import Decimal
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseForbidden
+from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
 from django.conf import settings
@@ -28,6 +30,16 @@ from app.services.semantic_job_matching import (
 )
 from app.services.mailer import send_application_submitted_email
 
+MAX_JOB_MATCHES_FOR_DASHBOARD = 12
+SEMANTIC_MATCH_CACHE_TTL_SECONDS = 300
+
+
+def _semantic_match_cache_key(applicant: Applicant, job: JobPosting, resume_text: str = '') -> str:
+    fingerprint = hashlib.sha256(
+        f"{applicant.pk}:{job.pk}:{(resume_text or '').strip()}".encode('utf-8')
+    ).hexdigest()
+    return f"applicant-job-match:{applicant.pk}:{job.pk}:{fingerprint}"
+
 
 def _semantic_model_status(match=None):
     if match and not match['model_ready']:
@@ -38,29 +50,58 @@ def _semantic_model_status(match=None):
     }
 
 
+def _has_semantic_profile_content(applicant: Applicant, resume_text: str = '') -> bool:
+    values = (
+        applicant.skills,
+        applicant.qualifications,
+        applicant.education_level,
+        resume_text,
+        f"{int(applicant.experience_years or 0)} years of experience" if (applicant.experience_years and int(applicant.experience_years) > 0) else '',
+    )
+    return any((value or '').strip() for value in values)
+
+
 def get_applicant_job_match(
     applicant: Applicant,
     job: JobPosting,
     resume_text: str = '',
 ) -> dict[str, object]:
     """Return pre-trained semantic relevance without application outcome labels."""
+    if not _has_semantic_profile_content(applicant, resume_text):
+        return {
+            'score': None,
+            'score_type': None,
+            'semantic_breakdown': [],
+            'reason': 'Add skills, qualifications, experience, or a resume to get an AI match estimate.',
+            'model_ready': False,
+        }
+
+    cache_key = _semantic_match_cache_key(applicant, job, resume_text)
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+
     try:
         semantic_match = compute_semantic_match(applicant, job, resume_text)
     except SemanticMatchingUnavailable as exc:
-        return {
+        result = {
             'score': None,
             'score_type': None,
             'semantic_breakdown': [],
             'reason': str(exc),
             'model_ready': False,
         }
-    return {
-        'score': semantic_match['score'],
-        'score_type': 'semantic_model' if semantic_match['score'] is not None else None,
-        'semantic_breakdown': semantic_match['breakdown'],
-        'reason': semantic_match['reason'],
-        'model_ready': True,
-    }
+    else:
+        result = {
+            'score': semantic_match['score'],
+            'score_type': 'semantic_model' if semantic_match['score'] is not None else None,
+            'semantic_breakdown': semantic_match['breakdown'],
+            'reason': semantic_match['reason'],
+            'model_ready': True,
+        }
+
+    cache.set(cache_key, result, timeout=SEMANTIC_MATCH_CACHE_TTL_SECONDS)
+    return result
 
 
 @require_role('applicant')
@@ -145,7 +186,7 @@ def dashboard_view(request):
     recommendations = []
     all_jobs = JobPosting.objects.filter(status='active').select_related(
         'employer'
-    ).prefetch_related('qualification_mappings__qualification').order_by('-posted_at')
+    ).prefetch_related('qualification_mappings__qualification').order_by('-posted_at')[:MAX_JOB_MATCHES_FOR_DASHBOARD]
     resume_text = ResumeAnalysis.objects.filter(
         applicant=applicant
     ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''

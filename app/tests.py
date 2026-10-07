@@ -19,6 +19,8 @@ from app.models import (
 from app.auth_utils import verify_password, hash_password
 from app.services.mailer import send_application_status_update_email
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
+from app.views.views_applicant import get_applicant_job_match
+from django.core.cache import cache
 from app.services.semantic_job_matching import (
     SemanticMatchingUnavailable,
     _load_wordpiece_tokenizer,
@@ -94,6 +96,41 @@ class MultiBizConversionTests(TestCase):
             salary_range='PHP 80,000 - 120,000',
             status='active'
         )
+
+    def test_get_applicant_job_match_skips_expensive_model_for_empty_profile(self):
+        empty_user = User.objects.create(
+            email='empty-applicant@example.com',
+            password='test-password',
+            role='applicant',
+            status='active',
+        )
+        empty_applicant = Applicant.objects.create(
+            user=empty_user,
+            skills='',
+            qualifications='',
+            education_level='',
+            experience_years=0,
+        )
+
+        with patch('app.views.views_applicant.compute_semantic_match') as mocked_match:
+            result = get_applicant_job_match(empty_applicant, self.job, '')
+
+        self.assertIsNone(result['score'])
+        self.assertFalse(result['model_ready'])
+        mocked_match.assert_not_called()
+
+    def test_get_applicant_job_match_uses_cache_for_repeated_calls(self):
+        cache.clear()
+        self.applicant.skills = 'Python, Django, SQL'
+        self.applicant.save(update_fields=['skills'])
+
+        with patch('app.views.views_applicant.compute_semantic_match', return_value={'score': 91.2, 'breakdown': [{'label': 'Role', 'score': 91.2}], 'reason': ''}) as mocked_match:
+            first = get_applicant_job_match(self.applicant, self.job, '')
+            second = get_applicant_job_match(self.applicant, self.job, '')
+
+        self.assertEqual(first['score'], 91.2)
+        self.assertEqual(second['score'], 91.2)
+        self.assertEqual(mocked_match.call_count, 1)
 
     def test_match_score_qualification_boundaries(self):
         expected_statuses = [
