@@ -763,7 +763,7 @@
             <div class="cand-kpi-card" style="border-top-color:#0284c7;">
                 <div class="cand-kpi-info">
                     <span class="cand-kpi-label">Total Applications</span>
-                    <span class="cand-kpi-value">{{ total_applications }}</span>
+                    <span class="cand-kpi-value" id="total-applications-count" aria-live="polite">{{ total_qualified }}</span>
                 </div>
                 <div class="cand-kpi-icon" style="background:#e0f2fe;color:#0284c7;"><i class="fas fa-users"></i></div>
             </div>
@@ -899,4 +899,43 @@
 window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {}
 });
+
+(() => {
+    const countElement = document.getElementById('total-applications-count');
+    if (!countElement) return;
+
+    let requestPending = false;
+    const refreshApplicationCount = async () => {
+        if (requestPending || document.hidden) return;
+        requestPending = true;
+        const url = new URL(window.location.href);
+        url.searchParams.set('count_only', '1');
+
+        try {
+            const response = await fetch(url, {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store',
+            });
+            if (!response.ok) {
+                throw new Error(`Application count refresh failed: ${response.status}`);
+            }
+            const data = await response.json();
+            if (Number.isInteger(data.high_match_count)) {
+                countElement.textContent = data.high_match_count;
+            } else {
+                throw new Error('Application count refresh returned an invalid count.');
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            requestPending = false;
+        }
+    };
+
+    window.setInterval(refreshApplicationCount, 30000);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshApplicationCount();
+    });
+})();
 </script>

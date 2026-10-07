@@ -984,6 +984,7 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(response.status_code, 200)
         summary = response.context['job_summaries'][0]
         self.assertEqual(summary['count_qualified'], 2)
+        self.assertEqual(response.context['total_qualified'], 2)
         self.assertEqual(summary['count_high_match'], 1)
         self.assertEqual(summary['count_under_qualified'], 1)
         self.assertEqual(summary['count_not_qualified'], 1)
@@ -1000,6 +1001,11 @@ class MultiBizConversionTests(TestCase):
             f'/admin/jobs/{self.job.job_id}/candidates/?job_ids=',
         )
         self.assertNotContains(response, '?qual=qualified&job_ids=')
+        self.assertContains(response, 'id="total-applications-count" aria-live="polite">2</span>')
+
+        count_response = self.client.get('/admin/candidates.php?count_only=1')
+        self.assertEqual(count_response.status_code, 200)
+        self.assertEqual(count_response.json(), {'high_match_count': 2})
 
         candidates_response = self.client.get(
             f"/admin/jobs/{self.job.job_id}/candidates/",

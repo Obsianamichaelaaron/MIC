@@ -1218,6 +1218,9 @@ def candidates_view(request):
     # Sort: most qualified applicants first
     job_summaries.sort(key=lambda x: x['count_qualified'], reverse=True)
 
+    if request.GET.get('count_only') == '1':
+        return JsonResponse({'high_match_count': total_qualified})
+
     context = {
         'page_title': 'Candidate Pipeline - MultiBiz Admin',
         'current_page': 'candidates.php',
