@@ -933,6 +933,19 @@ class MultiBizConversionTests(TestCase):
         self.assertNotContains(response, '40–60%')
         self.assertNotContains(response, '&lt;40%')
         self.assertNotContains(response, '≥ 85%')
+        self.assertContains(
+            response,
+            f'/admin/jobs/{self.job.job_id}/candidates/?job_ids=',
+        )
+        self.assertNotContains(response, '?qual=qualified&job_ids=')
+
+        candidates_response = self.client.get(
+            f"/admin/jobs/{self.job.job_id}/candidates/",
+            {'job_ids': str(self.job.job_id)},
+        )
+        self.assertEqual(candidates_response.status_code, 200)
+        self.assertEqual(candidates_response.context['counts']['all'], 4)
+        self.assertEqual(len(candidates_response.context['candidates']), 4)
 
     def test_candidate_pipeline_merges_exact_duplicate_job_postings_only(self):
         duplicate_job = JobPosting.objects.create(

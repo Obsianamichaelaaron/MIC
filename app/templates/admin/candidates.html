@@ -874,7 +874,7 @@
 
                 <!-- Col 6: Action -->
                 <div class="cand-col-actions">
-                    <a href="{% url 'admin_job_candidates' js.job_id %}?qual=qualified&job_ids={{ js.job_ids|join:',' }}" class="cand-btn-review">
+                    <a href="{% url 'admin_job_candidates' js.job_id %}?job_ids={{ js.job_ids|join:',' }}" class="cand-btn-review">
                         <i class="fas fa-users-viewfinder"></i> View Candidates
                     </a>
                 </div>
