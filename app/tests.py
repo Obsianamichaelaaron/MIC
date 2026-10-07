@@ -700,6 +700,39 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(response, 'High employability only')
         self.assertNotContains(response, 'ML unavailable')
 
+    def test_candidate_pipeline_counts_high_match_separately_from_high_employability(self):
+        self.applicant.employability_score = Decimal('70')
+        self.applicant.save(update_fields=['employability_score'])
+        Application.objects.create(job=self.job, applicant=self.applicant)
+
+        for index, score in enumerate(('90', '50', '30')):
+            user = User.objects.create(
+                email=f'pipeline-tier-{index}@example.com',
+                password='test-password',
+                role='applicant',
+                status='active',
+            )
+            applicant = Applicant.objects.create(
+                user=user,
+                employability_score=Decimal(score),
+            )
+            Application.objects.create(job=self.job, applicant=applicant)
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.get('/admin/candidates.php')
+
+        self.assertEqual(response.status_code, 200)
+        summary = response.context['job_summaries'][0]
+        self.assertEqual(summary['count_qualified'], 2)
+        self.assertEqual(summary['count_high_match'], 1)
+        self.assertEqual(summary['count_under_qualified'], 1)
+        self.assertEqual(summary['count_not_qualified'], 1)
+        self.assertContains(response, 'Not Qualified (&lt;40%)')
+
     def test_legacy_unavailable_filter_redirects_to_automatic_candidate_list(self):
         Application.objects.create(job=self.job, applicant=self.applicant)
         session = self.client.session

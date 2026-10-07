@@ -1076,11 +1076,13 @@ def candidates_view(request):
             continue  # skip jobs with no applicants
 
         class_counts = {'high': 0, 'medium': 0, 'low': 0, 'unavailable': 0}
+        count_high_match = 0
         for application in apps:
             result = compute_job_match_result(application.applicant, job)
             class_counts[result['match_class'] or 'unavailable'] += 1
+            if result['match_score'] >= 85:
+                count_high_match += 1
         count_qualified = class_counts['high']
-        count_high_match = class_counts['high']
         count_under_qualified = class_counts['medium']
         count_unclassified = 0
         count_not_qualified = class_counts['low']

@@ -344,6 +344,17 @@
     border-left: 4px solid #cbd5e1;
 }
 
+.cand-job-card {
+    grid-template-columns:
+        minmax(240px, 2.2fr)
+        minmax(140px, 1.1fr)
+        minmax(180px, 1.5fr)
+        minmax(90px, 0.7fr)
+        minmax(95px, 0.7fr)
+        minmax(165px, 1.1fr);
+    gap: 1rem;
+}
+
 .cand-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 8px 22px rgba(15, 23, 42, 0.08);
@@ -458,6 +469,27 @@
 /* Column 2: Applied Role */
 .cand-col-role {
     min-width: 0;
+}
+
+.cand-job-card .cand-col-role,
+.cand-job-card .cand-col-score,
+.cand-job-card .cand-col-actions {
+    min-width: 0;
+}
+
+.cand-job-card .cand-col-score {
+    text-align: center;
+}
+
+.cand-tier-breakdown {
+    display: grid;
+    gap: 0.15rem;
+    margin-top: 0.45rem;
+}
+
+.cand-tier-breakdown .cand-score-sub {
+    margin-top: 0;
+    white-space: nowrap;
 }
 
 .cand-col-label {
@@ -627,18 +659,15 @@
 
 /* Responsive Media Queries */
 @media (max-width: 1200px) {
-    .cand-card {
-        grid-template-columns: 2fr 1.5fr 1fr 1.5fr;
-        gap: 1rem;
+    .cand-job-card {
+        grid-template-columns:
+            minmax(220px, 1.8fr)
+            minmax(130px, 1fr)
+            minmax(170px, 1.4fr)
+            minmax(85px, 0.65fr)
+            minmax(90px, 0.65fr);
     }
-    .cand-col-status {
-        display: flex;
-        justify-content: flex-start;
-    }
-    .cand-col-score {
-        text-align: left;
-    }
-    .cand-col-actions {
+    .cand-job-card .cand-col-actions {
         grid-column: 1 / -1;
         justify-content: flex-end;
         padding-top: 0.75rem;
@@ -656,20 +685,16 @@
     .cand-btn-filter, .cand-btn-reset {
         justify-content: center;
     }
-    .cand-card {
-        grid-template-columns: 1fr;
+    .cand-job-card {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 1rem;
     }
-    .cand-col-identity,
-    .cand-col-role,
-    .cand-col-score,
-    .cand-col-status,
-    .cand-col-actions {
-        width: 100%;
-        text-align: left;
+    .cand-job-card .cand-col-identity,
+    .cand-job-card .cand-col-actions {
+        grid-column: 1 / -1;
     }
-    .cand-col-actions {
-        justify-content: flex-start;
+    .cand-job-card .cand-col-score {
+        text-align: left;
     }
 }
 
@@ -686,6 +711,16 @@
     .cand-col-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+    .cand-job-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .cand-job-card .cand-col-identity,
+    .cand-job-card .cand-col-actions {
+        grid-column: auto;
+    }
+    .cand-tier-breakdown .cand-score-sub {
+        white-space: normal;
     }
     .cand-btn-resume, .cand-btn-review {
         justify-content: center;
@@ -777,8 +812,7 @@
         <!-- 4. Job Rows -->
         <div class="cand-list-stack">
             {% for js in job_summaries %}
-            <div class="cand-card {% if js.count_high_match > 0 %}cat-excellent{% elif js.count_qualified > 0 %}cat-good{% else %}cat-average{% endif %}"
-                 style="grid-template-columns: minmax(280px, 2.5fr) minmax(180px, 1.5fr) 90px 90px 90px minmax(160px, 1.2fr);">
+            <div class="cand-card cand-job-card {% if js.count_high_match > 0 %}cat-excellent{% elif js.count_qualified > 0 %}cat-good{% else %}cat-average{% endif %}">
 
                 <!-- Col 1: Job Title & Company -->
                 <div class="cand-col-identity" style="gap:.85rem;">
@@ -817,11 +851,12 @@
 
                 <!-- Col 3: Qualified -->
                 <div class="cand-col-score">
-                    <div class="cand-col-label">High Employability</div>
+                    <div class="cand-col-label">High Employability (&gt;60%)</div>
                     <div class="cand-score-val" style="color:#059669;">{{ js.count_qualified }}</div>
-                    <div class="cand-score-sub" style="color:#059669;">&gt; 60%</div>
-                    <div class="cand-score-sub" style="color:#b45309;">Under-Qualified: {{ js.count_under_qualified }}</div>
-                    <div class="cand-score-sub" style="color:#b91c1c;">Not Qualified: {{ js.count_not_qualified }}</div>
+                    <div class="cand-tier-breakdown">
+                        <div class="cand-score-sub" style="color:#b45309;">Under-Qualified (40–60%): {{ js.count_under_qualified }}</div>
+                        <div class="cand-score-sub" style="color:#b91c1c;">Not Qualified (&lt;40%): {{ js.count_not_qualified }}</div>
+                    </div>
                 </div>
 
                 <!-- Col 4: High Match -->
