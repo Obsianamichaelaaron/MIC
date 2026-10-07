@@ -547,6 +547,7 @@ def candidates_view(request):
         apps_qs = apps_qs.filter(employer_status='for_review')
 
     candidates = []
+    display_applications = []
     for app in apps_qs.order_by('-forwarded_at', '-applied_at'):
         applicant = app.applicant
         user_obj = applicant.user if applicant else None
@@ -558,6 +559,9 @@ def candidates_view(request):
                 'qualification_status': 'unavailable',
             }
         )
+        app.match_score = match_result['match_score']
+        app.qualification_status = match_result['qualification_status']
+        display_applications.append(app)
         
         # Latest scheduled interview for this application
         latest_interview = InterviewSchedule.objects.filter(application=app).order_by('-interview_date').first()
@@ -609,7 +613,7 @@ def candidates_view(request):
         'current_page': 'candidates.php',
         'employer': employer,
         'candidates': candidates,
-        'applications': apps_qs.order_by('-forwarded_at', '-applied_at'),
+        'applications': display_applications,
         'selected_tab': selected_tab,
         'current_tab': {
             'for_review': 'review',

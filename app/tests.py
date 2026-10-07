@@ -1160,24 +1160,26 @@ class MultiBizConversionTests(TestCase):
             job=self.job,
             applicant=self.applicant,
             status='pending',
-            match_score=Decimal('88.00'),
+            match_score=Decimal('0.00'),
+            forwarded_to_employer=True,
         )
 
         session = self.client.session
-        session['user_id'] = self.admin_user.user_id
-        session['role'] = 'admin'
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
         session.save()
 
-        forward_response = self.client.post('/admin/batch_forward_candidates/', {
-            'job_id': self.job.job_id,
-            'scope': 'qualified',
-        })
+        response = self.client.get('/employer/candidates.php')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '86% High Employability')
+        self.assertNotContains(response, '0% Low Employability')
+        self.assertEqual(
+            response.context['applications'][0].qualification_status,
+            'qualified',
+        )
 
-        self.assertEqual(forward_response.status_code, 200)
-        self.assertTrue(forward_response.json()['success'])
         application.refresh_from_db()
-        self.assertTrue(application.forwarded_to_employer)
-        self.assertTrue(Notification.objects.filter(user=self.employer_user).exists())
+        self.assertEqual(application.match_score, Decimal('0.00'))
 
     def test_batch_forward_does_not_use_legacy_unclassified_score_bands(self):
         applications_by_score = {}
