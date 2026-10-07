@@ -812,6 +812,23 @@ class MultiBizConversionTests(TestCase):
         }
         first_job = JobPosting.objects.create(**duplicate_fields)
         second_job = JobPosting.objects.create(**duplicate_fields)
+        second_employer_user = User.objects.create(
+            email='duplicate-company-employer@example.com',
+            password='test-password',
+            role='employer',
+            status='active',
+        )
+        second_employer = Employer.objects.create(
+            user=second_employer_user,
+            company_name='  MULTIBIZ   CORPORATION ',
+            industry='Technology',
+        )
+        cross_account_duplicate_fields = {
+            **duplicate_fields,
+            'employer': second_employer,
+            'title': '  PRINCIPAL PYTHON AI ARCHITECT ',
+        }
+        cross_account_duplicate = JobPosting.objects.create(**cross_account_duplicate_fields)
 
         session = self.client.session
         session['user_id'] = self.admin_user.user_id
@@ -825,7 +842,11 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(admin_response.status_code, 200)
         careers_ids = {job.job_id for job in careers_response.context['jobs']}
         admin_ids = {job.job_id for job in admin_response.context['jobs']}
-        duplicate_ids = {first_job.job_id, second_job.job_id}
+        duplicate_ids = {
+            first_job.job_id,
+            second_job.job_id,
+            cross_account_duplicate.job_id,
+        }
         self.assertEqual(careers_ids, admin_ids)
         self.assertEqual(len(careers_ids & duplicate_ids), 1)
         grouped_row = next(job for job in admin_response.context['jobs'] if job.job_id in duplicate_ids)

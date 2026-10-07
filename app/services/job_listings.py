@@ -3,7 +3,7 @@ def job_posting_duplicate_key(job):
         return ' '.join(str(value or '').casefold().split())
 
     return (
-        job.employer_id,
+        normalize(job.employer.company_name if job.employer else ''),
         normalize(job.title),
         normalize(job.description),
         normalize(job.requirements),
