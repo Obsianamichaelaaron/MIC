@@ -10,6 +10,5 @@ onnxruntime>=1.19,<2.0
 tokenizers>=0.20,<1.0
 python-dotenv>=1.0.0
 whitenoise>=6.6.0
-google-api-python-client>=2.118.0
+google-auth>=2.29.0
 google-auth-oauthlib>=1.2.0
-google-auth-httplib2>=0.2.0

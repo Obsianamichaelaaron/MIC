@@ -1,13 +1,54 @@
-import io
 import os
 import json
 import glob
 import base64
+import uuid
 import requests
 from django.conf import settings
 
 TARGET_FOLDER_ID = "1pDIHRWfljyosJ0mJtVSL9zvSsYl2CjZv"
 TARGET_DRIVE_FOLDER_URL = f"https://drive.google.com/drive/folders/{TARGET_FOLDER_ID}?usp=sharing"
+DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files'
+EXCEL_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+
+def _create_drive_file(credentials, file_bytes, filename, folder_id):
+    from google.auth.transport.requests import AuthorizedSession
+
+    boundary = f'multibiz-{uuid.uuid4().hex}'
+    metadata = json.dumps({'name': filename, 'parents': [folder_id]})
+    body = b''.join((
+        f'--{boundary}\r\n'.encode(),
+        b'Content-Type: application/json; charset=UTF-8\r\n\r\n',
+        metadata.encode('utf-8'),
+        f'\r\n--{boundary}\r\n'.encode(),
+        f'Content-Type: {EXCEL_MIME_TYPE}\r\n\r\n'.encode(),
+        file_bytes,
+        f'\r\n--{boundary}--'.encode(),
+    ))
+    headers = {'Content-Type': f'multipart/related; boundary="{boundary}"'}
+    params = {
+        'uploadType': 'multipart',
+        'supportsAllDrives': 'true',
+        'fields': 'id,name,webViewLink',
+    }
+    with AuthorizedSession(credentials) as session:
+        response = session.post(
+            DRIVE_UPLOAD_URL,
+            params=params,
+            data=body,
+            headers=headers,
+            timeout=60,
+        )
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        try:
+            details = json.dumps(response.json())
+        except ValueError:
+            details = response.text
+        raise RuntimeError(details) from exc
+    return response.json()
 
 
 def _find_oauth_client_secret():
@@ -51,8 +92,6 @@ def _upload_with_oauth_user(file_bytes, filename, folder_id):
     try:
         from google.oauth2.credentials import Credentials
         from google.auth.transport.requests import Request
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaIoBaseUpload
 
         creds = Credentials.from_authorized_user_file(token_path, ['https://www.googleapis.com/auth/drive'])
         if creds and creds.expired and creds.refresh_token:
@@ -67,19 +106,7 @@ def _upload_with_oauth_user(file_bytes, filename, folder_id):
                 'message': 'Google Drive OAuth token is expired or invalid. Re-authorize the Google account to continue.'
             }
 
-        service = build('drive', 'v3', credentials=creds)
-        media = MediaIoBaseUpload(
-            io.BytesIO(file_bytes),
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            resumable=True
-        )
-        file_metadata = {'name': filename, 'parents': [folder_id]}
-        file_obj = service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id, name, webViewLink',
-            supportsAllDrives=True
-        ).execute()
+        file_obj = _create_drive_file(creds, file_bytes, filename, folder_id)
 
         return {
             'success': True,
@@ -177,30 +204,12 @@ def upload_excel_to_google_drive(file_bytes, filename, folder_id=TARGET_FOLDER_I
                         continue
 
                 from google.oauth2 import service_account
-                from googleapiclient.discovery import build
-                from googleapiclient.http import MediaIoBaseUpload
 
                 creds = service_account.Credentials.from_service_account_file(
                     cred_path,
                     scopes=['https://www.googleapis.com/auth/drive']
                 )
-                service = build('drive', 'v3', credentials=creds)
-
-                media = MediaIoBaseUpload(
-                    io.BytesIO(file_bytes),
-                    mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    resumable=True
-                )
-                file_metadata = {
-                    'name': filename,
-                    'parents': [folder_id]
-                }
-                file_obj = service.files().create(
-                    body=file_metadata,
-                    media_body=media,
-                    fields='id, name, webViewLink',
-                    supportsAllDrives=True
-                ).execute()
+                file_obj = _create_drive_file(creds, file_bytes, filename, folder_id)
 
                 return {
                     'success': True,

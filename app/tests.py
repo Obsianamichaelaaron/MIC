@@ -175,8 +175,7 @@ class MultiBizConversionTests(TestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200, f"Failed on URL: {url}")
 
-    def test_google_drive_service_account_upload_uses_shared_drive_support(self):
-        """Service account uploads should request shared-drive support for compatible parent folders."""
+    def test_google_drive_service_account_upload_uses_rest_client(self):
         with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as f:
             json.dump({
                 'type': 'service_account',
@@ -187,17 +186,12 @@ class MultiBizConversionTests(TestCase):
             }, f)
             service_account_path = f.name
 
+        credentials = object()
+
         def fake_from_service_account_file(path, scopes):
             self.assertEqual(path, service_account_path)
             self.assertIn('https://www.googleapis.com/auth/drive', scopes)
-            return object()
-
-        fake_drive = Mock()
-        fake_file = Mock()
-        fake_create = Mock()
-        fake_create.execute.return_value = {'id': 'file-123', 'name': 'demo.xlsx', 'webViewLink': 'https://example.com'}
-        fake_file.create.return_value = fake_create
-        fake_drive.files.return_value = fake_file
+            return credentials
 
         fake_google = types.ModuleType('google')
         fake_oauth2 = types.ModuleType('google.oauth2')
@@ -205,26 +199,21 @@ class MultiBizConversionTests(TestCase):
         fake_service_account.Credentials = types.SimpleNamespace(from_service_account_file=fake_from_service_account_file)
         fake_oauth2.service_account = fake_service_account
         fake_google.oauth2 = fake_oauth2
-        fake_discovery = types.ModuleType('googleapiclient.discovery')
-        fake_discovery.build = Mock(return_value=fake_drive)
-        fake_http = types.ModuleType('googleapiclient.http')
-        fake_http.MediaIoBaseUpload = Mock()
 
         original_google = sys.modules.get('google')
         original_oauth2 = sys.modules.get('google.oauth2')
         original_service_account = sys.modules.get('google.oauth2.service_account')
-        original_discovery = sys.modules.get('googleapiclient.discovery')
-        original_http = sys.modules.get('googleapiclient.http')
 
         try:
             sys.modules['google'] = fake_google
             sys.modules['google.oauth2'] = fake_oauth2
             sys.modules['google.oauth2.service_account'] = fake_service_account
-            sys.modules['googleapiclient.discovery'] = fake_discovery
-            sys.modules['googleapiclient.http'] = fake_http
 
             from app.services import google_drive_service
-            with patch('app.services.google_drive_service._upload_with_oauth_user', return_value={'success': False, 'error': 'oauth_missing'}):
+            with patch('app.services.google_drive_service._upload_with_oauth_user', return_value={'success': False, 'error': 'oauth_missing'}), patch(
+                'app.services.google_drive_service._create_drive_file',
+                return_value={'id': 'file-123', 'name': 'demo.xlsx', 'webViewLink': 'https://example.com'},
+            ) as create_drive_file:
                 with self.settings(GOOGLE_SERVICE_ACCOUNT_FILE=service_account_path):
                     result = google_drive_service.upload_excel_to_google_drive(b'abc', 'demo.xlsx', folder_id='folder-123')
         finally:
@@ -240,21 +229,47 @@ class MultiBizConversionTests(TestCase):
                 sys.modules['google.oauth2.service_account'] = original_service_account
             else:
                 sys.modules.pop('google.oauth2.service_account', None)
-            if original_discovery is not None:
-                sys.modules['googleapiclient.discovery'] = original_discovery
-            else:
-                sys.modules.pop('googleapiclient.discovery', None)
-            if original_http is not None:
-                sys.modules['googleapiclient.http'] = original_http
-            else:
-                sys.modules.pop('googleapiclient.http', None)
 
         self.assertTrue(result['success'])
-        fake_file.create.assert_called_once()
-        kwargs = fake_file.create.call_args.kwargs
-        self.assertTrue(kwargs['supportsAllDrives'])
+        create_drive_file.assert_called_once_with(credentials, b'abc', 'demo.xlsx', 'folder-123')
 
         os.unlink(service_account_path)
+
+    def test_google_drive_rest_upload_uses_multipart_and_shared_drive_support(self):
+        from app.services import google_drive_service
+
+        credentials = object()
+        session = Mock()
+        session.__enter__ = Mock(return_value=session)
+        session.__exit__ = Mock(return_value=False)
+        response = Mock()
+        response.json.return_value = {
+            'id': 'file-123',
+            'name': 'demo.xlsx',
+            'webViewLink': 'https://example.com',
+        }
+        session.post.return_value = response
+
+        with patch(
+            'google.auth.transport.requests.AuthorizedSession',
+            return_value=session,
+        ) as authorized_session:
+            file_obj = google_drive_service._create_drive_file(
+                credentials,
+                b'workbook bytes',
+                'demo.xlsx',
+                'folder-123',
+            )
+
+        authorized_session.assert_called_once_with(credentials)
+        request_args, request_kwargs = session.post.call_args
+        self.assertEqual(request_args[0], google_drive_service.DRIVE_UPLOAD_URL)
+        self.assertEqual(request_kwargs['params']['supportsAllDrives'], 'true')
+        self.assertEqual(request_kwargs['params']['uploadType'], 'multipart')
+        self.assertIn('multipart/related', request_kwargs['headers']['Content-Type'])
+        self.assertIn(b'"parents": ["folder-123"]', request_kwargs['data'])
+        self.assertIn(b'workbook bytes', request_kwargs['data'])
+        self.assertEqual(file_obj['id'], 'file-123')
 
     def test_google_drive_oauth_upload_refreshes_expired_token(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -283,15 +298,6 @@ class MultiBizConversionTests(TestCase):
             fake_google.oauth2 = fake_oauth2
             fake_google.auth = fake_auth
 
-            fake_discovery = types.ModuleType('googleapiclient.discovery')
-            fake_http = types.ModuleType('googleapiclient.http')
-            fake_service = Mock()
-            fake_service.files.return_value.create.return_value.execute.return_value = {
-                'id': 'file-123', 'name': 'demo.xlsx', 'webViewLink': 'https://example.com'
-            }
-            fake_discovery.build = Mock(return_value=fake_service)
-            fake_http.MediaIoBaseUpload = Mock()
-
             modules = {
                 'google': fake_google,
                 'google.oauth2': fake_oauth2,
@@ -299,14 +305,16 @@ class MultiBizConversionTests(TestCase):
                 'google.auth': fake_auth,
                 'google.auth.transport': fake_transport,
                 'google.auth.transport.requests': fake_requests,
-                'googleapiclient.discovery': fake_discovery,
-                'googleapiclient.http': fake_http,
             }
             from app.services import google_drive_service
             with patch.dict(sys.modules, modules), patch.object(
                 google_drive_service.settings, 'BASE_DIR', Path(temp_dir)
             ), patch.object(
                 google_drive_service, '_find_oauth_client_secret', return_value=client_secret_path
+            ), patch.object(
+                google_drive_service,
+                '_create_drive_file',
+                return_value={'id': 'file-123', 'name': 'demo.xlsx', 'webViewLink': 'https://example.com'},
             ):
                 result = google_drive_service._upload_with_oauth_user(b'abc', 'demo.xlsx', 'folder-123')
 
