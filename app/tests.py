@@ -1480,6 +1480,12 @@ class MultiBizConversionTests(TestCase):
         ).exists())
         send_email.assert_called_once()
 
+        detail_response = self.client.get(
+            f'/employer/view_candidate.php?id={application.application_id}'
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertNotContains(detail_response, 'Schedule Interview')
+
     def test_chat_messaging_system(self):
         """Test real-time messaging between employer and applicant"""
         # Log in as employer
