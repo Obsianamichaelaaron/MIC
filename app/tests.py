@@ -1514,6 +1514,41 @@ class MultiBizConversionTests(TestCase):
         self.assertNotContains(response, 'Meeting Link / Location:')
         self.assertNotContains(response, 'Instructions for Candidate:')
         self.assertNotContains(response, 'Send Interview Invitation')
+        response_html = response.content.decode()
+        status_select = response_html.split(
+            '<select name="employer_status"', 1
+        )[1].split('</select>', 1)[0]
+        self.assertIn('value="hired"', status_select)
+        self.assertIn('>Hired</option>', status_select)
+        self.assertIn('value="rejected"', status_select)
+        self.assertIn('>Reject</option>', status_select)
+        for unavailable_status in (
+            'for_review',
+            'qualified',
+            'for_interview',
+            'interview_completed',
+            'not_qualified',
+        ):
+            self.assertNotIn(f'value="{unavailable_status}"', status_select)
+
+        with patch('app.views.views_employer.send_application_status_update_email'):
+            update_response = self.client.post(
+                f'/employer/view_candidate.php?id={application.application_id}',
+                {
+                    'action': 'update_status',
+                    'employer_status': 'rejected',
+                    'remarks': 'Interview did not meet requirements.',
+                },
+            )
+
+        self.assertEqual(update_response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.employer_status, 'rejected')
+        self.assertEqual(application.status, 'rejected')
+        self.assertEqual(
+            application.employer_notes,
+            'Interview did not meet requirements.',
+        )
 
     def test_chat_messaging_system(self):
         """Test real-time messaging between employer and applicant"""

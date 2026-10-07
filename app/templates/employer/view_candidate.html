@@ -462,12 +462,17 @@
                             <div>
                                 <label class="employer-form-label form-label small fw-semibold text-dark">Update Employer Status:</label>
                                 <select name="employer_status" class="form-select-custom">
-                                    <option value="for_review" {% if application.employer_status == 'for_review' %}selected{% endif %}>For Review</option>
-                                    <option value="qualified" {% if application.employer_status == 'qualified' %}selected{% endif %}>Qualified</option>
-                                    <option value="for_interview" {% if application.employer_status == 'for_interview' %}selected{% endif %}>For Interview</option>
-                                    <option value="interview_completed" {% if application.employer_status == 'interview_completed' %}selected{% endif %}>Interview Completed</option>
-                                    <option value="hired" {% if application.employer_status == 'hired' %}selected{% endif %}>Hired / Offer Accepted</option>
-                                    <option value="not_qualified" {% if application.employer_status == 'not_qualified' %}selected{% endif %}>Not Qualified</option>
+                                    {% if application.employer_status == 'for_interview' or application.employer_status == 'interview_completed' %}
+                                        <option value="hired">Hired</option>
+                                        <option value="rejected">Reject</option>
+                                    {% else %}
+                                        <option value="for_review" {% if application.employer_status == 'for_review' %}selected{% endif %}>For Review</option>
+                                        <option value="qualified" {% if application.employer_status == 'qualified' %}selected{% endif %}>Qualified</option>
+                                        <option value="for_interview" {% if application.employer_status == 'for_interview' %}selected{% endif %}>For Interview</option>
+                                        <option value="interview_completed" {% if application.employer_status == 'interview_completed' %}selected{% endif %}>Interview Completed</option>
+                                        <option value="hired" {% if application.employer_status == 'hired' %}selected{% endif %}>Hired / Offer Accepted</option>
+                                        <option value="not_qualified" {% if application.employer_status == 'not_qualified' %}selected{% endif %}>Not Qualified</option>
+                                    {% endif %}
                                 </select>
                             </div>
 

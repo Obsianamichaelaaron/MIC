@@ -55,6 +55,20 @@ def log_status_history_event(application, stage_title, status_key, actor_name, a
     application.status_history = history
 
 
+def _allowed_employer_statuses(current_status):
+    if current_status in ('for_interview', 'interview_completed'):
+        return ('hired', 'rejected')
+    return (
+        'for_review',
+        'qualified',
+        'not_qualified',
+        'for_interview',
+        'interview_completed',
+        'hired',
+        'rejected',
+    )
+
+
 def _notify_applicant_for_employer_application(application, title, message):
     if connection.vendor == 'postgresql':
         with connection.cursor() as cursor:
@@ -747,11 +761,16 @@ def view_candidate_view(request, application_id=None):
         action = request.POST.get('action')
 
         if action == 'update_status':
-            new_status = request.POST.get('status', '').strip()
-            employer_notes = request.POST.get('employer_notes', '').strip()
+            new_status = request.POST.get(
+                'employer_status',
+                request.POST.get('status', ''),
+            ).strip()
+            employer_notes = request.POST.get(
+                'employer_notes',
+                request.POST.get('remarks', ''),
+            ).strip()
 
-            valid_statuses = ['for_review', 'qualified', 'not_qualified', 'for_interview', 'interview_completed', 'hired', 'rejected']
-            if new_status in valid_statuses:
+            if new_status in _allowed_employer_statuses(application.employer_status):
                 application.employer_status = new_status
                 if employer_notes:
                     application.employer_notes = employer_notes
@@ -958,7 +977,7 @@ def update_status_api(request):
     notes = request.POST.get('notes', '').strip() or request.POST.get('remarks', '').strip()
 
     application = get_object_or_404(Application, pk=app_id, job__employer=employer, forwarded_to_employer=True)
-    valid_statuses = ['for_review', 'qualified', 'not_qualified', 'for_interview', 'interview_completed', 'hired', 'rejected']
+    valid_statuses = _allowed_employer_statuses(application.employer_status)
 
     if status in valid_statuses:
         application.employer_status = status
