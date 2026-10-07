@@ -300,10 +300,17 @@
                 </div>
             {% endif %}
 
-            {% if error %}
+            {% if success_msg %}
+                <div class="alert alert-success d-flex align-items-center gap-2 mb-3" role="alert" style="border-radius:10px; font-size:0.88rem;">
+                    <i class="fa-solid fa-circle-check fs-5"></i>
+                    <div>{{ success_msg }}</div>
+                </div>
+            {% endif %}
+
+            {% if error_msg %}
                 <div class="alert alert-danger d-flex align-items-center gap-2 mb-3" role="alert" style="border-radius:10px; font-size:0.88rem;">
                     <i class="fa-solid fa-circle-exclamation fs-5"></i>
-                    <div>{{ error }}</div>
+                    <div>{{ error_msg }}</div>
                 </div>
             {% endif %}
 
@@ -466,13 +473,18 @@
                                     <input type="time" name="start_time" required class="form-control-custom">
                                 </div>
                                 <div class="col-6">
+                                    <label class="form-label small fw-semibold text-dark">End Time:</label>
+                                    <input type="time" name="end_time" required class="form-control-custom">
+                                </div>
+                            </div>
+
+                            <div>
                                     <label class="form-label small fw-semibold text-dark">Type:</label>
                                     <select name="interview_type" class="form-select-custom">
                                         <option value="Online">Online Video</option>
                                         <option value="Onsite">Onsite / Office</option>
                                         <option value="Phone">Phone Call</option>
                                     </select>
-                                </div>
                             </div>
 
                             <div>

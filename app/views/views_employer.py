@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q, Count
 from django.conf import settings
 from django.utils import timezone
+from django.utils.dateparse import parse_date, parse_time
 import json
 from app.models import (
     User, Employer, Applicant, JobPosting, Application,
@@ -789,7 +790,6 @@ def view_candidate_view(request, application_id=None):
 
         elif action == 'schedule_interview':
             interview_date = request.POST.get('interview_date', '').strip()
-            interview_time = request.POST.get('interview_time', '').strip()
             start_time_val = request.POST.get('start_time', '').strip() or None
             end_time_val = request.POST.get('end_time', '').strip() or None
             interview_type = request.POST.get('interview_type', 'Online').strip()
@@ -797,22 +797,31 @@ def view_candidate_view(request, application_id=None):
             interviewer_name = request.POST.get('interviewer_name', '').strip()
             instructions = request.POST.get('instructions', '').strip()
             additional_notes = request.POST.get('notes', '').strip()
+            parsed_date = parse_date(interview_date)
+            parsed_start_time = parse_time(start_time_val) if start_time_val else None
+            parsed_end_time = parse_time(end_time_val) if end_time_val else None
 
-            if not interview_date:
-                error_msg = "Please specify the interview date."
-            elif not interview_time and not start_time_val:
-                error_msg = "Please specify the interview time."
+            if not parsed_date:
+                error_msg = "Please provide a valid interview date."
+            elif not parsed_start_time:
+                error_msg = "Please provide a valid interview start time."
+            elif not parsed_end_time:
+                error_msg = "Please provide a valid interview end time."
+            elif parsed_end_time <= parsed_start_time:
+                error_msg = "Interview end time must be later than the start time."
             else:
-                formatted_time = interview_time or start_time_val or '10:00 AM'
+                formatted_start_time = parsed_start_time.strftime('%I:%M %p')
+                formatted_end_time = parsed_end_time.strftime('%I:%M %p')
+                formatted_time = f'{formatted_start_time} - {formatted_end_time}'
                 
                 # Create Interview Schedule Record
                 schedule = InterviewSchedule.objects.create(
                     application=application,
                     employer=employer,
-                    interview_date=interview_date,
+                    interview_date=parsed_date,
                     interview_time=formatted_time,
-                    start_time=start_time_val if start_time_val else None,
-                    end_time=end_time_val if end_time_val else None,
+                    start_time=parsed_start_time,
+                    end_time=parsed_end_time,
                     interview_type=interview_type,
                     location=location_or_link if interview_type != 'Online' else None,
                     meeting_link=location_or_link if interview_type == 'Online' else None,

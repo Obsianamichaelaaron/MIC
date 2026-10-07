@@ -14,7 +14,7 @@ from django.urls import reverse
 from app.models import (
     User, Applicant, Employer, JobPosting, Application,
     Qualification, JobQualificationMapping, Skill, ContactInquiry, Message, AuditTrail,
-    Notification, CmsHeroSlide, CmsBrand, CmsTestimonial
+    Notification, InterviewSchedule, CmsHeroSlide, CmsBrand, CmsTestimonial
 )
 from app.auth_utils import verify_password, hash_password
 from app.services.mailer import send_application_status_update_email
@@ -1419,6 +1419,64 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(update_resp.status_code, 200)
         app.refresh_from_db()
         self.assertEqual(app.status, 'shortlisted')
+
+    def test_employer_can_send_interview_invitation(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='shortlisted',
+            forwarded_to_employer=True,
+        )
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session['email'] = self.employer_user.email
+        session.save()
+
+        with patch('app.views.views_employer.send_interview_scheduled_email') as send_email:
+            invalid_response = self.client.post(
+                f'/employer/view_candidate.php?id={application.application_id}',
+                {
+                    'action': 'schedule_interview',
+                    'interview_date': '2026-10-15',
+                    'start_time': '10:30',
+                    'interview_type': 'Online',
+                },
+            )
+            self.assertEqual(invalid_response.status_code, 200)
+            self.assertContains(invalid_response, 'Please provide a valid interview end time.')
+            self.assertFalse(InterviewSchedule.objects.filter(application=application).exists())
+
+            response = self.client.post(
+                f'/employer/view_candidate.php?id={application.application_id}',
+                {
+                    'action': 'schedule_interview',
+                    'interview_date': '2026-10-15',
+                    'start_time': '10:30',
+                    'end_time': '11:30',
+                    'interview_type': 'Online',
+                    'location_or_link': 'https://meet.example.com/interview',
+                    'interviewer_name': 'Hiring Team',
+                    'instructions': 'Bring your portfolio.',
+                    'notes': 'Technical interview.',
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Interview successfully scheduled')
+        schedule = InterviewSchedule.objects.get(application=application)
+        self.assertEqual(schedule.interview_date.isoformat(), '2026-10-15')
+        self.assertEqual(schedule.start_time.strftime('%H:%M'), '10:30')
+        self.assertEqual(schedule.end_time.strftime('%H:%M'), '11:30')
+        self.assertEqual(schedule.meeting_link, 'https://meet.example.com/interview')
+        application.refresh_from_db()
+        self.assertEqual(application.employer_status, 'for_interview')
+        self.assertEqual(application.status, 'interviewed')
+        self.assertTrue(Notification.objects.filter(
+            user=self.applicant_user,
+            title__contains='Interview Scheduled',
+        ).exists())
+        send_email.assert_called_once()
 
     def test_chat_messaging_system(self):
         """Test real-time messaging between employer and applicant"""
