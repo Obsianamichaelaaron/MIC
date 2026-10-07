@@ -20,6 +20,7 @@ from app.services.ml_ranking import (
     compute_job_match_result,
     compute_job_match_score,
 )
+from app.services.qualification import classify_match_score
 from app.services.mailer import (
     send_application_status_update_email,
     send_talent_request_admin_notification,
@@ -555,12 +556,19 @@ def candidates_view(request):
             compute_job_match_result(applicant, app.job)
             if applicant and app.job else {
                 'match_score': None,
-                'match_class': None,
-                'qualification_status': 'unavailable',
             }
         )
         app.match_score = match_result['match_score']
-        app.qualification_status = match_result['qualification_status']
+        app.qualification_status = (
+            classify_match_score(app.match_score)
+            if app.match_score is not None else 'unavailable'
+        )
+        app.match_class = {
+            'qualified': 'high',
+            'under_qualified': 'medium',
+            'not_qualified': 'low',
+            'unavailable': 'unavailable',
+        }[app.qualification_status]
         display_applications.append(app)
         
         # Latest scheduled interview for this application

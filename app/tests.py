@@ -1189,6 +1189,10 @@ class MultiBizConversionTests(TestCase):
             inconsistent_score_response = self.client.get('/employer/candidates.php')
         self.assertContains(inconsistent_score_response, '89% High Employability')
         self.assertNotContains(inconsistent_score_response, '89% Low Employability')
+        self.assertEqual(
+            inconsistent_score_response.context['applications'][0].match_class,
+            'high',
+        )
 
         application.refresh_from_db()
         self.assertEqual(application.match_score, Decimal('0.00'))
