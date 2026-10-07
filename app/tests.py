@@ -1529,6 +1529,7 @@ class MultiBizConversionTests(TestCase):
         )[1].split('</select>', 1)[0]
         self.assertIn('value="hired"', status_select)
         self.assertIn('>Hired</option>', status_select)
+        self.assertIn('value="hired" selected', status_select)
         self.assertIn('value="rejected"', status_select)
         self.assertIn('>Reject</option>', status_select)
         for unavailable_status in (
@@ -1558,6 +1559,33 @@ class MultiBizConversionTests(TestCase):
             application.employer_notes,
             'Interview did not meet requirements.',
         )
+
+    def test_for_interview_status_dropdown_defaults_to_hired_or_reject(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='interviewed',
+            employer_status='for_interview',
+            forwarded_to_employer=True,
+        )
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session['email'] = self.employer_user.email
+        session.save()
+
+        response = self.client.get(
+            f'/employer/view_candidate.php?id={application.application_id}'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        status_select = response.content.decode().split(
+            '<select name="employer_status"', 1
+        )[1].split('</select>', 1)[0]
+        self.assertIn('value="hired" selected', status_select)
+        self.assertIn('value="rejected"', status_select)
+        self.assertNotIn('>For Interview</option>', status_select)
+        self.assertNotIn('value="for_interview"', status_select)
 
     def test_chat_messaging_system(self):
         """Test real-time messaging between employer and applicant"""

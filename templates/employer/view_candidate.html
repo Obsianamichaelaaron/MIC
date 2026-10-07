@@ -467,7 +467,7 @@
                                 <label class="employer-form-label form-label small fw-semibold text-dark">Update Employer Status:</label>
                                 <select name="employer_status" class="form-select-custom">
                                     {% if interview_stage %}
-                                        <option value="hired" {% if application.employer_status == 'hired' %}selected{% endif %}>Hired</option>
+                                        <option value="hired" {% if application.employer_status != 'rejected' %}selected{% endif %}>Hired</option>
                                         <option value="rejected" {% if application.employer_status == 'rejected' %}selected{% endif %}>Reject</option>
                                     {% else %}
                                         <option value="for_review" {% if application.employer_status == 'for_review' %}selected{% endif %}>For Review</option>
