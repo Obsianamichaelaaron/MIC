@@ -462,9 +462,9 @@
                             <div>
                                 <label class="employer-form-label form-label small fw-semibold text-dark">Update Employer Status:</label>
                                 <select name="employer_status" class="form-select-custom">
-                                    {% if application.employer_status == 'for_interview' or application.employer_status == 'interview_completed' %}
-                                        <option value="hired">Hired</option>
-                                        <option value="rejected">Reject</option>
+                                    {% if interview_stage %}
+                                        <option value="hired" {% if application.employer_status == 'hired' %}selected{% endif %}>Hired</option>
+                                        <option value="rejected" {% if application.employer_status == 'rejected' %}selected{% endif %}>Reject</option>
                                     {% else %}
                                         <option value="for_review" {% if application.employer_status == 'for_review' %}selected{% endif %}>For Review</option>
                                         <option value="qualified" {% if application.employer_status == 'qualified' %}selected{% endif %}>Qualified</option>
@@ -487,7 +487,7 @@
                         </form>
                     </div>
 
-                    {% if can_schedule_interview and application.employer_status != 'for_interview' and application.employer_status != 'interview_completed' and application.employer_status != 'hired' %}
+                    {% if can_schedule_interview and not interview_stage %}
                     <!-- Interview Scheduling Card -->
                     <div class="p-3.5 border rounded-3 bg-white shadow-sm">
                         <h6 class="fw-bold text-dark mb-3 pb-2 border-bottom"><i class="fa-solid fa-calendar-plus text-primary me-1"></i> Schedule Interview</h6>

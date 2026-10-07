@@ -1495,8 +1495,17 @@ class MultiBizConversionTests(TestCase):
             job=self.job,
             applicant=self.applicant,
             status='interviewed',
-            employer_status='for_interview',
+            employer_status='for_review',
             forwarded_to_employer=True,
+        )
+        InterviewSchedule.objects.create(
+            application=application,
+            employer=self.employer,
+            interview_date='2026-10-15',
+            start_time='10:30',
+            end_time='11:30',
+            interview_type='Online',
+            status='scheduled',
         )
         session = self.client.session
         session['user_id'] = self.employer_user.user_id

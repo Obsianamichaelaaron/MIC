@@ -55,8 +55,16 @@ def log_status_history_event(application, stage_title, status_key, actor_name, a
     application.status_history = history
 
 
-def _allowed_employer_statuses(current_status):
-    if current_status in ('for_interview', 'interview_completed'):
+def _is_employer_interview_stage(application):
+    return (
+        application.employer_status in ('for_interview', 'interview_completed')
+        or application.status in ('interviewed', 'interview_completed', 'for_interview')
+        or application.interviews.exists()
+    )
+
+
+def _allowed_employer_statuses(application):
+    if _is_employer_interview_stage(application):
         return ('hired', 'rejected')
     return (
         'for_review',
@@ -770,7 +778,7 @@ def view_candidate_view(request, application_id=None):
                 request.POST.get('remarks', ''),
             ).strip()
 
-            if new_status in _allowed_employer_statuses(application.employer_status):
+            if new_status in _allowed_employer_statuses(application):
                 application.employer_status = new_status
                 if employer_notes:
                     application.employer_notes = employer_notes
@@ -923,9 +931,14 @@ def view_candidate_view(request, application_id=None):
 
     # Scheduled interviews
     interviews = InterviewSchedule.objects.filter(application=application).order_by('-interview_date')
+    interview_stage = (
+        application.employer_status in ('for_interview', 'interview_completed')
+        or application.status in ('interviewed', 'interview_completed', 'for_interview')
+        or interviews.exists()
+    )
     can_schedule_interview = (
-        not interviews.exists()
-        and application.employer_status not in ('for_interview', 'interview_completed', 'hired')
+        not interview_stage
+        and application.employer_status != 'hired'
     )
     
     # Chatbot assessment answers
@@ -949,6 +962,7 @@ def view_candidate_view(request, application_id=None):
         'job': job,
         'employer': employer,
         'interviews': interviews,
+        'interview_stage': interview_stage,
         'can_schedule_interview': can_schedule_interview,
         'chatbot_answers': chatbot_answers,
         'ml_score': score_info['ml_ranking_score'],
@@ -977,7 +991,7 @@ def update_status_api(request):
     notes = request.POST.get('notes', '').strip() or request.POST.get('remarks', '').strip()
 
     application = get_object_or_404(Application, pk=app_id, job__employer=employer, forwarded_to_employer=True)
-    valid_statuses = _allowed_employer_statuses(application.employer_status)
+    valid_statuses = _allowed_employer_statuses(application)
 
     if status in valid_statuses:
         application.employer_status = status
