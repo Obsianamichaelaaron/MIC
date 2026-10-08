@@ -291,6 +291,11 @@
                     <div>Your job requisition has been submitted and is currently pending Admin review!</div>
                 </div>
             {% endif %}
+            {% if email_failed %}
+                <div class="alert alert-warning mb-3" role="status" style="border-radius:10px; font-size:0.88rem;">
+                    The in-app job request was saved, but one or more email notifications failed. Check the email service configuration and try again.
+                </div>
+            {% endif %}
 
             {% if updated_success %}
                 <div class="alert alert-success d-flex align-items-center gap-2 mb-3" role="alert" style="border-radius:10px; font-size:0.88rem;">

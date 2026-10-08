@@ -36,6 +36,7 @@ from app.services.mailer import (
     send_applicant_forwarded_to_employer_email, send_interview_scheduled_email
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
+from app.services.qualification import classify_match_score
 from app.services.job_listings import job_posting_duplicate_key as _job_posting_duplicate_key
 
 
@@ -903,18 +904,22 @@ def jobs_view(request):
                     type='job'
                 )
                 try:
-                    send_job_posted_live_notification(
-                        employer_email=emp_user.email,
-                        employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
-                        job_title=job.title,
+                    email_result = send_job_posted_live_notification(
+                        to_email=emp_user.email,
                         company_name=company_name,
+                        contact_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                        job_title=job.title,
                         job_id=job.job_id
                     )
                 except Exception as e:
                     print(f"[Admin Post Live Notification Error]: {e}")
+                    email_result = {'success': False}
+            else:
+                email_result = {'success': False}
 
             log_audit_trail(request, admin_id, 'post_job_live', f"Published job #{job.job_id} ({job.title}) live for {company_name}", 'job', job.job_id, job.title)
-            return redirect('/admin/jobs.php?posted=success')
+            email_status = '' if email_result.get('success') else '&email_failed=1'
+            return redirect(f'/admin/jobs.php?posted=success{email_status}')
 
         elif action == 'reject':
             reason = request.POST.get('rejection_reason', '').strip() or "Job request details did not meet criteria."
@@ -932,18 +937,22 @@ def jobs_view(request):
                     type='job'
                 )
                 try:
-                    send_job_request_rejected_notification(
-                        employer_email=emp_user.email,
-                        employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
-                        job_title=job.title,
+                    email_result = send_job_request_rejected_notification(
+                        to_email=emp_user.email,
                         company_name=company_name,
+                        contact_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                        job_title=job.title,
                         rejection_reason=reason
                     )
                 except Exception as e:
                     print(f"[Admin Reject Notification Error]: {e}")
+                    email_result = {'success': False}
+            else:
+                email_result = {'success': False}
 
             log_audit_trail(request, admin_id, 'reject_job_request', f"Rejected job request #{job.job_id} ({job.title}) for {company_name}. Reason: {reason}", 'job', job.job_id, job.title)
-            return redirect('/admin/jobs.php?rejected=success')
+            email_status = '' if email_result.get('success') else '&email_failed=1'
+            return redirect(f'/admin/jobs.php?rejected=success{email_status}')
 
         elif action == 'toggle_status':
             new_status = 'closed' if job.status == 'active' else 'active'
@@ -1010,6 +1019,7 @@ def jobs_view(request):
         'approved_success': request.GET.get('approved') == 'success',
         'rejected_success': request.GET.get('rejected') == 'success',
         'updated_success': request.GET.get('updated') == 'success',
+        'email_failed': request.GET.get('email_failed') == '1',
     }
     return render(request, 'admin/jobs.html', context)
 
@@ -1068,18 +1078,26 @@ def job_request_action_api(request):
                 type='job'
             )
             try:
-                send_job_posted_live_notification(
-                    employer_email=emp_user.email,
-                    employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
-                    job_title=job.title,
+                email_result = send_job_posted_live_notification(
+                    to_email=emp_user.email,
                     company_name=company_name,
+                    contact_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                    job_title=job.title,
                     job_id=job.job_id
                 )
             except Exception as e:
                 print(f"[Admin Post Live Error]: {e}")
+                email_result = {'success': False}
+        else:
+            email_result = {'success': False}
 
         log_audit_trail(request, admin_id, 'post_job_live', f"Published job #{job.job_id} ({job.title}) live", 'job', job.job_id, job.title)
-        return JsonResponse({'success': True, 'message': f"Job '{job.title}' is now active and posted live!", 'status': 'active'})
+        return JsonResponse({
+            'success': True,
+            'message': f"Job '{job.title}' is now active and posted live.",
+            'email_sent': bool(email_result.get('success')),
+            'status': 'active',
+        })
 
     elif action == 'reject':
         if not reason:
@@ -1097,18 +1115,30 @@ def job_request_action_api(request):
                 type='job'
             )
             try:
-                send_job_request_rejected_notification(
-                    employer_email=emp_user.email,
-                    employer_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
-                    job_title=job.title,
+                email_result = send_job_request_rejected_notification(
+                    to_email=emp_user.email,
                     company_name=company_name,
+                    contact_name=f"{emp_user.first_name} {emp_user.last_name}".strip() or company_name,
+                    job_title=job.title,
                     rejection_reason=reason
                 )
             except Exception as e:
                 print(f"[Admin Reject Error]: {e}")
+                email_result = {'success': False}
+        else:
+            email_result = {'success': False}
 
         log_audit_trail(request, admin_id, 'reject_job_request', f"Rejected job #{job.job_id} ({job.title}). Reason: {reason}", 'job', job.job_id, job.title)
-        return JsonResponse({'success': True, 'message': f"Job request rejected. Employer has been notified.", 'status': 'rejected'})
+        return JsonResponse({
+            'success': True,
+            'message': (
+                'Job request rejected and email notification sent.'
+                if email_result.get('success')
+                else 'Job request rejected and in-app notification saved, but email delivery failed.'
+            ),
+            'email_sent': bool(email_result.get('success')),
+            'status': 'rejected',
+        })
 
     return JsonResponse({'success': False, 'message': 'Unknown action'})
 
@@ -1121,7 +1151,26 @@ def candidates_view(request):
     """
     search = request.GET.get('search', '').strip()
 
-    jobs_qs = JobPosting.objects.select_related('employer').order_by('-posted_at')
+    jobs_qs = (
+        JobPosting.objects.select_related('employer')
+        .only(
+            'job_id',
+            'employer_id',
+            'title',
+            'description',
+            'requirements',
+            'skills_required',
+            'location',
+            'employment_type',
+            'salary_range',
+            'positions_available',
+            'status',
+            'posted_at',
+            'employer__employer_id',
+            'employer__company_name',
+        )
+        .order_by('-posted_at')
+    )
 
     if search:
         jobs_qs = jobs_qs.filter(
@@ -1146,22 +1195,61 @@ def candidates_view(request):
     total_high_match = 0
     total_forwarded = 0
 
+    groups_by_job_id = {}
     for group in grouped_jobs.values():
-        job = group['job']
-        grouped_job_ids = [grouped_job.job_id for grouped_job in group['jobs']]
-        all_apps = list(
-            Application.objects.filter(job_id__in=grouped_job_ids)
+        group['job_ids'] = [grouped_job.job_id for grouped_job in group['jobs']]
+        group['applications'] = []
+        group['seen_applicants'] = set()
+        for grouped_job_id in group['job_ids']:
+            groups_by_job_id[grouped_job_id] = group
+
+    if request.GET.get('count_only') == '1':
+        high_match_count = 0
+        for job_id, applicant_id, employability_score in (
+            Application.objects.filter(job_id__in=groups_by_job_id)
+            .values_list(
+                'job_id',
+                'applicant_id',
+                'applicant__employability_score',
+            )
+        ):
+            group = groups_by_job_id[job_id]
+            if applicant_id in group['seen_applicants']:
+                continue
+            group['seen_applicants'].add(applicant_id)
+            if classify_match_score(employability_score) == 'qualified':
+                high_match_count += 1
+        return JsonResponse({'high_match_count': high_match_count})
+
+    if groups_by_job_id:
+        applications = (
+            Application.objects.filter(job_id__in=groups_by_job_id)
             .select_related('applicant', 'job')
+            .only(
+                'application_id',
+                'job_id',
+                'applicant_id',
+                'applied_at',
+                'forwarded_to_employer',
+                'status',
+                'applicant__applicant_id',
+                'applicant__employability_score',
+                'job__job_id',
+            )
             .order_by('-applied_at', '-application_id')
         )
-        total_applications += len(all_apps)
-        apps = []
-        seen_applicants = set()
-        for application in all_apps:
-            if application.applicant_id in seen_applicants:
+        for application in applications:
+            total_applications += 1
+            group = groups_by_job_id[application.job_id]
+            if application.applicant_id in group['seen_applicants']:
                 continue
-            seen_applicants.add(application.applicant_id)
-            apps.append(application)
+            group['seen_applicants'].add(application.applicant_id)
+            group['applications'].append(application)
+
+    for group in grouped_jobs.values():
+        job = group['job']
+        grouped_job_ids = group['job_ids']
+        apps = group['applications']
         count_all = len(apps)
         if count_all == 0:
             continue  # skip jobs with no applicants
@@ -1217,9 +1305,6 @@ def candidates_view(request):
 
     # Sort: most qualified applicants first
     job_summaries.sort(key=lambda x: x['count_qualified'], reverse=True)
-
-    if request.GET.get('count_only') == '1':
-        return JsonResponse({'high_match_count': total_qualified})
 
     context = {
         'page_title': 'Candidate Pipeline - MultiBiz Admin',
@@ -1295,7 +1380,7 @@ def view_candidate_view(request, application_id=None):
                 )
 
                 try:
-                    send_application_status_update_email(
+                    email_result = send_application_status_update_email(
                         to_email=candidate_user.email,
                         applicant_name=f"{candidate_user.first_name} {candidate_user.last_name}".strip() or candidate_user.email,
                         job_title=job.title,
@@ -1305,9 +1390,15 @@ def view_candidate_view(request, application_id=None):
                     )
                 except Exception as e:
                     print(f"[Admin Status Update Mailer] Error: {e}")
+                    email_result = {'success': False}
 
                 log_audit_trail(request, admin_id, 'update_application_status', f"Updated application screening status for {candidate_user.email} on {job.title} to {new_status}", 'application', application.application_id, candidate_user.email)
-                success_msg = f"Candidate screening status updated to {new_status.title()}! Notification email sent to candidate."
+                email_status = (
+                    f"Notification email sent to {candidate_user.email}."
+                    if email_result.get('success')
+                    else "The applicant has an in-app notification, but email delivery failed."
+                )
+                success_msg = f"Candidate screening status updated to {new_status.title()}! {email_status}"
 
         elif action == 'schedule_interview':
             error_msg = "Interview scheduling and hiring approvals are managed directly by the employer from their portal."
@@ -1353,6 +1444,7 @@ def view_candidate_view(request, application_id=None):
             # Notify employer
             emp_user = job.employer.user if (job.employer and job.employer.user) else None
             candidate_name = f"{candidate_user.first_name} {candidate_user.last_name}".strip() or candidate_user.email
+            email_result = {'success': False}
             if emp_user:
                 Notification.objects.create(
                     user=emp_user,
@@ -1361,7 +1453,7 @@ def view_candidate_view(request, application_id=None):
                     type='application'
                 )
                 try:
-                    send_applicant_forwarded_to_employer_email(
+                    email_result = send_applicant_forwarded_to_employer_email(
                         to_email=emp_user.email,
                         applicant_name=candidate_name,
                         company_name=company_name,
@@ -1373,7 +1465,15 @@ def view_candidate_view(request, application_id=None):
                     print(f"[Admin Forward Candidate Mailer Error]: {e}")
 
             log_audit_trail(request, admin_id, 'forward_candidate_to_employer', f"Forwarded candidate {candidate_name} ({candidate_user.email}) for {job.title} to {company_name}", 'application', application.application_id, candidate_name)
-            success_msg = f"Candidate {candidate_name} has been successfully forwarded to {company_name}!"
+            email_status = (
+                f"Email sent to {emp_user.email}."
+                if email_result.get('success') and emp_user
+                else "The employer has an in-app notification, but email delivery failed."
+            )
+            success_msg = (
+                f"Candidate {candidate_name} has been successfully forwarded to {company_name}! "
+                f"{email_status}"
+            )
 
     interviews = InterviewSchedule.objects.filter(application=application).order_by('-interview_date')
     chatbot_answers = ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number')
@@ -1456,6 +1556,7 @@ def forward_candidate_api(request):
     )
     application.save()
 
+    email_result = {'success': False}
     if emp_user:
         Notification.objects.create(
             user=emp_user,
@@ -1464,7 +1565,7 @@ def forward_candidate_api(request):
             type='application'
         )
         try:
-            send_applicant_forwarded_to_employer_email(
+            email_result = send_applicant_forwarded_to_employer_email(
                 to_email=emp_user.email,
                 applicant_name=candidate_name,
                 company_name=company_name,
@@ -1476,7 +1577,15 @@ def forward_candidate_api(request):
             print(f"[forward_candidate_api Mailer Error]: {e}")
 
     log_audit_trail(request, admin_id, 'forward_candidate_to_employer', f"Forwarded candidate {candidate_name} for {job_title} to {company_name}", 'application', application.application_id, candidate_name)
-    return JsonResponse({'success': True, 'message': f"Candidate {candidate_name} forwarded to {company_name}!"})
+    return JsonResponse({
+        'success': True,
+        'message': (
+            f"Candidate {candidate_name} forwarded to {company_name} and email notification sent."
+            if email_result.get('success')
+            else f"Candidate {candidate_name} forwarded to {company_name}; in-app notification saved, but email delivery failed."
+        ),
+        'email_sent': bool(email_result.get('success')),
+    })
 
 
 @csrf_exempt
@@ -1643,6 +1752,7 @@ def update_status_api(request):
             application.remarks_history = f"{application.remarks_history}\n{new_entry}"
         application.save()
 
+        email_result = {'success': False}
         try:
             cand_user = application.applicant.user if (application.applicant and application.applicant.user) else None
             company_name = (application.job.employer.company_name if application.job and application.job.employer else '') or 'MultiBiz'
@@ -1653,7 +1763,7 @@ def update_status_api(request):
                     message=f"Your application status for {application.job.title} at {company_name} was updated to {status.title()}.",
                     type='application'
                 )
-                send_application_status_update_email(
+                email_result = send_application_status_update_email(
                     to_email=cand_user.email,
                     applicant_name=f"{cand_user.first_name} {cand_user.last_name}".strip() or cand_user.email,
                     job_title=application.job.title,
@@ -1665,7 +1775,15 @@ def update_status_api(request):
             print(f"[Admin update_status_api Mailer] Error: {e}")
 
         log_audit_trail(request, admin_id, 'update_application_status', f"Updated application status for app #{app_id} to {status}", 'application', application.application_id, status)
-        return JsonResponse({'success': True, 'message': f'Status updated to {status.title()}'})
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f'Status updated to {status.title()} and email notification sent.'
+                if email_result.get('success')
+                else f'Status updated to {status.title()}; in-app notification saved, but email delivery failed.'
+            ),
+            'email_sent': bool(email_result.get('success')),
+        })
 
     return JsonResponse({'success': False, 'message': 'Invalid status'})
 
@@ -2857,7 +2975,13 @@ def messages_view(request):
                 inquiry.save()
 
                 log_audit_trail(request, admin_id, 'reply_contact_inquiry', f"Replied to contact inquiry from {inquiry.name} ({inquiry.email})", 'contact_inquiry', inquiry.id, inquiry.subject)
-                success_msg = f"Reply sent to {inquiry.name} ({inquiry.email})!"
+                if res.get('success'):
+                    success_msg = f"Reply sent to {inquiry.name} ({inquiry.email})!"
+                else:
+                    success_msg = (
+                        f"Reply saved for {inquiry.name}, but email delivery failed. "
+                        "Check the email service configuration and try again."
+                    )
 
         elif action == 'delete_inquiry':
             inq_id = request.POST.get('inquiry_id')
@@ -3236,7 +3360,11 @@ def contact_api_view(request):
         return JsonResponse({
             'success': True,
             'email_sent': email_res.get('success', False),
-            'message': 'Reply recorded and email sent!'
+            'message': (
+                'Reply recorded and email sent!'
+                if email_res.get('success')
+                else 'Reply recorded, but email delivery failed. Check the email service configuration and try again.'
+            ),
         })
 
     # 4. MARK READ / UNREAD

@@ -751,7 +751,7 @@ def apply_job_view(request, job_id=None):
             try:
                 applicant_name = f"{user.first_name} {user.last_name}".strip() or user.email
                 company_name = job.employer.company_name if (job.employer and job.employer.company_name) else (job.company_name or 'MultiBiz Employer')
-                send_application_submitted_email(
+                email_result = send_application_submitted_email(
                     to_email=user.email,
                     applicant_name=applicant_name,
                     job_title=job.title,
@@ -759,8 +759,10 @@ def apply_job_view(request, job_id=None):
                 )
             except Exception as e:
                 print(f"[Application Submit Mailer] Failed to dispatch email: {e}")
+                email_result = {'success': False}
 
-            return redirect('/applicant/applications.php?applied=success')
+            email_status = '' if email_result.get('success') else '&email_failed=1'
+            return redirect(f'/applicant/applications.php?applied=success{email_status}')
 
     resume_text = ResumeAnalysis.objects.filter(
         applicant=applicant
@@ -832,6 +834,7 @@ def applications_view(request):
             'reason': 'Uses a pre-trained sentence-transformer model; no admin-reviewed outcomes are required.',
         },
         'applied_success': request.GET.get('applied') == 'success',
+        'application_email_failed': request.GET.get('email_failed') == '1',
     }
     return render(request, 'applicant/applications.html', context)
 

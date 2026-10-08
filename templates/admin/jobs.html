@@ -312,7 +312,12 @@
     {% endif %}
     {% if rejected_success %}
         <div style="background:#fee2e2;border:1px solid #fecaca;color:#b91c1c;padding:0.9rem 1.25rem;border-radius:12px;margin-bottom:1.5rem;font-weight:600;display:flex;align-items:center;gap:0.6rem;">
-            <i class="fas fa-ban" style="font-size:1.1rem;"></i> Job request has been rejected. Feedback notification dispatched to employer.
+            <i class="fas fa-ban" style="font-size:1.1rem;"></i> Job request has been rejected. An in-app notification was saved for the employer.
+        </div>
+    {% endif %}
+    {% if email_failed %}
+        <div class="alert alert-warning" role="status">
+            The in-app notification was saved, but email delivery failed. Check the email service configuration and try again.
         </div>
     {% endif %}
 

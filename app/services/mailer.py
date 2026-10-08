@@ -1,7 +1,45 @@
 import datetime
 import html
-from django.core.mail import send_mail
+import logging
+
+from django.core.exceptions import ImproperlyConfigured
+from django.core.mail import send_mail as django_send_mail
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
+
+
+def send_mail(*args, **kwargs):
+    """Send an email and fail loudly if configuration or delivery is unsuccessful."""
+    recipients = kwargs.get('recipient_list', [])
+    kwargs['fail_silently'] = False
+
+    if not recipients:
+        raise ImproperlyConfigured('Email delivery requires at least one recipient.')
+
+    if settings.EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend':
+        missing_settings = [
+            name for name in (
+                'EMAIL_HOST',
+                'EMAIL_HOST_USER',
+                'EMAIL_HOST_PASSWORD',
+                'DEFAULT_FROM_EMAIL',
+            )
+            if not getattr(settings, name, '')
+        ]
+        if missing_settings:
+            raise ImproperlyConfigured(
+                'Email delivery requires these environment settings: '
+                + ', '.join(missing_settings)
+            )
+
+    sent_count = django_send_mail(*args, **kwargs)
+    if sent_count != len(recipients):
+        raise RuntimeError(
+            f'Email backend sent {sent_count} of {len(recipients)} messages.'
+        )
+    return sent_count
+
 
 def send_contact_reply(to_email: str, to_name: str, subject: str, body_text: str, original_message: str = '') -> dict:
     """
@@ -77,7 +115,7 @@ def send_contact_reply(to_email: str, to_name: str, subject: str, body_text: str
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[MultiBiz Mailer] Error sending email: {e}")
+        logger.exception("Contact reply email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -145,7 +183,7 @@ def send_otp_email(to_email: str, first_name: str, otp_code: str) -> dict:
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[OTP Mailer] Error sending OTP email: {e}")
+        logger.exception("OTP email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -191,7 +229,7 @@ def send_welcome_email(to_email: str, first_name: str) -> dict:
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Welcome Mailer] Error sending email: {e}")
+        logger.exception("Applicant welcome email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -243,7 +281,7 @@ def send_employer_welcome_email(to_email: str, first_name: str, company_name: st
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Employer Welcome Mailer] Error sending email: {e}")
+        logger.exception("Employer welcome email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -275,7 +313,7 @@ def send_application_submitted_email(to_email: str, applicant_name: str, job_tit
         <p style='margin:6px 0 0;color:#455a64;font-size:13px;'>Your resume and credentials have been received and are currently being reviewed by the hiring team.</p>
       </div>
       <p>We will notify you via email as soon as the employer updates your application status or schedules an interview.</p>
-      <p style='margin-top:24px;'>You can also track your real-time status anytime on your <a href='http://127.0.0.1:8000/applicant/applications.php' style='color:#1866a3;font-weight:600;'>Applicant Dashboard</a>.</p>
+      <p style='margin-top:24px;'>You can also track your real-time status anytime on your <a href='{settings.SITE_URL}/applicant/applications.php' style='color:#1866a3;font-weight:600;'>Applicant Dashboard</a>.</p>
       <p style='margin-top:24px;margin-bottom:0;'>Best regards,<br><strong>The MultiBiz Recruitment Team</strong></p>
     </div>
     <div style='padding:18px 32px;text-align:center;background:#f8f9fc;border-top:1px solid #e8eaf0;color:#999;font-size:12px;'>&copy; {year} {site_name}. All rights reserved.</div>
@@ -305,7 +343,7 @@ def send_application_submitted_email(to_email: str, applicant_name: str, job_tit
             return {'success': False, 'error': 'Email backend did not send a message.'}
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Application Submit Mailer] Error sending email: {e}")
+        logger.exception("Application submission email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -427,7 +465,7 @@ def send_application_status_update_email(to_email: str, applicant_name: str, job
       </div>
       {message_body}
       {remarks_block}
-      {'' if qualification_notice else "<p style='margin-top:24px;'>You can view full details on your <a href='http://127.0.0.1:8000/applicant/applications.php' style='color:#1866a3;font-weight:600;'>Applications Page</a>.</p>"}
+      {'' if qualification_notice else f"<p style='margin-top:24px;'>You can view full details on your <a href='{settings.SITE_URL}/applicant/applications.php' style='color:#1866a3;font-weight:600;'>Applications Page</a>.</p>"}
       <p style='margin-top:24px;margin-bottom:0;'>Best regards,<br><strong>The MultiBiz Recruitment Team</strong></p>
     </div>
     <div style='padding:18px 32px;text-align:center;background:#f8f9fc;border-top:1px solid #e8eaf0;color:#999;font-size:12px;'>&copy; {year} {site_name}. All rights reserved.</div>
@@ -456,7 +494,7 @@ def send_application_status_update_email(to_email: str, applicant_name: str, job
             return {'success': False, 'error': 'Email backend did not send a message.'}
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Status Update Mailer] Error sending email: {e}")
+        logger.exception("Application status email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -466,7 +504,7 @@ def send_talent_request_admin_notification(inquiry_id: int, company_name: str, c
     """
     site_name = 'MULTIBIZ INTERNATIONAL CORPORATION'
     year = datetime.date.today().year
-    admin_email = getattr(settings, 'EMAIL_HOST_USER', 'reccapinto8@gmail.com')
+    admin_email = settings.ADMIN_NOTIFICATION_EMAIL
 
     safe_company = html.escape(company_name or 'Company')
     safe_contact = html.escape(contact_name or 'Hiring Manager')
@@ -520,7 +558,7 @@ def send_talent_request_admin_notification(inquiry_id: int, company_name: str, c
       </div>
 
       <div style='text-align:center;margin:28px 0 10px;'>
-        <a href='http://127.0.0.1:8000/admin/messages.php?id={inquiry_id}' style='background:#1866a3;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;'>
+        <a href='{settings.SITE_URL}/admin/messages.php?id={inquiry_id}' style='background:#1866a3;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;'>
           Review &amp; Post Job in Admin
         </a>
       </div>
@@ -530,7 +568,7 @@ def send_talent_request_admin_notification(inquiry_id: int, company_name: str, c
 </body>
 </html>"""
 
-    plain_text = f"New Talent Request from {company_name} for position: {job_title}\n\nReview at: http://127.0.0.1:8000/admin/messages.php?id={inquiry_id}"
+    plain_text = f"New Talent Request from {company_name} for position: {job_title}\n\nReview at: {settings.SITE_URL}/admin/messages.php?id={inquiry_id}"
     try:
         send_mail(
             subject=subject,
@@ -538,11 +576,10 @@ def send_talent_request_admin_notification(inquiry_id: int, company_name: str, c
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[admin_email],
             html_message=html_content,
-            fail_silently=True
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Talent Request Mailer] Error sending admin notification: {e}")
+        logger.exception("Talent request admin email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -589,11 +626,10 @@ def send_talent_request_employer_confirmation(to_email: str, company_name: str, 
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[to_email],
             html_message=html_content,
-            fail_silently=True
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Talent Request Mailer] Error sending employer confirmation: {e}")
+        logger.exception("Talent request confirmation email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -631,7 +667,7 @@ def send_job_posted_live_notification(to_email: str, company_name: str, contact_
       <p>Applicants can now discover and apply for this opening. You can monitor incoming applicants and review AI candidate rankings directly from your Employer Portal.</p>
 
       <div style='text-align:center;margin:28px 0 10px;'>
-        <a href='http://127.0.0.1:8000/employer/jobs.php' style='background:#1866a3;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;'>
+        <a href='{settings.SITE_URL}/employer/jobs.php' style='background:#1866a3;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;'>
           View Job in Employer Portal
         </a>
       </div>
@@ -643,7 +679,7 @@ def send_job_posted_live_notification(to_email: str, company_name: str, contact_
 </body>
 </html>"""
 
-    plain_text = f"Hello {contact_name},\n\nYour job {job_title} has been reviewed and posted live by MultiBiz Admin!\n\nView at: http://127.0.0.1:8000/employer/jobs.php\n\nBest regards,\nMultiBiz Team"
+    plain_text = f"Hello {contact_name},\n\nYour job {job_title} has been reviewed and posted live by MultiBiz Admin!\n\nView at: {settings.SITE_URL}/employer/jobs.php\n\nBest regards,\nMultiBiz Team"
     try:
         send_mail(
             subject=subject,
@@ -651,11 +687,10 @@ def send_job_posted_live_notification(to_email: str, company_name: str, contact_
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[to_email],
             html_message=html_content,
-            fail_silently=True
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Job Live Mailer] Error sending live notification: {e}")
+        logger.exception("Job published email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -765,7 +800,7 @@ def send_interview_scheduled_email(
             {notes_block}
 
             <p style="margin:24px 0 0;font-size:13px;color:#64748b;line-height:1.6;">
-              You can also view this interview schedule and manage your application anytime inside your <a href="http://127.0.0.1:8000/applicant/dashboard/" style="color:#0284c7;font-weight:600;">Applicant Dashboard</a>.
+              You can also view this interview schedule and manage your application anytime inside your <a href="{settings.SITE_URL}/applicant/dashboard.php" style="color:#0284c7;font-weight:600;">Applicant Dashboard</a>.
             </p>
 
             <p style="margin-top:24px;margin-bottom:0;color:#334155;font-size:14px;">Best of luck with your interview!<br><strong>The MultiBiz Talent Team</strong></p>
@@ -806,11 +841,10 @@ MultiBiz Team"""
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[to_email],
             html_message=html_content,
-            fail_silently=True
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Interview Mailer] Error: {e}")
+        logger.exception("Interview email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -864,11 +898,10 @@ def send_job_request_rejected_notification(to_email: str, company_name: str, con
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[to_email],
             html_message=html_content,
-            fail_silently=True
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Job Rejection Mailer] Error: {e}")
+        logger.exception("Job rejection email failed.")
         return {'success': False, 'error': str(e)}
 
 
@@ -921,7 +954,7 @@ def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str,
       <p style="font-size:13.5px;color:#4b5563;">You can now review their complete resume dossier, mark them as Qualified/Not Qualified, or schedule an interview directly from your Employer Portal.</p>
 
       <div style='text-align:center;margin:26px 0 10px;'>
-        <a href='http://127.0.0.1:8000/employer/candidates/' style='background:#0284c7;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;'>
+        <a href='{settings.SITE_URL}/employer/candidates.php' style='background:#0284c7;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;'>
           Review Candidate in Portal
         </a>
       </div>
@@ -941,9 +974,8 @@ def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[to_email],
             html_message=html_content,
-            fail_silently=True
         )
         return {'success': True, 'error': None}
     except Exception as e:
-        print(f"[Candidate Forwarded Mailer] Error: {e}")
+        logger.exception("Forwarded candidate email failed.")
         return {'success': False, 'error': str(e)}

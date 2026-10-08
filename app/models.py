@@ -221,6 +221,9 @@ class Message(models.Model):
 
     class Meta:
         db_table = 'messages'
+        indexes = [
+            models.Index(fields=['receiver', 'is_read'], name='msg_receiver_read_idx'),
+        ]
 
 
 class Notification(models.Model):
@@ -384,6 +387,9 @@ class ContactInquiry(models.Model):
 
     class Meta:
         db_table = 'contact_inquiries'
+        indexes = [
+            models.Index(fields=['is_read'], name='inquiry_read_idx'),
+        ]
 
 
 class ContactReply(models.Model):

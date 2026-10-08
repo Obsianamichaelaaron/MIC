@@ -630,6 +630,11 @@
                 <div>Your application was submitted successfully! The employer will review it soon.</div>
             </div>
         {% endif %}
+        {% if application_email_failed %}
+            <div class="alert-warning" role="status">
+                Your application is available here, but we could not send the confirmation email. Please verify your email address and try again later.
+            </div>
+        {% endif %}
 
         <!-- ── Toolbar: Count & Status Filters ── -->
         <div class="apps-toolbar">

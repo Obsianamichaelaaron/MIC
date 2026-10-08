@@ -323,25 +323,32 @@ def post_job_view(request):
                 'requirements': requirements,
                 'special_notes': special_notes,
             }
+            email_results = []
             try:
-                send_talent_request_admin_notification(
+                email_results.append(send_talent_request_admin_notification(
                     inquiry_id=job.job_id,
                     company_name=job_specs['company_name'],
                     contact_name=user.full_name or employer.company_name,
                     contact_email=user.email,
                     job_title=title,
                     job_specs=job_specs
-                )
-                send_talent_request_employer_confirmation(
+                ))
+                email_results.append(send_talent_request_employer_confirmation(
                     to_email=user.email,
                     company_name=job_specs['company_name'],
                     contact_name=user.first_name or employer.company_name,
                     job_title=title
-                )
+                ))
             except Exception as e:
                 print(f"[Job Request Mailer] Error: {e}")
+                email_results.append({'success': False})
 
-            return redirect('/employer/jobs.php?submitted=success')
+            email_status = (
+                '' if len(email_results) == 2
+                and all(result.get('success') for result in email_results)
+                else '&email_failed=1'
+            )
+            return redirect(f'/employer/jobs.php?submitted=success{email_status}')
 
     qualifications = Qualification.objects.filter(status='active').order_by('name')
 
@@ -428,6 +435,7 @@ def jobs_view(request):
         'rejected_count': rejected_count,
         'closed_count': closed_count,
         'submitted_success': request.GET.get('submitted') == 'success',
+        'email_failed': request.GET.get('email_failed') == '1',
         'posted_success': request.GET.get('posted') == 'success',
         'updated_success': request.GET.get('updated') == 'success',
     }
@@ -832,7 +840,7 @@ def view_candidate_view(request, application_id=None):
 
                 # Send email update
                 try:
-                    send_application_status_update_email(
+                    email_result = send_application_status_update_email(
                         to_email=candidate_user.email,
                         applicant_name=candidate_user.full_name or candidate_user.email,
                         job_title=job.title,
@@ -842,6 +850,7 @@ def view_candidate_view(request, application_id=None):
                     )
                 except Exception as e:
                     print(f"[Employer Status Update Mailer] Error: {e}")
+                    email_result = {'success': False}
 
                 if new_status == 'hired':
                     applicant_name = candidate_user.full_name or candidate_user.email
@@ -851,7 +860,12 @@ def view_candidate_view(request, application_id=None):
                     )
                     return redirect('employer_dashboard')
 
-                success_msg = f"Candidate moved to '{status_label}' successfully!"
+                email_status = (
+                    f"Email sent to {candidate_user.email}."
+                    if email_result.get('success')
+                    else "The applicant has an in-app notification, but email delivery failed."
+                )
+                success_msg = f"Candidate moved to '{status_label}' successfully! {email_status}"
 
         elif action == 'schedule_interview':
             interview_date = request.POST.get('interview_date', '').strip()
@@ -920,7 +934,7 @@ def view_candidate_view(request, application_id=None):
 
                 # Send Automated Email with Complete Details to Applicant
                 try:
-                    send_interview_scheduled_email(
+                    email_result = send_interview_scheduled_email(
                         to_email=candidate_user.email,
                         applicant_name=candidate_user.full_name or candidate_user.email,
                         company_name=employer.company_name or 'Employer',
@@ -935,8 +949,14 @@ def view_candidate_view(request, application_id=None):
                     )
                 except Exception as e:
                     print(f"[Interview Scheduled Mailer] Error: {e}")
+                    email_result = {'success': False}
 
-                success_msg = f"Interview successfully scheduled for {interview_date} at {formatted_time}! Invitation email sent to {candidate_user.email}."
+                email_status = (
+                    f"Invitation email sent to {candidate_user.email}."
+                    if email_result.get('success')
+                    else "The applicant has an in-app notification, but email delivery failed."
+                )
+                success_msg = f"Interview successfully scheduled for {interview_date} at {formatted_time}! {email_status}"
 
         elif action == 'submit_feedback':
             feedback_text = request.POST.get('feedback_text', '').strip()
@@ -1046,6 +1066,7 @@ def update_status_api(request):
 
         # In-App Notification and Email
         cand_user = application.applicant.user if (application.applicant and application.applicant.user) else None
+        email_result = {'success': False}
         if cand_user:
             _notify_applicant_for_employer_application(
                 application,
@@ -1063,8 +1084,18 @@ def update_status_api(request):
                 )
             except Exception as e:
                 print(f"[update_status_api Mailer] Error: {e}")
+                email_result = {'success': False}
 
-        return JsonResponse({'success': True, 'message': f'Status updated to {status_label}', 'new_status': status})
+        return JsonResponse({
+            'success': True,
+            'message': (
+                f'Status updated to {status_label}.'
+                if email_result.get('success')
+                else f'Status updated to {status_label}; in-app notification sent, but email delivery failed.'
+            ),
+            'email_sent': bool(email_result.get('success')),
+            'new_status': status,
+        })
 
     return JsonResponse({'success': False, 'message': 'Invalid status'})
 
@@ -1132,7 +1163,7 @@ def schedule_interview_api(request):
     )
 
     try:
-        send_interview_scheduled_email(
+        email_result = send_interview_scheduled_email(
             to_email=candidate_user.email,
             applicant_name=candidate_user.full_name or candidate_user.email,
             company_name=employer.company_name or 'Employer',

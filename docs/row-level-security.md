@@ -71,6 +71,16 @@ variables. Never commit these values. `DJANGO_SECRET_KEY` is required at
 startup; SMTP password is required for email delivery. The Supabase service
 role key is server-only and must never be sent to a browser.
 
+Configure email delivery with `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USE_TLS`,
+`EMAIL_USE_SSL`, `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, and
+`DEFAULT_FROM_EMAIL`. For Gmail, use an app password for
+`EMAIL_HOST_PASSWORD`; an ordinary account password will not authenticate.
+`EMAIL_USE_TLS` and `EMAIL_USE_SSL` cannot both be enabled. Set
+`ADMIN_NOTIFICATION_EMAIL` to the mailbox that should receive admin alerts
+and `SITE_URL` to the public HTTPS site URL used in notification links.
+Email send failures are logged and returned as failures; notifications must
+not be reported as email-delivered unless the backend confirms delivery.
+
 Create a private Supabase Storage bucket named `private-resumes` (or configure
 `RESUME_STORAGE_BUCKET` to another private bucket). Applicant resume uploads
 are staged temporarily and then persisted to that bucket. Resume downloads use

@@ -200,6 +200,61 @@ class MultiBizConversionTests(TestCase):
         self.assertIn('35%', mail.outbox[0].body)
         self.assertNotIn('Applications Page', mail.outbox[0].alternatives[0][0])
 
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_email_helpers_report_backend_zero_delivery_as_failure(self):
+        with patch('app.services.mailer.django_send_mail', return_value=0):
+            result = send_application_status_update_email(
+                to_email=self.applicant_user.email,
+                applicant_name='Job Seeker',
+                job_title=self.job.title,
+                company_name=self.employer.company_name,
+                new_status='qualified',
+            )
+
+        self.assertFalse(result['success'])
+        self.assertIn('sent 0 of 1', result['error'])
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.smtp.EmailBackend',
+        EMAIL_HOST_USER='',
+        EMAIL_HOST_PASSWORD='',
+    )
+    def test_email_helpers_explain_missing_smtp_credentials(self):
+        result = send_application_status_update_email(
+            to_email=self.applicant_user.email,
+            applicant_name='Job Seeker',
+            job_title=self.job.title,
+            company_name=self.employer.company_name,
+            new_status='qualified',
+        )
+
+        self.assertFalse(result['success'])
+        self.assertIn('EMAIL_HOST_USER', result['error'])
+        self.assertIn('EMAIL_HOST_PASSWORD', result['error'])
+
+    @patch(
+        'app.views.views_admin.send_job_posted_live_notification',
+        return_value={'success': True, 'error': None},
+    )
+    def test_admin_publish_action_dispatches_employer_email(self, send_email):
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.post(
+            '/admin/job_request_action/',
+            {'job_id': self.job.job_id, 'action': 'post_live'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['email_sent'])
+        send_email.assert_called_once()
+        self.assertEqual(
+            send_email.call_args.kwargs['to_email'],
+            self.employer_user.email,
+        )
+
     def test_password_verification(self):
         """Test password verification with bcrypt compatible with PHP"""
         self.assertTrue(verify_password('admin123', self.admin_user.password))
