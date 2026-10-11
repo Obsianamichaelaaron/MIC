@@ -29,6 +29,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'app.middleware.PostgreSQLRLSMiddleware',
     # Timing (local dev only - no-op when DEBUG=False)
     'app.timing_middleware.RequestTimingMiddleware',
     'django.middleware.security.SecurityMiddleware',
@@ -74,14 +75,105 @@ TEMPLATES = [
 WSGI_APPLICATION = 'multibiz.wsgi.application'
 ASGI_APPLICATION = 'multibiz.asgi.application'
 
-# Database - SQLite (simple, no server needed)
-# To switch to PostgreSQL later just set DATABASE_URL in your .env
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+# Use the restricted PostgreSQL role for web requests and the privileged
+# DATABASE_URL for management commands. Keep SQLite for local development.
+database_url = os.environ.get('DATABASE_URL')
+if os.environ.get('VERCEL') == '1' and not database_url:
+    raise RuntimeError('DATABASE_URL must be configured for the Vercel runtime.')
+
+RLS_CONTEXT_SECRET = os.environ.get('RLS_CONTEXT_SECRET', '')
+RLS_DATABASE_ROLE = 'mic_app_rls'
+SUPABASE_URL = os.environ.get('SUPABASE_URL', '').rstrip('/')
+SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
+RESUME_STORAGE_BUCKET = os.environ.get(
+    'RESUME_STORAGE_BUCKET',
+    'private-resumes',
+)
+PROFILE_PICTURE_STORAGE_BUCKET = os.environ.get(
+    'PROFILE_PICTURE_STORAGE_BUCKET',
+    'public-profile-pictures',
+)
+rls_management_commands = {
+    'migrate',
+    'makemigrations',
+    'showmigrations',
+    'test',
+    'check',
+    'dbshell',
+    'dumpdata',
+    'loaddata',
+    'shell',
+    'createsuperuser',
+    'inspectdb',
 }
+is_rls_management_command = (
+    len(sys.argv) > 1 and sys.argv[1] in rls_management_commands
+)
+if (
+    len(sys.argv) > 1
+    and sys.argv[1] == 'test'
+    and not RLS_CONTEXT_SECRET
+):
+    RLS_CONTEXT_SECRET = secrets.token_hex(32)
+    os.environ['RLS_CONTEXT_SECRET'] = RLS_CONTEXT_SECRET
+
+if database_url and not is_rls_management_command:
+    rls_database_url = os.environ.get('RLS_DATABASE_URL')
+    if not rls_database_url:
+        raise RuntimeError(
+            'RLS_DATABASE_URL must point to a dedicated non-bypass PostgreSQL '
+            'login for the web runtime. DATABASE_URL is reserved for privileged '
+            'management commands.'
+        )
+    if len(RLS_CONTEXT_SECRET) < 32:
+        raise RuntimeError(
+            'RLS_CONTEXT_SECRET must be configured with at least 32 characters '
+            'for PostgreSQL web requests.'
+        )
+
+    import dj_database_url
+
+    DATABASES = {
+        'default': dj_database_url.parse(
+            rls_database_url,
+            conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '600')),
+            conn_health_checks=True,
+            ssl_require=True,
+        )
+    }
+    RLS_USE_RESTRICTED_ROLE = True
+elif database_url:
+    import dj_database_url
+
+    DATABASES = {
+        'default': dj_database_url.parse(
+            database_url,
+            conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '600')),
+            conn_health_checks=True,
+            ssl_require=True,
+        )
+    }
+    RLS_USE_RESTRICTED_ROLE = False
+elif os.environ.get('VERCEL') == '1':
+    raise RuntimeError('DATABASE_URL must be configured for the Vercel runtime.')
+else:
+    RLS_USE_RESTRICTED_ROLE = False
+    db_path = BASE_DIR / 'db.sqlite3'
+    if 'VERCEL' in os.environ:
+        import shutil
+
+        tmp_db = '/tmp/db.sqlite3'
+        if not os.path.exists(tmp_db) and os.path.exists(db_path):
+            shutil.copyfile(str(db_path), tmp_db)
+        if os.path.exists(tmp_db):
+            db_path = Path(tmp_db)
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': db_path,
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -159,7 +251,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ── Caching ──────────────────────────────────────────────────────────────────
 CACHE_DIR = BASE_DIR / '.django_cache'
 CACHE_BACKEND = os.environ.get('CACHE_BACKEND', 'django.core.cache.backends.filebased.FileBasedCache')
-CACHE_LOCATION = os.environ.get('CACHE_LOCATION', str(CACHE_DIR))
+CACHE_LOCATION = os.environ.get(
+    'CACHE_LOCATION',
+    '/tmp/django_cache' if os.environ.get('VERCEL') == '1' else str(CACHE_DIR),
+)
 CACHES = {
     'default': {
         'BACKEND': CACHE_BACKEND,
