@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title }}</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- DNS prefetch & preconnect for external resources -->
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
     <link rel="stylesheet" href="/static/css/typography.css">
     <style>
         * { box-sizing: border-box; }
@@ -73,7 +78,7 @@
                 {% for news in news_articles %}
                     <article class="card">
                         {% if news.image_path %}
-                            <img class="card-image" src="{{ news.image_path }}" alt="{{ news.title }}">
+                            <img class="card-image" src="{{ news.image_path }}" alt="{{ news.title }}" width="400" height="190" loading="lazy" decoding="async">
                         {% endif %}
                         <div class="card-body">
                             {% if news.category %}<div class="category">{{ news.category }}</div>{% endif %}

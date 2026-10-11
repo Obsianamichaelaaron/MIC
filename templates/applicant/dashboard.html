@@ -790,7 +790,7 @@
                                         </div>
                                         <div class="d-flex flex-column align-items-end gap-1">
                                             {% if item.match_score != None %}
-                                                <span class="portal-match" title="Pre-trained semantic relevance; not a probability of being hired"><i class="fas fa-brain"></i> {{ item.match_score|floatformat:0 }}% AI relevance</span>
+                                                <span class="portal-match" title="Candidate match score: {{ item.match_score|floatformat:0 }}%"><i class="{% if item.match_score_type == 'semantic_model' %}fas fa-brain{% else %}fas fa-bullseye{% endif %}"></i> {{ item.match_score|floatformat:0 }}% Match</span>
                                             {% else %}
                                                 <span class="portal-match" title="{{ item.match_reason }}">{{ item.match_reason|default:"Estimate unavailable" }}</span>
                                             {% endif %}
@@ -816,11 +816,11 @@
                                     <i class="fas fa-sparkles"></i>
                                 </div>
                                 <h3 style="font-size: 1rem; font-weight: 700; color: #1e293b; margin-bottom: 0.3rem;">
-                                    {% if not chatbot_completed %}Unlock Personalized AI Job Matches{% else %}No active 40%+ match listings yet{% endif %}
+                                    {% if not profile_is_complete %}Complete Your Profile to Unlock AI Job Matches{% else %}No active 40%+ match listings yet{% endif %}
                                 </h3>
                                 <p style="font-size: 0.8rem; color: #64748b; max-width: 440px; margin: 0 auto 1rem; line-height: 1.5;">
-                                    {% if not chatbot_completed %}
-                                        Complete your conversational career quiz or add tech skills to your profile so our AI ranking engine can curate high-affinity jobs for you.
+                                    {% if not profile_is_complete %}
+                                        Upload a matching resume and complete your profile information to see personalized job matches.
                                     {% else %}
                                         Update your profile skills and experience to expand your recommendation reach.
                                     {% endif %}
@@ -859,10 +859,10 @@
                                             <small class="text-muted"><i class="fas fa-building"></i> {{ app.job.employer.company_name|default:"MultiBiz Partner" }}</small>
                                         </td>
                                         <td>
-                                            {% if app.match_score != None %}
+                                            {% if profile_is_complete and app.match_score != None %}
                                                 <span class="portal-match" title="Pre-trained semantic relevance; not a probability of being hired" style="padding: 0.15rem 0.45rem; font-size: 0.68rem;">{{ app.match_score|floatformat:0 }}% AI relevance</span>
                                             {% else %}
-                                                <span class="portal-match text-muted" style="padding: 0.15rem 0.45rem; font-size: 0.68rem;">Estimate unavailable</span>
+                                                <span class="portal-match text-muted" style="padding: 0.15rem 0.45rem; font-size: 0.68rem;">{% if profile_is_complete %}Estimate unavailable{% else %}Complete profile to view{% endif %}</span>
                                             {% endif %}
                                         </td>
                                         <td>

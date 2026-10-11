@@ -633,9 +633,49 @@
         }
 
         /* ── Avatar Dropdown Styles ─────────────────────────────────── */
+        .navbar-account-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+
+        .applicant-notification-link {
+            position: relative;
+            width: 40px;
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            color: var(--nav-link);
+            text-decoration: none;
+            transition: background 0.2s, color 0.2s;
+        }
+        .applicant-notification-link:hover,
+        .applicant-notification-link.active {
+            color: #1d4ed8;
+            background: #eff6ff;
+        }
+        .applicant-notification-link > i { font-size: 1.1rem; }
+        .applicant-notification-badge {
+            position: absolute;
+            top: 0;
+            right: 0;
+            min-width: 17px;
+            padding: 0 4px;
+            border-radius: 999px;
+            background: #ef4444;
+            color: #fff;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 17px;
+            text-align: center;
+        }
+
         .ud-wrapper {
             position: relative;
-            margin-left: auto;
             flex-shrink: 0;
         }
 
@@ -925,7 +965,7 @@
 
         @media (max-width: 768px) {
             .dm-toggle { margin-right: 4px; }
-            .ud-wrapper { margin-left: 0; order: 3; }
+            .navbar-account-actions { order: 3; }
             .ud-dropdown { right: -5px; width: 220px; }
         }
         @media (max-width: 480px) {
@@ -941,6 +981,7 @@
         .navbar-brand img { height: 38px !important; }
         .navbar-menu { gap: .35rem; margin-left: 1.25rem; margin-right: 1.25rem; }
         .navbar-menu a { padding: .5rem .85rem; font-size: .88rem; }
+        .navbar-account-actions { flex-shrink: 0; }
         .ud-wrapper { flex-shrink: 0; }
         @media (max-width: 768px) {
             .navbar { padding: .65rem 1rem; }
@@ -992,9 +1033,6 @@
                     <a href="/applicant/applications.php" class="{% if current_page == 'applications.php' %}active{% endif %}">
                         <i class="fas fa-file-alt"></i> <span>Applications</span>
                     </a>
-                    <a href="/applicant/chat.php" class="{% if current_page == 'chat.php' %}active{% endif %}">
-                        <i class="fas fa-comments"></i> <span>Messages</span>
-                    </a>
                 {% elif current_role == 'employer' %}
                     <a href="/employer/dashboard.php" class="{% if current_page == 'dashboard.php' %}active{% endif %}">
                         <i class="fas fa-home"></i> <span>Dashboard</span>
@@ -1011,9 +1049,6 @@
                     <a href="/employer/recommended_candidates.php" class="{% if current_page == 'recommended_candidates.php' %}active{% endif %}">
                         <i class="fas fa-wand-magic-sparkles"></i> <span>Recommended</span>
                     </a>
-                    <a href="/employer/chat.php" class="{% if current_page == 'chat.php' %}active{% endif %}">
-                        <i class="fas fa-comments"></i> <span>Messages</span>
-                    </a>
                 {% elif current_role == 'admin' %}
                     <a href="/admin/dashboard.php" class="{% if current_page == 'dashboard.php' %}active{% endif %}">
                         <i class="fas fa-chart-line"></i> <span>Dashboard</span>
@@ -1027,24 +1062,8 @@
                     <a href="/admin/candidates.php" class="{% if current_page == 'candidates.php' %}active{% endif %}">
                         <i class="fas fa-users-viewfinder"></i> <span>Candidates</span>
                     </a>
-                    <a href="/admin/users.php" class="{% if current_page == 'users.php' %}active{% endif %}">
-                        <i class="fas fa-users-cog"></i> <span>Users</span>
-                    </a>
-                    <a href="/admin/analytics.php" class="{% if current_page == 'analytics.php' %}active{% endif %}">
-                        <i class="fas fa-chart-bar"></i> <span>Analytics</span>
-                    </a>
                     <a href="/admin/cms.php" class="{% if current_page == 'cms.php' %}active{% endif %}">
                         <i class="fas fa-edit"></i> <span>CMS</span>
-                    </a>
-                    <a href="/admin/messages.php" class="{% if current_page == 'messages.php' %}active{% endif %}" style="position:relative;">
-                        <i class="fas fa-envelope"></i> <span>Inquiries</span>
-                        {% if unread_inquiries_count > 0 %}
-                            <span style="position:absolute;top:-4px;right:-6px;background:#ef4444;color:white;
-                                         border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;
-                                         min-width:16px;text-align:center;line-height:16px;">
-                                {{ unread_inquiries_count }}
-                            </span>
-                        {% endif %}
                     </a>
                 {% else %}
                     <a href="/{{ current_role }}/dashboard.php" class="{% if current_page == 'dashboard.php' %}active{% endif %}">
@@ -1054,7 +1073,27 @@
             {% endif %}
         </div>
 
-        <!-- User Avatar Dropdown -->
+        <!-- Applicant Notifications and User Avatar -->
+        <div class="navbar-account-actions">
+            {% if current_role == 'applicant' %}
+                <a href="/applicant/notifications/" class="applicant-notification-link{% if current_page == 'notifications.php' %} active{% endif %}" aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}" title="Notifications">
+                    <i class="fas fa-bell" aria-hidden="true"></i>
+                    {% if unread_notification_count > 0 %}
+                        <span class="applicant-notification-badge">
+                            {% if unread_notification_count > 99 %}99+{% else %}{{ unread_notification_count }}{% endif %}
+                        </span>
+                    {% endif %}
+                </a>
+            {% elif current_role == 'admin' %}
+                <a href="/admin/notifications/" class="applicant-notification-link{% if current_page == 'notifications.php' %} active{% endif %}" aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}" title="Notifications">
+                    <i class="fas fa-bell" aria-hidden="true"></i>
+                    {% if unread_notification_count > 0 %}
+                        <span class="applicant-notification-badge">
+                            {% if unread_notification_count > 99 %}99+{% else %}{{ unread_notification_count }}{% endif %}
+                        </span>
+                    {% endif %}
+                </a>
+            {% endif %}
         <div class="ud-wrapper" id="udWrapper">
             <button class="ud-trigger" id="udTrigger" aria-haspopup="true" aria-expanded="false">
                 <span class="ud-avatar" id="udAvatar">
@@ -1105,6 +1144,18 @@
                     <span class="ud-item-icon"><i class="fas fa-users-viewfinder"></i></span>
                     <span>Candidates Pipeline</span>
                 </a>
+                <a href="/admin/users.php" class="ud-item" role="menuitem">
+                    <span class="ud-item-icon"><i class="fas fa-users-cog"></i></span>
+                    <span>Users</span>
+                </a>
+                <a href="/admin/analytics.php" class="ud-item" role="menuitem">
+                    <span class="ud-item-icon"><i class="fas fa-chart-bar"></i></span>
+                    <span>Analytics</span>
+                </a>
+                <a href="/admin/messages.php" class="ud-item" role="menuitem" style="position:relative;">
+                    <span class="ud-item-icon"><i class="fas fa-envelope"></i></span>
+                    <span>Inquiries{% if unread_inquiries_count > 0 %} ({{ unread_inquiries_count }}){% endif %}</span>
+                </a>
                 {% endif %}
                 <a href="/{{ current_role }}/chat.php" class="ud-item" role="menuitem">
                     <span class="ud-item-icon"><i class="fas fa-comments"></i></span>
@@ -1119,8 +1170,25 @@
                 </a>
             </div>
         </div>
+        </div>
 
     </nav>
+
+    {% if current_role == 'admin' %}
+    <div id="adminApplicationToast" role="status" aria-live="polite" aria-atomic="true" hidden
+         style="display:none;position:fixed;top:5.5rem;right:1rem;z-index:20000;width:min(390px,calc(100vw - 2rem));padding:1rem 1.1rem;background:#fff;border:1px solid #dbe4ef;border-left:4px solid #0284c7;border-radius:12px;box-shadow:0 12px 35px rgba(15,23,42,.2);">
+        <div style="display:flex;align-items:flex-start;gap:.75rem;">
+            <i class="fas fa-bell" aria-hidden="true" style="color:#0284c7;margin-top:.2rem;"></i>
+            <div style="flex:1;min-width:0;">
+                <strong id="adminApplicationToastTitle" style="display:block;color:#0f172a;font-size:.92rem;">New applicant</strong>
+                <span id="adminApplicationToastMessage" style="display:block;color:#475569;font-size:.84rem;margin-top:.2rem;"></span>
+                <a href="/admin/notifications/" style="display:inline-block;color:#0369a1;font-size:.8rem;font-weight:700;margin-top:.5rem;">View notifications</a>
+            </div>
+            <button type="button" id="adminApplicationToastClose" aria-label="Dismiss notification"
+                    style="border:0;background:transparent;color:#64748b;font-size:1.1rem;line-height:1;cursor:pointer;padding:.1rem;">&times;</button>
+        </div>
+    </div>
+    {% endif %}
 
     <script>
     // Mobile Menu Toggle
@@ -1218,4 +1286,100 @@
             initDropdown();
         }
     })();
+
+    {% if current_role == 'admin' %}
+    (function() {
+        var toast = document.getElementById('adminApplicationToast');
+        var toastTitle = document.getElementById('adminApplicationToastTitle');
+        var toastMessage = document.getElementById('adminApplicationToastMessage');
+        var closeButton = document.getElementById('adminApplicationToastClose');
+        var notificationBell = document.querySelector('.navbar-account-actions a[href="/admin/notifications/"]');
+        if (!toast || !toastTitle || !toastMessage) return;
+
+        var requestPending = false;
+        var hideTimer = null;
+        function showToast(title, message) {
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+            toast.hidden = false;
+            toast.style.display = 'block';
+            if (hideTimer) window.clearTimeout(hideTimer);
+            hideTimer = window.setTimeout(function() {
+                toast.hidden = true;
+                toast.style.display = 'none';
+            }, 9000);
+        }
+
+        if (closeButton) {
+            closeButton.addEventListener('click', function() {
+                toast.hidden = true;
+                toast.style.display = 'none';
+                if (hideTimer) window.clearTimeout(hideTimer);
+            });
+        }
+
+        async function checkApplicationNotifications() {
+            if (requestPending || document.hidden) return;
+            requestPending = true;
+            try {
+                var response = await fetch('/admin/notifications/?poll=applications', {
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!response.ok) {
+                    throw new Error('Admin application notification check failed: ' + response.status);
+                }
+                var data = await response.json();
+                if (!Array.isArray(data.notifications) ||
+                    !Number.isInteger(data.unread_notification_count)) {
+                    throw new Error('Admin application notification response is invalid.');
+                }
+
+                var badge = notificationBell
+                    ? notificationBell.querySelector('.applicant-notification-badge')
+                    : null;
+                if (data.unread_notification_count > 0) {
+                    if (!badge && notificationBell) {
+                        badge = document.createElement('span');
+                        badge.className = 'applicant-notification-badge';
+                        notificationBell.appendChild(badge);
+                    }
+                    if (badge) {
+                        badge.textContent = data.unread_notification_count > 99
+                            ? '99+'
+                            : String(data.unread_notification_count);
+                    }
+                    if (notificationBell) {
+                        notificationBell.setAttribute(
+                            'aria-label',
+                            'Notifications, ' + data.unread_notification_count + ' unread'
+                        );
+                    }
+                } else {
+                    if (badge) badge.remove();
+                    if (notificationBell) notificationBell.setAttribute('aria-label', 'Notifications');
+                }
+
+                if (data.notifications.length) {
+                    var latestNotification = data.notifications[data.notifications.length - 1];
+                    var title = data.notifications.length > 1
+                        ? data.notifications.length + ' new applicants applied'
+                        : latestNotification.title;
+                    showToast(title, latestNotification.message);
+                }
+            } catch (error) {
+                console.error(error);
+            } finally {
+                requestPending = false;
+            }
+        }
+
+        checkApplicationNotifications();
+        window.setInterval(checkApplicationNotifications, 15000);
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) checkApplicationNotifications();
+        });
+    })();
+    {% endif %}
     </script>

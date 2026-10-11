@@ -1,0 +1,241 @@
+{% include 'includes/header.html' %}
+
+<style>
+.notifications-page {
+    min-height: 100vh;
+    padding-bottom: 4rem;
+    background: #c7d1dd;
+    color: #1a1a2e;
+    font-family: 'DM Sans', sans-serif;
+}
+.notifications-hero {
+    position: relative;
+    overflow: hidden;
+    padding: 2.25rem 1rem 3.8rem;
+    background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 55%, #2196f3 100%);
+    color: #fff;
+}
+.notifications-hero::before {
+    position: absolute;
+    inset: 0;
+    background: url('/static/images/bg.webp') center/cover no-repeat;
+    content: '';
+    opacity: .18;
+}
+.notifications-hero::after {
+    position: absolute;
+    right: 0;
+    bottom: -2px;
+    left: 0;
+    height: 48px;
+    background: #c7d1dd;
+    clip-path: ellipse(55% 100% at 50% 100%);
+    content: '';
+}
+.notifications-hero-inner {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    text-align: center;
+}
+.notifications-hero h1 {
+    margin: 0 0 .35rem;
+    color: #fff;
+    font-family: 'DM Serif Display', Georgia, serif;
+    font-size: 2rem;
+    font-weight: 400;
+}
+.notifications-hero p {
+    margin: 0;
+    color: rgba(255, 255, 255, .85);
+    font-size: .92rem;
+}
+.notifications-shell {
+    position: relative;
+    z-index: 2;
+    max-width: 1000px;
+    margin: -1.5rem auto 0;
+    padding: 0 1.25rem;
+}
+.notifications-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 2px 16px rgba(0, 0, 0, .06);
+}
+.notifications-count {
+    margin: 0;
+    color: #1a1a2e;
+    font-size: 1rem;
+    font-weight: 700;
+}
+.notifications-count span {
+    color: #687386;
+    font-size: .8rem;
+    font-weight: 500;
+}
+.notifications-mark-all,
+.notification-mark-read {
+    border: 1px solid #1866a3;
+    border-radius: 8px;
+    background: #1866a3;
+    color: #fff;
+    font: inherit;
+    font-size: .78rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.notifications-mark-all { padding: .62rem .9rem; }
+.notifications-list { display: grid; gap: .75rem; }
+.notification-card {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.15rem;
+    border: 1px solid #dbe3ec;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, .05);
+}
+.notification-card.unread {
+    border-left: 4px solid #1866a3;
+}
+.notification-copy { min-width: 0; }
+.notification-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin: 0;
+    color: #1a1a2e;
+    font-size: .95rem;
+    font-weight: 700;
+}
+.notification-new {
+    padding: .14rem .4rem;
+    border-radius: 999px;
+    background: #e8f0fe;
+    color: #1866a3;
+    font-size: .62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+.notification-message {
+    margin: .4rem 0;
+    color: #526174;
+    font-size: .84rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+.notification-date {
+    color: #687386;
+    font-size: .73rem;
+}
+.notification-mark-read {
+    flex-shrink: 0;
+    padding: .45rem .65rem;
+    border-color: #dbe3ec;
+    background: #f0f4f9;
+    color: #334155;
+}
+.notifications-empty {
+    padding: 3rem 1.5rem;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #fff;
+    color: #687386;
+    text-align: center;
+}
+.notifications-empty i { font-size: 2rem; color: #1866a3; }
+.notifications-empty p { margin: .75rem 0 0; }
+[data-theme="dark"] .notifications-page { background: #0f1117; color: #e2e8f0; }
+[data-theme="dark"] .notifications-hero::after { background: #0f1117; }
+[data-theme="dark"] .notifications-toolbar,
+[data-theme="dark"] .notification-card,
+[data-theme="dark"] .notifications-empty {
+    border-color: #2d3348;
+    background: #1a1d27;
+}
+[data-theme="dark"] .notifications-count,
+[data-theme="dark"] .notification-title { color: #e2e8f0; }
+[data-theme="dark"] .notification-message { color: #cbd5e1; }
+[data-theme="dark"] .notification-mark-read { border-color: #2d3348; background: #242736; color: #e2e8f0; }
+@media (max-width: 600px) {
+    .notifications-hero { padding: 1.75rem .75rem 3.25rem; }
+    .notifications-hero h1 { font-size: 1.65rem; }
+    .notifications-shell { padding: 0 .75rem; }
+    .notifications-toolbar { align-items: flex-start; flex-direction: column; }
+    .notification-card { flex-direction: column; }
+    .notification-mark-read { align-self: flex-end; }
+}
+</style>
+
+<main class="notifications-page">
+    <header class="notifications-hero">
+        <div class="notifications-hero-inner">
+            <h1><i class="fas fa-bell" aria-hidden="true"></i> Notifications</h1>
+            <p>Updates about your applications and account.</p>
+        </div>
+    </header>
+
+    <div class="notifications-shell">
+        <section class="notifications-toolbar" aria-label="Notification actions">
+            <p class="notifications-count">
+                Your notifications
+                <span>({{ notifications|length }})</span>
+            </p>
+            {% if unread_notification_count %}
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="mark_all_read">
+                    <button class="notifications-mark-all" type="submit">
+                        <i class="fas fa-check-double" aria-hidden="true"></i> Mark all as read
+                    </button>
+                </form>
+            {% endif %}
+        </section>
+
+        <section class="notifications-list" aria-label="Your notifications">
+            {% for notification in notifications %}
+                <article class="notification-card{% if not notification.is_read %} unread{% endif %}">
+                    <div class="notification-copy">
+                        <h2 class="notification-title">
+                            {{ notification.title }}
+                            {% if not notification.is_read %}
+                                <span class="notification-new">New</span>
+                            {% endif %}
+                        </h2>
+                        {% if notification.message %}
+                            <p class="notification-message">{{ notification.message }}</p>
+                        {% endif %}
+                        <time class="notification-date" datetime="{{ notification.created_at|date:'c' }}">
+                            <i class="far fa-clock" aria-hidden="true"></i>
+                            {{ notification.created_at|date:"M d, Y g:i A" }}
+                        </time>
+                    </div>
+                    {% if not notification.is_read %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="mark_read">
+                            <input type="hidden" name="notification_id" value="{{ notification.notification_id }}">
+                            <button class="notification-mark-read" type="submit">Mark read</button>
+                        </form>
+                    {% endif %}
+                </article>
+            {% empty %}
+                <div class="notifications-empty">
+                    <i class="far fa-bell-slash" aria-hidden="true"></i>
+                    <p>You don't have any notifications yet.</p>
+                </div>
+            {% endfor %}
+        </section>
+    </div>
+</main>

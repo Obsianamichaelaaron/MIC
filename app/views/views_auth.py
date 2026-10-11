@@ -20,7 +20,12 @@ from app.services.database_rls import (
     user_email_exists,
 )
 from app.services.mailer import send_otp_email, send_welcome_email, send_employer_welcome_email
-from app.services.resume_parser import verify_resume_document, parse_and_save_applicant_resume
+from app.services.resume_parser import (
+    parse_and_save_applicant_resume,
+    parse_resume_text,
+    resume_name_matches,
+    verify_resume_document,
+)
 from app.services.resume_storage import (
     ResumeStorageError,
     stage_uploaded_file,
@@ -160,13 +165,27 @@ def login_register_view(request):
                                         'AI Verification Failed: The uploaded file is not recognized as a valid resume.',
                                     )
                                 else:
-                                    try:
-                                        resume_rel_path = store_verified_resume(
-                                            file_path,
-                                            file_ext,
+                                    parsed_resume = parse_resume_text(
+                                        verification.get('extracted_text', '')
+                                    )
+                                    if not resume_name_matches(
+                                        parsed_resume['first_name'],
+                                        parsed_resume['last_name'],
+                                        first_name,
+                                        last_name,
+                                    ):
+                                        error = (
+                                            "The name on the resume must match "
+                                            "the applicant name entered during registration."
                                         )
-                                    except ResumeStorageError as exc:
-                                        error = str(exc)
+                                    else:
+                                        try:
+                                            resume_rel_path = store_verified_resume(
+                                                file_path,
+                                                file_ext,
+                                            )
+                                        except ResumeStorageError as exc:
+                                            error = str(exc)
 
                     if not error:
                         hashed_pwd = hash_password(password)
@@ -200,7 +219,11 @@ def login_register_view(request):
                         # If resume was uploaded, parse it
                         if resume_rel_path:
                             abs_pdf = settings.BASE_DIR / resume_rel_path
-                            parse_and_save_applicant_resume(applicant, str(abs_pdf))
+                            parse_and_save_applicant_resume(
+                                applicant,
+                                str(abs_pdf),
+                                parsed_resume,
+                            )
 
                         # Auto-login newly registered applicant
                         request.session.flush()

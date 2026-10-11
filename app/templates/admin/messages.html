@@ -436,7 +436,7 @@ async function openInquiry(id) {
                 </div>
                 ${sender_meta.applicant_id ? `
                     <a href="/admin/candidates.php?search=${encodeURIComponent(inq.email)}" target="_blank" class="btn btn-sm btn-outline" style="border-color:#10b981;color:#065f46;background:#fff;">
-                        <i class="fas fa-id-card"></i> View Candidate Dossier
+                        <i class="fas fa-id-card"></i> View Candidate Details
                     </a>
                 ` : ''}
             </div>
@@ -533,7 +533,7 @@ async function openInquiry(id) {
                 ` : ''}
                 ${sender_meta.type === 'applicant' && sender_meta.applicant_id ? `
                     <a href="/admin/candidates.php?search=${encodeURIComponent(inq.email)}" target="_blank" class="btn btn-sm btn-outline">
-                        <i class="fas fa-id-card"></i> Candidate Dossier
+                        <i class="fas fa-id-card"></i> Candidate Details
                     </a>
                 ` : ''}
                 ${inq.is_read==1

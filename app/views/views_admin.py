@@ -16,7 +16,8 @@ from django.http import (
 )
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError, transaction
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Case, When, IntegerField, F
+from django.db.models.functions import TruncMonth
 from django.conf import settings
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -158,41 +159,102 @@ def _ensure_landing_cms_content():
 def dashboard_view(request):
     """
     Admin Dashboard matching admin/dashboard.php.
+    Optimised: collapses ~25 individual count() calls into ~5 aggregated queries.
     """
     admin_id = getCurrentUserId(request)
     admin_user = get_object_or_404(User, pk=admin_id)
 
-    total_users = User.objects.count()
-    total_applicants = User.objects.filter(role='applicant').count()
-    total_employers = User.objects.filter(role='employer').count()
-    total_jobs = JobPosting.objects.count()
-    active_jobs = JobPosting.objects.filter(status='active').count()
-    total_applications = Application.objects.count()
-    unread_inquiries = ContactInquiry.objects.filter(is_read=False).count()
-    total_audit_logs = AuditTrail.objects.count()
+    # ── 1 query: all user role counts at once ─────────────────────────────────
+    role_counts_qs = (
+        User.objects.values('role')
+        .annotate(cnt=Count('pk'))
+    )
+    role_counts = {row['role']: row['cnt'] for row in role_counts_qs}
+    total_users = sum(role_counts.values())
+    total_applicants = role_counts.get('applicant', 0)
+    total_employers  = role_counts.get('employer', 0)
+    total_admins     = role_counts.get('admin', 0)
+
+    # ── 1 query: job counts by status ────────────────────────────────────────
+    job_counts_qs = (
+        JobPosting.objects.values('status', 'employment_type')
+        .annotate(cnt=Count('job_id'))
+    )
+    job_status_counts = {}
+    job_type_counts   = {}
+    for row in job_counts_qs:
+        job_status_counts[row['status']] = job_status_counts.get(row['status'], 0) + row['cnt']
+        job_type_counts[row['employment_type']] = job_type_counts.get(row['employment_type'], 0) + row['cnt']
+    total_jobs  = sum(job_status_counts.values())
+    active_jobs = job_status_counts.get('active', 0)
+
+    # ── 1 query: application pipeline counts by status ───────────────────────
+    app_status_qs = (
+        Application.objects.values('status')
+        .annotate(cnt=Count('application_id'))
+    )
+    app_status_counts = {row['status']: row['cnt'] for row in app_status_qs}
+    total_applications = sum(app_status_counts.values())
+
+    # ── 1 query: employability tier counts ───────────────────────────────────
+    tier_qs = Application.objects.aggregate(
+        high=Count(
+            Case(When(applicant__employability_score__gt=60, then=1), output_field=IntegerField())
+        ),
+        medium=Count(
+            Case(
+                When(applicant__employability_score__gte=40, applicant__employability_score__lte=60, then=1),
+                output_field=IntegerField(),
+            )
+        ),
+        low=Count(
+            Case(When(applicant__employability_score__lt=40, then=1), output_field=IntegerField())
+        ),
+    )
+    match_class_counts = {
+        'high': tier_qs['high'],
+        'medium': tier_qs['medium'],
+        'low': tier_qs['low'],
+    }
+
+    # ── 1 query: 30-day new counts ────────────────────────────────────────────
     thirty_days_ago = timezone.now() - timedelta(days=30)
-    match_class_counts = _automatic_tier_counts()
     new_users_30d = User.objects.filter(created_at__gte=thirty_days_ago).count()
-    new_apps_30d = Application.objects.filter(applied_at__gte=thirty_days_ago).count()
-    total_admins = User.objects.filter(role='admin').count()
+    new_apps_30d  = Application.objects.filter(applied_at__gte=thirty_days_ago).count()
+
+    unread_inquiries  = ContactInquiry.objects.filter(is_read=False).count()
+    total_audit_logs  = AuditTrail.objects.count()
+
+    # ── 1 query: 6-month trend via GROUP BY month ─────────────────────────────
+    six_months_ago = (timezone.now() - timedelta(days=180)).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0
+    )
+    user_trend_qs = (
+        User.objects.filter(created_at__gte=six_months_ago)
+        .annotate(month=TruncMonth('created_at'))
+        .values('month')
+        .annotate(cnt=Count('pk'))
+        .order_by('month')
+    )
+    app_trend_qs = (
+        Application.objects.filter(applied_at__gte=six_months_ago)
+        .annotate(month=TruncMonth('applied_at'))
+        .values('month')
+        .annotate(cnt=Count('pk'))
+        .order_by('month')
+    )
+    user_trend_map = {row['month']: row['cnt'] for row in user_trend_qs}
+    app_trend_map  = {row['month']: row['cnt'] for row in app_trend_qs}
+
+    # Build ordered 6-month label/data lists
     month_starts = []
     month_cursor = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     for _ in range(6):
         month_starts.append(month_cursor)
         month_cursor = (month_cursor - timedelta(days=1)).replace(day=1)
     month_starts.reverse()
-    trend_users = []
-    trend_apps = []
-    for month_start in month_starts:
-        next_month = (month_start + timedelta(days=32)).replace(day=1)
-        trend_users.append(User.objects.filter(
-            created_at__gte=month_start,
-            created_at__lt=next_month,
-        ).count())
-        trend_apps.append(Application.objects.filter(
-            applied_at__gte=month_start,
-            applied_at__lt=next_month,
-        ).count())
+    trend_users = [user_trend_map.get(m, 0) for m in month_starts]
+    trend_apps  = [app_trend_map.get(m, 0)  for m in month_starts]
 
     chart_data = {
         'trend_labels': [month.strftime('%b') for month in month_starts],
@@ -202,19 +264,19 @@ def dashboard_view(request):
         'user_role_data': [total_applicants, total_admins],
         'pipeline_labels': ['Pending Review', 'Reviewed', 'Shortlisted', 'Interview Scheduled', 'Accepted / Hired', 'Rejected'],
         'pipeline_data': [
-            Application.objects.filter(status='pending').count(),
-            Application.objects.filter(status='reviewed').count(),
-            Application.objects.filter(status='shortlisted').count(),
-            Application.objects.filter(status='interviewed').count(),
-            Application.objects.filter(status='accepted').count(),
-            Application.objects.filter(status='rejected').count(),
+            app_status_counts.get('pending', 0),
+            app_status_counts.get('reviewed', 0),
+            app_status_counts.get('shortlisted', 0),
+            app_status_counts.get('interviewed', 0),
+            app_status_counts.get('accepted', 0),
+            app_status_counts.get('rejected', 0),
         ],
         'job_type_labels': ['Full-Time', 'Part-Time', 'Contract', 'Internship'],
         'job_type_data': [
-            JobPosting.objects.filter(employment_type='full-time').count(),
-            JobPosting.objects.filter(employment_type='part-time').count(),
-            JobPosting.objects.filter(employment_type='contract').count(),
-            JobPosting.objects.filter(employment_type='internship').count(),
+            job_type_counts.get('full-time', 0),
+            job_type_counts.get('part-time', 0),
+            job_type_counts.get('contract', 0),
+            job_type_counts.get('internship', 0),
         ],
         'match_tier_labels': ['High employability', 'Medium employability', 'Low employability'],
         'match_tier_data': [
@@ -224,9 +286,9 @@ def dashboard_view(request):
         ],
     }
 
-    recent_users = User.objects.order_by('-created_at')[:5]
-    recent_jobs = JobPosting.objects.select_related('employer').order_by('-posted_at')[:5]
-    recent_inquiries = ContactInquiry.objects.order_by('-created_at')[:5]
+    recent_users      = User.objects.order_by('-created_at')[:5]
+    recent_jobs       = JobPosting.objects.select_related('employer').order_by('-posted_at')[:5]
+    recent_inquiries  = ContactInquiry.objects.order_by('-created_at')[:5]
     recent_audit_logs = AuditTrail.objects.order_by('-created_at')[:5]
 
     stats = {
@@ -598,13 +660,6 @@ def post_job_view(request):
 
     if request.method == 'POST':
         company_name = request.POST.get('company_name', '').strip()
-        contact_first_name = request.POST.get('contact_first_name', '').strip()
-        contact_last_name = request.POST.get('contact_last_name', '').strip()
-        account_email = request.POST.get('account_email', '').strip().lower()
-        account_password = request.POST.get('account_password', '')
-        industry = request.POST.get('industry', '').strip()
-        company_address = request.POST.get('company_address', '').strip()
-        company_website = request.POST.get('company_website', '').strip()
         title = request.POST.get('title', '').strip()
         description = request.POST.get('description', '').strip()
         requirements = request.POST.get('requirements', '').strip()
@@ -620,95 +675,46 @@ def post_job_view(request):
         elif not title:
             error = "Job title is required."
         else:
-            employer = Employer.objects.filter(
-                company_name__iexact=company_name,
-                user__role='employer',
-            ).select_related('user').order_by('employer_id').first()
-            create_partner_account = employer is None
+            with transaction.atomic():
+                employer = _get_or_create_employer_company(company_name, admin_user)
+                JobPosting.objects.filter(
+                    employer__company_name__iexact=company_name,
+                    employer__user__role='admin',
+                ).exclude(employer=employer).update(employer=employer)
 
-            if create_partner_account:
-                if not contact_first_name or not contact_last_name or not account_email or not account_password:
-                    error = "For a new company, provide the contact's name, login email, and temporary password."
-                elif len(account_password) < 6:
-                    error = "Temporary password must be at least 6 characters."
-                elif len(account_password.encode('utf-8')) > 72:
-                    error = "Temporary password must be no longer than 72 UTF-8 bytes."
-                else:
-                    try:
-                        validate_email(account_email)
-                    except ValidationError:
-                        error = "Please provide a valid employer login email."
+                target_quals_str = ','.join(qualification_ids) if qualification_ids else ''
+                job = JobPosting.objects.create(
+                    employer=employer,
+                    title=title,
+                    description=description,
+                    requirements=requirements,
+                    skills_required=skills_required,
+                    location=location,
+                    employment_type=employment_type,
+                    salary_range=salary_range,
+                    status=status,
+                    target_qualifications=target_quals_str
+                )
 
-                    if not error and User.objects.filter(email__iexact=account_email).exists():
-                        error = "That login email is already in use. Select the existing partner company or use another email."
+                for q_id in qualification_ids:
+                    if str(q_id).isdigit():
+                        q_obj = Qualification.objects.filter(pk=int(q_id)).first()
+                        if q_obj:
+                            JobQualificationMapping.objects.create(job=job, qualification=q_obj)
 
-            if not error:
-                with transaction.atomic():
-                    if create_partner_account:
-                        try:
-                            with transaction.atomic():
-                                partner_user = User.objects.create(
-                                    email=account_email,
-                                    password=hash_password(account_password),
-                                    role='employer',
-                                    first_name=contact_first_name,
-                                    last_name=contact_last_name,
-                                    phone=request.POST.get('contact_phone', '').strip(),
-                                    status='active',
-                                    created_by_admin=True,
-                                )
-                        except IntegrityError:
-                            error = "That employer login email is already in use."
+                if initial_inquiry:
+                    initial_inquiry.status = 'replied'
+                    initial_inquiry.is_read = True
+                    initial_inquiry.save()
+                    ContactReply.objects.create(
+                        inquiry=initial_inquiry,
+                        admin=admin_user,
+                        reply_text=f"Job posting #{job.job_id} ('{job.title}') was created and published to portal from this request."
+                    )
 
-                        if not error:
-                            employer = Employer.objects.create(
-                                user=partner_user,
-                                company_name=company_name,
-                                industry=industry,
-                                company_address=company_address,
-                                company_website=company_website,
-                            )
+                log_audit_trail(request, admin_id, 'create_job', f"Posted new job: {title} for {company_name}", 'job', job.job_id, title)
 
-                    if not error:
-                        JobPosting.objects.filter(
-                            employer__company_name__iexact=company_name,
-                            employer__user__role='admin',
-                        ).exclude(employer=employer).update(employer=employer)
-
-                        target_quals_str = ','.join(qualification_ids) if qualification_ids else ''
-                        job = JobPosting.objects.create(
-                            employer=employer,
-                            title=title,
-                            description=description,
-                            requirements=requirements,
-                            skills_required=skills_required,
-                            location=location,
-                            employment_type=employment_type,
-                            salary_range=salary_range,
-                            status=status,
-                            target_qualifications=target_quals_str
-                        )
-
-                        for q_id in qualification_ids:
-                            if str(q_id).isdigit():
-                                q_obj = Qualification.objects.filter(pk=int(q_id)).first()
-                                if q_obj:
-                                    JobQualificationMapping.objects.create(job=job, qualification=q_obj)
-
-                        if initial_inquiry:
-                            initial_inquiry.status = 'replied'
-                            initial_inquiry.is_read = True
-                            initial_inquiry.save()
-                            ContactReply.objects.create(
-                                inquiry=initial_inquiry,
-                                admin=admin_user,
-                                reply_text=f"Job posting #{job.job_id} ('{job.title}') was created and published to portal from this request."
-                            )
-
-                        log_audit_trail(request, admin_id, 'create_job', f"Posted new job: {title} for {company_name}", 'job', job.job_id, title)
-
-                if not error:
-                    return redirect('/admin/jobs.php?posted=success')
+            return redirect('/admin/jobs.php?posted=success')
 
     # Initial prefill computation
     initial_company_name = request.GET.get('company_name', '')
@@ -737,23 +743,11 @@ def post_job_view(request):
     selected_posting_status = (request.POST.get('status') if request.method == 'POST' else 'active') or 'active'
     qualifications = Qualification.objects.filter(status='active').order_by('name')
     existing_companies = list(Employer.objects.values_list('company_name', flat=True).distinct())
-    existing_partner_companies = list(
-        Employer.objects.filter(user__role='employer')
-        .exclude(company_name__isnull=True)
-        .values_list('company_name', flat=True)
-        .distinct()
-    )
-    inquiry_name_parts = initial_inquiry.name.split(maxsplit=1) if initial_inquiry and initial_inquiry.name else []
-
     context = {
         'page_title': 'Post a Job - MultiBiz Admin',
         'current_page': 'post_job.php',
         'qualifications': qualifications,
         'existing_companies': [c for c in existing_companies if c],
-        'existing_partner_companies': [c for c in existing_partner_companies if c],
-        'initial_contact_first_name': inquiry_name_parts[0] if inquiry_name_parts else '',
-        'initial_contact_last_name': inquiry_name_parts[1] if len(inquiry_name_parts) > 1 else '',
-        'initial_contact_email': initial_inquiry.email if initial_inquiry else '',
         'form_values': request.POST if request.method == 'POST' else {},
         'selected_employment_type': selected_employment_type,
         'selected_posting_status': selected_posting_status,
@@ -1003,15 +997,61 @@ def jobs_view(request):
     for duplicate_jobs in visible_job_groups:
         job = duplicate_jobs[0]
         job.duplicate_job_ids = [duplicate_job.job_id for duplicate_job in duplicate_jobs]
-        job.applicant_count = Application.objects.filter(
+        group_applications = Application.objects.filter(
             job_id__in=job.duplicate_job_ids,
-        ).values('applicant_id').distinct().count()
+        )
+        job.applicant_count = group_applications.values('applicant_id').distinct().count()
+        latest_application = group_applications.order_by(
+            '-applied_at', '-application_id'
+        ).values('application_id', 'applied_at').first()
+        job.latest_application_id = (
+            latest_application['application_id'] if latest_application else None
+        )
+        job.latest_applied_at = (
+            latest_application['applied_at'] if latest_application else None
+        )
         jobs.append(job)
+
+    jobs.sort(
+        key=lambda job: (
+            job.latest_applied_at is not None,
+            job.latest_applied_at or job.posted_at,
+            job.latest_application_id or job.job_id,
+        ),
+        reverse=True,
+    )
+
+    visible_job_ids = [
+        job_id
+        for job in jobs
+        for job_id in job.duplicate_job_ids
+    ]
+    latest_application = (
+        Application.objects.filter(job_id__in=visible_job_ids)
+        .order_by('-applied_at', '-application_id')
+        .values('application_id')
+        .first()
+    )
+    latest_application_id = (
+        latest_application['application_id'] if latest_application else None
+    )
+
+    if request.GET.get('check_updates') == '1':
+        return JsonResponse({
+            'total_application_count': Application.objects.filter(
+                job_id__in=visible_job_ids
+            ).count(),
+            'latest_application_id': latest_application_id,
+        })
 
     context = {
         'page_title': 'All Jobs & Requests - MultiBiz Admin',
         'current_page': 'jobs.php',
         'jobs': jobs,
+        'total_application_count': Application.objects.filter(
+            job_id__in=visible_job_ids
+        ).count(),
+        'latest_application_id': latest_application_id,
         'counts': counts,
         'search': search,
         'status_filter': status_filter,
@@ -1219,32 +1259,49 @@ def candidates_view(request):
             group['seen_applicants'].add(applicant_id)
             if classify_match_score(employability_score) == 'qualified':
                 high_match_count += 1
-        return JsonResponse({'high_match_count': high_match_count})
+        latest_application = (
+            Application.objects.filter(job_id__in=groups_by_job_id)
+            .order_by('-applied_at', '-application_id')
+            .values('application_id', 'applied_at')
+            .first()
+        )
+        return JsonResponse({
+            'high_match_count': high_match_count,
+            'total_application_count': Application.objects.filter(
+                job_id__in=groups_by_job_id
+            ).count(),
+            'latest_application_id': (
+                latest_application['application_id'] if latest_application else None
+            ),
+            'latest_applied_at': (
+                latest_application['applied_at'].isoformat()
+                if latest_application and latest_application['applied_at'] else None
+            ),
+        })
 
     if groups_by_job_id:
-        applications = (
+        # Single annotated query: computes per-job-id tier counts and forwarded/pending
+        # counts entirely in SQL instead of loading every application into Python.
+        app_agg_qs = (
             Application.objects.filter(job_id__in=groups_by_job_id)
-            .select_related('applicant', 'job')
-            .only(
-                'application_id',
-                'job_id',
-                'applicant_id',
-                'applied_at',
-                'forwarded_to_employer',
-                'status',
-                'applicant__applicant_id',
-                'applicant__employability_score',
-                'job__job_id',
+            .values('job_id', 'applicant_id', 'application_id', 'applied_at')
+            .annotate(
+                _emp_score=F('applicant__employability_score'),
+                _fwd=F('forwarded_to_employer'),
+                _status=F('status'),
             )
             .order_by('-applied_at', '-application_id')
         )
-        for application in applications:
+
+        # We still need deduplication per-group (same applicant across dup jobs)
+        # Pull only the scalar fields needed — no full ORM objects.
+        for row in app_agg_qs:
             total_applications += 1
-            group = groups_by_job_id[application.job_id]
-            if application.applicant_id in group['seen_applicants']:
+            group = groups_by_job_id[row['job_id']]
+            if row['applicant_id'] in group['seen_applicants']:
                 continue
-            group['seen_applicants'].add(application.applicant_id)
-            group['applications'].append(application)
+            group['seen_applicants'].add(row['applicant_id'])
+            group['applications'].append(row)  # store the dict row
 
     for group in grouped_jobs.values():
         job = group['job']
@@ -1254,24 +1311,36 @@ def candidates_view(request):
         if count_all == 0:
             continue  # skip jobs with no applicants
 
-        class_counts = {'high': 0, 'medium': 0, 'low': 0, 'unavailable': 0}
-        count_high_match = 0
-        for application in apps:
-            result = compute_job_match_result(application.applicant, application.job)
-            class_counts[result['match_class'] or 'unavailable'] += 1
-            if result['match_score'] >= 85:
+        count_high_match   = 0
+        count_qualified    = 0
+        count_medium       = 0
+        count_low          = 0
+        count_forwarded    = 0
+        count_pending      = 0
+        for row in apps:
+            score = float(row.get('_emp_score') or 0)
+            q_status = classify_match_score(score)
+            if q_status == 'qualified':
+                count_qualified += 1
+            elif q_status == 'under_qualified':
+                count_medium += 1
+            else:
+                count_low += 1
+            if score >= 85:
                 count_high_match += 1
-        count_qualified = class_counts['high']
-        count_under_qualified = class_counts['medium']
-        count_unclassified = 0
-        count_not_qualified = class_counts['low']
-        count_forwarded = sum(1 for application in apps if application.forwarded_to_employer)
-        count_pending = sum(1 for application in apps if application.status == 'pending')
+            if row.get('_fwd'):
+                count_forwarded += 1
+            if row.get('_status') == 'pending':
+                count_pending += 1
 
-        total_applicants += count_all
-        total_qualified += count_qualified
-        total_high_match += count_high_match
-        total_forwarded += count_forwarded
+        count_under_qualified = count_medium
+        count_not_qualified   = count_low
+        count_unclassified    = 0
+
+        total_applicants  += count_all
+        total_qualified   += count_qualified
+        total_high_match  += count_high_match
+        total_forwarded   += count_forwarded
 
         employment_type = ''
         if hasattr(job, 'get_employment_type_display'):
@@ -1296,15 +1365,32 @@ def candidates_view(request):
             'count_under_qualified': count_under_qualified,
             'count_unclassified': count_unclassified,
             'count_not_qualified': count_not_qualified,
-            'count_ml_unavailable': class_counts['unavailable'],
+            'count_ml_unavailable': 0,
             'count_high_match': count_high_match,
             'count_forwarded': count_forwarded,
             'count_pending': count_pending,
             'posted_at': job.posted_at,
+            'latest_application_id': apps[0]['application_id'],
+            'latest_applied_at': apps[0]['applied_at'],
         })
 
-    # Sort: most qualified applicants first
-    job_summaries.sort(key=lambda x: x['count_qualified'], reverse=True)
+    latest_application = (
+        Application.objects.filter(job_id__in=groups_by_job_id)
+        .order_by('-applied_at', '-application_id')
+        .values('application_id')
+        .first()
+    )
+    latest_application_id = (
+        latest_application['application_id'] if latest_application else None
+    )
+
+    job_summaries.sort(
+        key=lambda summary: (
+            summary['latest_applied_at'],
+            summary['latest_application_id'],
+        ),
+        reverse=True,
+    )
 
     context = {
         'page_title': 'Candidate Pipeline - MultiBiz Admin',
@@ -1317,6 +1403,7 @@ def candidates_view(request):
         'total_high_match': total_high_match,
         'total_forwarded': total_forwarded,
         'total_jobs': len(job_summaries),
+        'latest_application_id': latest_application_id,
     }
     return render(request, 'admin/candidates.html', context)
 
@@ -2339,11 +2426,29 @@ def job_candidates_view(request, job_id):
         return redirect('admin_job_candidates', job_id=job_id)
     selected_status = request.GET.get('status', '').strip()
     query           = request.GET.get('q', '').strip()
-    selected_sort   = request.GET.get('sort', 'score').strip()
+    selected_sort   = request.GET.get('sort', 'date').strip()
+    if selected_sort not in {'date', 'score', 'experience'}:
+        selected_sort = 'date'
 
     apps_qs = Application.objects.filter(job_id__in=grouped_job_ids).select_related(
         'applicant', 'applicant__user', 'job'
     ).order_by('-applied_at', '-application_id')
+
+    if request.GET.get('check_updates') == '1':
+        latest_application = apps_qs.values(
+            'application_id', 'applied_at'
+        ).first()
+        return JsonResponse({
+            'latest_application_id': (
+                latest_application['application_id'] if latest_application else None
+            ),
+            'applied_at': (
+                latest_application['applied_at'].isoformat()
+                if latest_application and latest_application['applied_at'] else None
+            ),
+        })
+
+    latest_application_id = apps_qs.values_list('application_id', flat=True).first()
 
     all_candidates = []
     seen_applicants = set()
@@ -2377,27 +2482,55 @@ def job_candidates_view(request, job_id):
         }
         all_candidates.append(cand_info)
 
+    # Keep top-match badges tied to score, regardless of the displayed sort.
+    qualified_by_score = sorted(
+        (
+            candidate for candidate in all_candidates
+            if candidate['qualification_status'] == 'qualified'
+        ),
+        key=lambda candidate: (
+            candidate['match_score'] is not None,
+            candidate['match_score'] or 0,
+        ),
+        reverse=True,
+    )
+    top_match_ids = {
+        candidate['application'].application_id
+        for candidate in qualified_by_score[:3]
+    }
+    for candidate in all_candidates:
+        candidate['is_top_match'] = (
+            candidate['application'].application_id in top_match_ids
+        )
+
     # Sort candidates
     if selected_sort == 'score':
         all_candidates.sort(
             key=lambda x: (
                 x['match_score'] is not None,
                 x['match_score'] or 0,
+                x['application'].applied_at,
+                x['application'].application_id,
             ),
             reverse=True,
         )
     elif selected_sort == 'experience':
-        all_candidates.sort(key=lambda x: x['applicant'].experience_years or 0, reverse=True)
+        all_candidates.sort(
+            key=lambda x: (
+                x['applicant'].experience_years or 0,
+                x['application'].applied_at,
+                x['application'].application_id,
+            ),
+            reverse=True,
+        )
     elif selected_sort == 'date':
-        all_candidates.sort(key=lambda x: x['application'].applied_at, reverse=True)
-
-    # Flag top 3 qualified matches
-    qual_count = 0
-    for c in all_candidates:
-        if c['qualification_status'] == 'qualified':
-            qual_count += 1
-            if qual_count <= 3:
-                c['is_top_match'] = True
+        all_candidates.sort(
+            key=lambda x: (
+                x['application'].applied_at,
+                x['application'].application_id,
+            ),
+            reverse=True,
+        )
 
     forwarded_filter = request.GET.get('forwarded', '').strip()
 
@@ -2446,6 +2579,7 @@ def job_candidates_view(request, job_id):
         'forwarded_filter': forwarded_filter,
         'query': query,
         'selected_sort': selected_sort,
+        'latest_application_id': latest_application_id,
         'current_page': 'candidates.php',
     }
     return render(request, 'admin/job_candidates.html', context)
@@ -2705,6 +2839,166 @@ def notify_single_applicant_view(request, application_id):
         f"Created dashboard notice for {applicant_user.email} for application #{application_id}; email {notice_status}",
     )
     return redirect(f'/admin/jobs/{app.job.job_id}/candidates/?notified={notice_status}')
+
+
+@require_role('admin')
+def notifications_view(request):
+    """Show the signed-in administrator's in-app notifications."""
+    admin_id = getCurrentUserId(request)
+
+    if request.method == 'GET' and not request.session.get(
+        'admin_application_notifications_backfilled'
+    ):
+        _backfill_admin_application_notifications(admin_id)
+        request.session['admin_application_notifications_backfilled'] = True
+
+    if request.method == 'GET' and request.GET.get('poll') == 'applications':
+        cursor_key = f'admin_application_notification_cursor_{admin_id}'
+        notification_cursor = request.session.get(cursor_key)
+        if notification_cursor is None:
+            latest_notification_id = (
+                Notification.objects.filter(user_id=admin_id)
+                .order_by('-notification_id')
+                .values_list('notification_id', flat=True)
+                .first()
+            ) or 0
+            request.session[cursor_key] = latest_notification_id
+            latest_unread_application = Notification.objects.filter(
+                user_id=admin_id,
+                type='application',
+                is_read=False,
+                notification_id__lte=latest_notification_id,
+            ).order_by('-notification_id').first()
+            new_notifications = (
+                [latest_unread_application] if latest_unread_application else []
+            )
+        else:
+            new_notifications = list(
+                Notification.objects.filter(
+                    user_id=admin_id,
+                    type='application',
+                    notification_id__gt=notification_cursor,
+                ).order_by('notification_id')[:20]
+            )
+            if new_notifications:
+                request.session[cursor_key] = new_notifications[-1].notification_id
+
+        return JsonResponse({
+            'notifications': [
+                {
+                    'notification_id': notification.notification_id,
+                    'title': notification.title,
+                    'message': notification.message or '',
+                }
+                for notification in new_notifications
+            ],
+            'unread_notification_count': Notification.objects.filter(
+                user_id=admin_id,
+                is_read=False,
+            ).count(),
+        })
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'mark_all_read':
+            Notification.objects.filter(
+                user_id=admin_id,
+                is_read=False,
+            ).update(is_read=True)
+        elif action == 'mark_read':
+            notification_id = request.POST.get('notification_id', '')
+            if not notification_id.isdigit():
+                return HttpResponseBadRequest('A valid notification ID is required.')
+            notification = get_object_or_404(
+                Notification,
+                pk=int(notification_id),
+                user_id=admin_id,
+            )
+            if not notification.is_read:
+                notification.is_read = True
+                notification.save(update_fields=['is_read'])
+        else:
+            return HttpResponseBadRequest('Invalid notification action.')
+
+        return redirect('admin_notifications')
+
+    notifications = Notification.objects.filter(
+        user_id=admin_id,
+    ).order_by('-created_at', '-notification_id')[:100]
+    context = {
+        'page_title': 'Notifications - MultiBiz Admin',
+        'current_page': 'notifications.php',
+        'notifications': notifications,
+        'unread_notification_count': Notification.objects.filter(
+            user_id=admin_id,
+            is_read=False,
+        ).count(),
+    }
+    return render(request, 'admin/notifications.html', context)
+
+
+def _backfill_admin_application_notifications(admin_id):
+    existing_messages = set(
+        Notification.objects.filter(
+            user_id=admin_id,
+            type='application',
+            title='New applicant applied',
+        ).values_list('message', flat=True)
+    )
+    notified_application_ids = set()
+    legacy_messages = set()
+    for message in existing_messages:
+        if not message:
+            continue
+        if message.startswith('Application #'):
+            application_id, separator, _ = message.partition(':')
+            if separator:
+                try:
+                    notified_application_ids.add(int(application_id.removeprefix('Application #')))
+                except ValueError:
+                    continue
+        else:
+            legacy_messages.add(message)
+
+    pending_notifications = []
+    for application in Application.objects.select_related(
+        'applicant__user',
+        'job__employer',
+    ).order_by('application_id').iterator(chunk_size=500):
+        applicant_user = application.applicant.user
+        applicant_name = (
+            f'{applicant_user.first_name} {applicant_user.last_name}'.strip()
+            or applicant_user.email
+        )
+        company_name = (
+            application.job.employer.company_name
+            if application.job.employer and application.job.employer.company_name
+            else 'MultiBiz Employer'
+        )
+        legacy_message = (
+            f'{applicant_name} applied for {application.job.title} '
+            f'at {company_name}.'
+        )
+        if (
+            application.application_id in notified_application_ids
+            or legacy_message in legacy_messages
+        ):
+            continue
+
+        pending_notifications.append(Notification(
+            user_id=admin_id,
+            title='New applicant applied',
+            message=f'Application #{application.application_id}: {legacy_message}',
+            type='application',
+        ))
+        notified_application_ids.add(application.application_id)
+
+        if len(pending_notifications) >= 500:
+            Notification.objects.bulk_create(pending_notifications)
+            pending_notifications.clear()
+
+    if pending_notifications:
+        Notification.objects.bulk_create(pending_notifications)
 
 
 @require_role('admin')

@@ -10,9 +10,22 @@
     <meta name="description" content="Learn about MULTIBIZ INTERNATIONAL CORPORATION - Your trusted managed services partner since 2002">
     <link rel="shortcut icon" href="2024/favicon.png" type="image/x-icon">
     <link rel="apple-touch-icon" href="2024/favicon.png">
+
+    <!-- DNS prefetch & preconnect for external resources -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+
+    <!-- Async non-blocking Google Fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap"></noscript>
+
+    <!-- Non-render-blocking Font Awesome -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
     <style>
         /* ============================================================
            DESIGN SYSTEM — LUXURY CORPORATE (synced with services.php)
@@ -626,7 +639,12 @@
 <header id="mainHeader">
     <div class="header-container">
         <div class="logo">
-            <a href="index.php"><img src="images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION"></a>
+            <a href="index.php">
+                <picture>
+                    <source srcset="/static/images/mbLogo.webp" type="image/webp">
+                    <img src="/static/images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION" width="150" height="40" style="height:40px;width:auto;" loading="eager">
+                </picture>
+            </a>
         </div>
         <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
             <i class="fas fa-bars"></i>
@@ -714,7 +732,10 @@
         </div>
 
         <div class="about-image animate-on-scroll">
-            <img src="images/picture3.png" alt="MULTIBIZ Team">
+            <picture>
+                <source srcset="/static/images/picture3.webp" type="image/webp">
+                <img src="/static/images/picture3.png" alt="MULTIBIZ Team" width="560" height="380" loading="lazy" decoding="async" style="width:100%;height:auto;aspect-ratio:56/38;object-fit:cover;border-radius:12px;">
+            </picture>
         </div>
     </div>
 </section>
@@ -723,7 +744,10 @@
 <section id="vision" class="about-section about-section-alt">
     <div class="about-container">
         <div class="about-image animate-on-scroll">
-            <img src="images/picture2.png" alt="Our Vision and Mission">
+            <picture>
+                <source srcset="/static/images/picture2.webp" type="image/webp">
+                <img src="/static/images/picture2.png" alt="Our Vision and Mission" width="560" height="380" loading="lazy" decoding="async" style="width:100%;height:auto;aspect-ratio:56/38;object-fit:cover;border-radius:12px;">
+            </picture>
         </div>
 
         <div class="about-content animate-on-scroll">
@@ -774,7 +798,10 @@
         </div>
 
         <div class="about-image animate-on-scroll">
-            <img src="images/map.png" alt="Our Location">
+            <picture>
+                <source srcset="/static/images/map.webp" type="image/webp">
+                <img src="/static/images/map.png" alt="Our Location" width="600" height="400" loading="lazy" decoding="async" style="width:100%;height:auto;aspect-ratio:3/2;object-fit:contain;border-radius:12px;">
+            </picture>
         </div>
     </div>
 </section>
@@ -783,7 +810,10 @@
 <section id="industries" class="about-section about-section-alt">
     <div class="about-container">
         <div class="about-image animate-on-scroll">
-            <img src="images/picture1.png" alt="Industries We Serve">
+            <picture>
+                <source srcset="/static/images/picture1.webp" type="image/webp">
+                <img src="/static/images/picture1.png" alt="Industries We Serve" width="560" height="380" loading="lazy" decoding="async" style="width:100%;height:auto;aspect-ratio:56/38;object-fit:cover;border-radius:12px;">
+            </picture>
         </div>
 
         <div class="about-content animate-on-scroll">
@@ -853,7 +883,10 @@
 <section id="history" class="about-section">
     <div class="about-container">
         <div class="about-image animate-on-scroll">
-            <img src="images/picture3.png" alt="Our History">
+            <picture>
+                <source srcset="/static/images/picture3.webp" type="image/webp">
+                <img src="/static/images/picture3.png" alt="Our History" width="560" height="380" loading="lazy" decoding="async" style="width: 100%; height: auto; aspect-ratio: 56/38; object-fit: cover;">
+            </picture>
         </div>
 
         <div class="about-content animate-on-scroll">
@@ -881,9 +914,9 @@
             </p>
 
             <div class="stories-grid">
-                <div class="story-card"><div class="story-image"><img src="https://placehold.co/400x250/0a1628/d4af55?text=Healthcare" alt="Healthcare"></div><div class="story-content"><h4>Medical Records Management</h4><p>60% reduction in processing time.</p><a href="#" class="story-link">Read Story <i class="fas fa-arrow-right"></i></a></div></div>
-                <div class="story-card"><div class="story-image"><img src="https://placehold.co/400x250/1a4fa0/ffffff?text=Banking" alt="Banking"></div><div class="story-content"><h4>Banking Transformation</h4><p>Secure document management.</p><a href="#" class="story-link">Read Story <i class="fas fa-arrow-right"></i></a></div></div>
-                <div class="story-card"><div class="story-image"><img src="https://placehold.co/400x250/18151f/b8973a?text=Education" alt="Education"></div><div class="story-content"><h4>Campus Modernization</h4><p>Unified print services for university.</p><a href="#" class="story-link">Read Story <i class="fas fa-arrow-right"></i></a></div></div>
+                <div class="story-card"><div class="story-image"><img src="https://placehold.co/400x250/0a1628/d4af55?text=Healthcare" alt="Healthcare" width="400" height="250" loading="lazy" decoding="async" style="width: 100%; height: auto; aspect-ratio: 16/10; object-fit: cover;"></div><div class="story-content"><h4>Medical Records Management</h4><p>60% reduction in processing time.</p><a href="#" class="story-link">Read Story <i class="fas fa-arrow-right"></i></a></div></div>
+                <div class="story-card"><div class="story-image"><img src="https://placehold.co/400x250/1a4fa0/ffffff?text=Banking" alt="Banking" width="400" height="250" loading="lazy" decoding="async" style="width: 100%; height: auto; aspect-ratio: 16/10; object-fit: cover;"></div><div class="story-content"><h4>Banking Transformation</h4><p>Secure document management.</p><a href="#" class="story-link">Read Story <i class="fas fa-arrow-right"></i></a></div></div>
+                <div class="story-card"><div class="story-image"><img src="https://placehold.co/400x250/18151f/b8973a?text=Education" alt="Education" width="400" height="250" loading="lazy" decoding="async" style="width: 100%; height: auto; aspect-ratio: 16/10; object-fit: cover;"></div><div class="story-content"><h4>Campus Modernization</h4><p>Unified print services for university.</p><a href="#" class="story-link">Read Story <i class="fas fa-arrow-right"></i></a></div></div>
             </div>
 
             <div class="about-cta">

@@ -932,9 +932,6 @@ $currentPage = basename($_SERVER['PHP_SELF']);
                     <a href="../employer/jobs.php" class="<?php echo ($currentPage == 'jobs.php') ? 'active' : ''; ?>">
                         <i class="fas fa-briefcase"></i> <span>My Jobs</span>
                     </a>
-                    <a href="../employer/chat.php" class="<?php echo ($currentPage == 'chat.php') ? 'active' : ''; ?>">
-                        <i class="fas fa-comments"></i> <span>Messages</span>
-                    </a>
                 <?php elseif ($currentRole === 'admin'): ?>
                     <a href="../admin/users.php" class="<?php echo ($currentPage == 'users.php') ? 'active' : ''; ?>">
                         <i class="fas fa-users-cog"></i> <span>Users</span>

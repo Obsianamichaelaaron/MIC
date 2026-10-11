@@ -415,6 +415,11 @@
                                 <a href="/admin/jobs/{{ job.job_id }}/candidates/?job_ids={{ job.duplicate_job_ids|join:',' }}" class="candidates-counter-pill" title="Screen candidates for this job">
                                     <i class="fas fa-users-viewfinder"></i> {{ job.applicant_count|default:0 }} Applicants
                                 </a>
+                                {% if job.latest_applied_at %}
+                                    <div style="font-size:0.72rem;color:#64748b;margin-top:0.3rem;white-space:nowrap;">
+                                        <i class="fas fa-clock"></i> Latest: {{ job.latest_applied_at|date:"M d, Y, P" }}
+                                    </div>
+                                {% endif %}
                             </td>
                             <td>
                                 <span class="job-status-badge status-{{ job.status|lower }}">
@@ -521,6 +526,11 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+        <div style="padding:.7rem 1rem;text-align:right;border-top:1px solid #e2e8f0;">
+            <span class="small" id="jobsApplicationRefreshStatus" data-latest-application-id="{{ latest_application_id|default_if_none:'' }}">
+                {{ total_application_count }} total applications · checking every 15 seconds
+            </span>
         </div>
     </div>
 </div>
@@ -643,6 +653,51 @@
 </div>
 
 <script>
+(() => {
+    const statusElement = document.getElementById('jobsApplicationRefreshStatus');
+    if (!statusElement) return;
+
+    let requestPending = false;
+    const refreshJobs = async () => {
+        if (requestPending || document.hidden) return;
+        requestPending = true;
+
+        const updateUrl = new URL(window.location.href);
+        updateUrl.searchParams.set('check_updates', '1');
+        try {
+            const response = await fetch(updateUrl, {
+                credentials: 'same-origin',
+                cache: 'no-store',
+                headers: { 'Accept': 'application/json' },
+            });
+            if (!response.ok) {
+                throw new Error(`Application refresh failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            if (!Number.isInteger(data.total_application_count)) {
+                throw new Error('Application refresh returned an invalid count.');
+            }
+            statusElement.textContent =
+                `${data.total_application_count} total applications · checking every 15 seconds`;
+
+            if (data.latest_application_id !== null &&
+                String(data.latest_application_id) !== statusElement.dataset.latestApplicationId) {
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            requestPending = false;
+        }
+    };
+
+    window.setInterval(refreshJobs, 15000);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshJobs();
+    });
+})();
+
 function openRejectModal(jobId, jobIds, jobTitle, employerName) {
     document.getElementById('reject_modal_job_id').value = jobId;
     document.getElementById('reject_modal_job_ids').value = jobIds;

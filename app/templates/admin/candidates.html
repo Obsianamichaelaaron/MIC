@@ -763,21 +763,21 @@
             <div class="cand-kpi-card" style="border-top-color:#0284c7;">
                 <div class="cand-kpi-info">
                     <span class="cand-kpi-label">Total Applications</span>
-                    <span class="cand-kpi-value" id="total-applications-count" aria-live="polite">{{ total_qualified }}</span>
+                    <span class="cand-kpi-value" id="total-applications-count" aria-live="polite" data-latest-application-id="{{ latest_application_id|default_if_none:'' }}">{{ total_applications }}</span>
                 </div>
                 <div class="cand-kpi-icon" style="background:#e0f2fe;color:#0284c7;"><i class="fas fa-users"></i></div>
             </div>
             <div class="cand-kpi-card kpi-accepted">
                 <div class="cand-kpi-info">
                     <span class="cand-kpi-label">High Match</span>
-                    <span class="cand-kpi-value">{{ total_qualified }}</span>
+                    <span class="cand-kpi-value" id="qualified-applicants-count">{{ total_qualified }}</span>
                 </div>
                 <div class="cand-kpi-icon"><i class="fas fa-circle-check"></i></div>
             </div>
             <div class="cand-kpi-card kpi-interviewed">
                 <div class="cand-kpi-info">
                     <span class="cand-kpi-label">Highest Match</span>
-                    <span class="cand-kpi-value">{{ total_high_match }}</span>
+                    <span class="cand-kpi-value" id="high-match-count">{{ total_high_match }}</span>
                 </div>
                 <div class="cand-kpi-icon"><i class="fas fa-crown"></i></div>
             </div>
@@ -847,6 +847,7 @@
                     <div class="cand-col-label">Posted</div>
                     <div style="font-size:.88rem;font-weight:600;color:#334155;">{{ js.posted_at|date:"M d, Y" }}</div>
                     <div class="cand-date"><i class="fas fa-users me-1"></i>{{ js.count_all }} total applicant{{ js.count_all|pluralize }}</div>
+                    <div class="cand-date"><i class="fas fa-clock me-1"></i>Latest application: {{ js.latest_applied_at|date:"M d, Y, P" }}</div>
                 </div>
 
                 <!-- Col 3: High match -->
@@ -921,10 +922,14 @@ window.addEventListener('keydown', (e) => {
                 throw new Error(`Application count refresh failed: ${response.status}`);
             }
             const data = await response.json();
-            if (Number.isInteger(data.high_match_count)) {
-                countElement.textContent = data.high_match_count;
-            } else {
+            if (!Number.isInteger(data.total_application_count)) {
                 throw new Error('Application count refresh returned an invalid count.');
+            }
+            countElement.textContent = data.total_application_count;
+
+            if (data.latest_application_id !== null &&
+                String(data.latest_application_id) !== countElement.dataset.latestApplicationId) {
+                window.location.reload();
             }
         } catch (error) {
             console.error(error);
@@ -933,7 +938,7 @@ window.addEventListener('keydown', (e) => {
         }
     };
 
-    window.setInterval(refreshApplicationCount, 30000);
+    window.setInterval(refreshApplicationCount, 15000);
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) refreshApplicationCount();
     });

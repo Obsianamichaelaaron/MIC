@@ -11,25 +11,32 @@ def black_admin_view(request, *args, **kwargs):
         '<body style="margin:0;width:100%;min-height:100vh;background:#000"></body></html>'
     )
 
+def cached_serve(request, path, document_root=None, show_indexes=False):
+    response = serve(request, path, document_root=document_root, show_indexes=show_indexes)
+    if response.status_code == 200:
+        response['Cache-Control'] = 'public, max-age=604800, stale-while-revalidate=86400'
+    return response
+
 urlpatterns = [
     re_path(r'^django-admin(?:/.*)?$', black_admin_view),
     path('admin/', black_admin_view),
-    path('', include('app.urls')),
-    # Direct media, static and asset routing
+    # Direct media, static and asset routing with aggressive browser caching
+    re_path(r'^static/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static')}),
     re_path(r'^uploads/(?P<path>.*)$', smart_media_serve),
-    re_path(r'^images/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'images')}),
-    re_path(r'^js/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'js')}),
-    re_path(r'^css/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'css')}),
-    re_path(r'^2024/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / '2024')}),
-    re_path(r'^applicant/images/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'images')}),
-    re_path(r'^applicant/js/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'js')}),
-    re_path(r'^applicant/css/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'css')}),
-    re_path(r'^employer/images/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'images')}),
-    re_path(r'^employer/js/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'js')}),
-    re_path(r'^employer/css/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'css')}),
-    re_path(r'^admin/images/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'images')}),
-    re_path(r'^admin/js/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'js')}),
-    re_path(r'^admin/css/(?P<path>.*)$', serve, {'document_root': str(settings.BASE_DIR / 'static' / 'css')}),
+    re_path(r'^images/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'images')}),
+    re_path(r'^js/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'js')}),
+    re_path(r'^css/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'css')}),
+    re_path(r'^2024/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / '2024')}),
+    re_path(r'^applicant/images/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'images')}),
+    re_path(r'^applicant/js/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'js')}),
+    re_path(r'^applicant/css/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'css')}),
+    re_path(r'^employer/images/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'images')}),
+    re_path(r'^employer/js/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'js')}),
+    re_path(r'^employer/css/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'css')}),
+    re_path(r'^admin/images/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'images')}),
+    re_path(r'^admin/js/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'js')}),
+    re_path(r'^admin/css/(?P<path>.*)$', cached_serve, {'document_root': str(settings.BASE_DIR / 'static' / 'css')}),
+    path('', include('app.urls')),
 ]
 
 if settings.DEBUG:

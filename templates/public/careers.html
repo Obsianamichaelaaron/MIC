@@ -10,9 +10,22 @@
     <meta name="description" content="Join the MULTIBIZ team – explore career opportunities in managed print, document management, and system integration.">
     <link rel="shortcut icon" href="2024/favicon.png" type="image/x-icon">
     <link rel="apple-touch-icon" href="2024/favicon.png">
+
+    <!-- DNS prefetch & preconnect for external resources -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+
+    <!-- Async non-blocking Google Fonts -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap"></noscript>
+
+    <!-- Non-render-blocking Font Awesome -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
     <style>
         /* ============================================================
            DESIGN SYSTEM — LUXURY CORPORATE (synced with services.php)
@@ -471,7 +484,12 @@
 <header id="mainHeader">
     <div class="header-container">
         <div class="logo">
-            <a href="index.php"><img src="images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION"></a>
+            <a href="index.php">
+                <picture>
+                    <source srcset="/static/images/mbLogo.webp" type="image/webp">
+                    <img src="/static/images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION" width="150" height="40" style="height:40px;width:auto;" loading="eager">
+                </picture>
+            </a>
         </div>
         <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
             <i class="fas fa-bars"></i>
@@ -537,7 +555,10 @@
             </div>
         </div>
         <div class="work-image animate-on-scroll">
-            <img src="images/applynow.png" alt="MULTIBIZ team">
+            <picture>
+                <source srcset="/static/images/applynow.webp" type="image/webp">
+                <img src="/static/images/applynow.png" alt="MULTIBIZ team" width="560" height="396" loading="lazy" decoding="async" style="width: 100%; height: auto; aspect-ratio: 2245/1587; object-fit: cover;">
+            </picture>
         </div>
     </div>
 </section>

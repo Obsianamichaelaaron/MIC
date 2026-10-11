@@ -29,6 +29,11 @@ class User(models.Model):
         db_table = 'users'
         verbose_name = 'User'
         verbose_name_plural = 'Users'
+        indexes = [
+            models.Index(fields=['role'],       name='user_role_idx'),
+            models.Index(fields=['created_at'], name='user_created_idx'),
+            models.Index(fields=['status'],     name='user_status_idx'),
+        ]
 
     def __str__(self):
         return f"{self.email} ({self.role})"
@@ -52,6 +57,9 @@ class Applicant(models.Model):
 
     class Meta:
         db_table = 'applicants'
+        indexes = [
+            models.Index(fields=['employability_score'], name='applicant_score_idx'),
+        ]
 
 
 class Employer(models.Model):
@@ -122,6 +130,10 @@ class JobPosting(models.Model):
 
     class Meta:
         db_table = 'job_postings'
+        indexes = [
+            models.Index(fields=['status'],    name='job_status_idx'),
+            models.Index(fields=['posted_at'], name='job_posted_idx'),
+        ]
 
 
 class JobQualificationMapping(models.Model):
@@ -199,6 +211,12 @@ class Application(models.Model):
 
     class Meta:
         db_table = 'applications'
+        indexes = [
+            models.Index(fields=['status'],                   name='app_status_idx'),
+            models.Index(fields=['applied_at'],               name='app_applied_idx'),
+            models.Index(fields=['job', 'applicant'],         name='app_job_applicant_idx'),
+            models.Index(fields=['forwarded_to_employer'],    name='app_forwarded_idx'),
+        ]
 
 
 class SavedJob(models.Model):

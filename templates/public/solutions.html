@@ -13,17 +13,26 @@
     <link rel="shortcut icon" href="images/favicon.png" type="image/x-icon" />
     <link rel="apple-touch-icon" href="images/favicon.png">
 
+    <!-- DNS prefetch & preconnect for external resources -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+
     <!-- Google Fonts & Typography System -->
     <link rel="stylesheet" href="/static/css/typography.css">
 
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Non-render-blocking Font Awesome -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
 
     <!-- Custom CSS -->
     <link rel="stylesheet" href="css/solutions.css">
 
      <!-- JavaScript -->
-    <script src="js/script.js"></script>
+    <script src="js/script.js" defer></script>
 </head>
 
 <body>
@@ -32,7 +41,10 @@
         <div class="header-container">
             <div class="logo">
                 <a href="index.php">
-                    <img src="images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION">
+                    <picture>
+                        <source srcset="/static/images/mbLogo.webp" type="image/webp">
+                        <img src="/static/images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION" width="150" height="40" style="height:40px;width:auto;" loading="eager">
+                    </picture>
                 </a>
             </div>
             

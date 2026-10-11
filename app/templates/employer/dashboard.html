@@ -414,11 +414,13 @@
                                             {{ app.employer_status|default:"For Review"|title }}
                                         </span>
                                     </div>
+                                    {% if app.employer_status|default:''|lower != 'hired' and app.employer_status|default:''|lower != 'rejected' %}
                                     <div class="d-flex justify-content-end gap-2 mt-2 pt-2 border-top">
                                         <a href="/employer/view_candidate.php?id={{ app.application_id }}" class="btn btn-sm btn-outline-primary px-3 fw-semibold" style="border-radius:6px; font-size:0.78rem;">
-                                            <i class="fa-solid fa-id-card me-1"></i> Review Dossier
+                                            <i class="fa-solid fa-id-card me-1"></i> Review Candidate
                                         </a>
                                     </div>
+                                    {% endif %}
                                 </div>
                             {% endfor %}
                         </div>

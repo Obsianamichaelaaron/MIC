@@ -1,5 +1,6 @@
 import os
 import re
+from django.utils import timezone
 from pypdf import PdfReader
 from docx import Document
 from app.models import Applicant, Skill, Qualification, ResumeAnalysis
@@ -16,12 +17,41 @@ COMMON_SKILL_KEYWORDS = [
 ]
 
 EDUCATION_LEVELS = [
-    ('Doctorate', ['phd', 'doctorate', 'doctor of']),
-    ('Master', ['master', 'mba', 'msc', 'ma', 'master of']),
-    ('Bachelor', ['bachelor', 'bs', 'ba', 'bba', 'bsc', 'undergraduate', 'college graduate', 'degree', 'bachelor of']),
-    ('Associate', ['associate', 'diploma', 'vocational', 'associate in']),
-    ('High School', ['high school', 'secondary', 'senior high school', 'shs']),
+    ('Doctorate', [
+        r'\bph\.?\s*d\.?\b',
+        r'\bdoctorate\b',
+        r'\bdoctoral\b',
+        r'\bdoctor of\b',
+    ]),
+    ('Master', [
+        r"\bmaster(?:'s)?(?:\s+degree)?\b",
+        r'\b(?:mba|m\.?sc\.?|m\.?s\.?|m\.?a\.?|m\.?eng\.?|m\.?ed\.?|m\.?tech\.?|m\.?sw|mpa|mphil)\b',
+    ]),
+    ('Bachelor', [
+        r"\bbachelor(?:'s)?(?:\s+degree)?\b",
+        r'\b(?:b\.?sc\.?|b\.?s\.?|b\.?a\.?|bba|b\.?eng\.?|b\.?tech\.?|b\.?com|b\.?ed\.?)\b',
+        r'\bundergraduate\b',
+        r'\bcollege graduate\b',
+    ]),
+    ('Associate', [
+        r'\bassociate(?:\s+degree|\s+in)?\b',
+        r'\bdiploma\b',
+        r'\bvocational\b',
+    ]),
+    ('High School', [
+        r'\bhigh school\b',
+        r'\bsecondary\b',
+        r'\bsenior high school\b',
+        r'\bshs\b',
+    ]),
 ]
+
+DATE_RANGE_PATTERN = re.compile(
+    r'\b((?:19|20)\d{2})[ \t]*'
+    r'(?:[-\u2013\u2014\uFFFD]+|[ \t]+to\b)[ \t]*'
+    r'((?:19|20)\d{2}|present|current|now)\b',
+    re.IGNORECASE,
+)
 
 # Non-resume negative indicator patterns
 DISQUALIFIER_PATTERNS = {
@@ -142,6 +172,61 @@ def extract_document_text(file_path: str) -> str:
     return txt
 
 
+def extract_resume_name(text: str) -> tuple[str, str]:
+    """Extract the candidate name from the resume header."""
+    ignored_headers = {
+        'resume', 'curriculum vitae', 'professional summary', 'career objective',
+        'objective', 'contact', 'contact information', 'personal information',
+        'work experience', 'professional experience', 'employment history',
+        'education', 'skills', 'qualifications', 'certifications',
+    }
+    for line in (text or '').splitlines()[:15]:
+        candidate = line.strip()
+        if not candidate:
+            continue
+        candidate = re.split(r'\s+[|•]\s+', candidate, maxsplit=1)[0]
+        if '@' in candidate or re.search(r'\d', candidate):
+            continue
+        candidate = candidate.strip(' \t:|•-–—')
+        if candidate.casefold() in ignored_headers:
+            continue
+        if re.search(
+            r'\b(?:engineer|developer|manager|analyst|specialist|designer|'
+            r'coordinator|administrator|consultant|technician|intern|teacher|'
+            r'accountant|nurse|officer|assistant|director|supervisor)\b',
+            candidate,
+            re.IGNORECASE,
+        ):
+            continue
+        name_parts = re.findall(
+            r"[^\W\d_]+(?:['’.-][^\W\d_]+)*",
+            candidate,
+            flags=re.UNICODE,
+        )
+        if 2 <= len(name_parts) <= 5 and len(' '.join(name_parts)) >= 4:
+            return ' '.join(name_parts[:-1]), name_parts[-1]
+    return '', ''
+
+
+def resume_name_matches(resume_first_name: str, resume_last_name: str, first_name: str, last_name: str) -> bool:
+    """Compare given and family names while allowing middle names or initials."""
+    def normalize(value: str) -> list[str]:
+        return re.findall(r'[^\W\d_]+', value.casefold(), flags=re.UNICODE)
+
+    resume_first = normalize(resume_first_name)
+    resume_last = normalize(resume_last_name)
+    account_first = normalize(first_name)
+    account_last = normalize(last_name)
+    return bool(
+        resume_first
+        and resume_last
+        and account_first
+        and account_last
+        and resume_first[0] == account_first[0]
+        and resume_last[-1] == account_last[-1]
+    )
+
+
 def verify_resume_document(file_path: str) -> dict:
     """
     AI-Powered Resume Document Verification Engine.
@@ -258,14 +343,11 @@ def verify_resume_document(file_path: str) -> dict:
 
     # Education mentions
     has_education_degree = False
-    for level, kws in EDUCATION_LEVELS:
-        for kw in kws:
-            if re.search(r'\b' + re.escape(kw) + r'\b', lower_text):
-                has_education_degree = True
-                if 'education' not in detected_sections:
-                    detected_sections.append('education')
-                break
-        if has_education_degree:
+    for _, patterns in EDUCATION_LEVELS:
+        if any(re.search(pattern, lower_text) for pattern in patterns):
+            has_education_degree = True
+            if 'education' not in detected_sections:
+                detected_sections.append('education')
             break
 
     # Skill extraction from database and taxonomy
@@ -289,7 +371,7 @@ def verify_resume_document(file_path: str) -> dict:
         detected_sections.append('skills')
 
     # Date ranges / timeline check (e.g. 2018 - 2023, 2021 - Present)
-    year_ranges = re.findall(r'\b(20[012]\d|19[89]\d)\s*[-–—to]+\s*(20[012]\d|present|current)\b', lower_text)
+    year_ranges = DATE_RANGE_PATTERN.findall(lower_text)
     has_timeline = len(year_ranges) > 0
 
     # Job roles and Action verbs check
@@ -385,37 +467,29 @@ def parse_resume_text(text: str) -> dict:
             found_skills.add(s_canon)
             
     # 2. Extract Education Level
-    detected_education = 'High School'
-    for level, keywords in EDUCATION_LEVELS:
-        for kw in keywords:
-            if re.search(r'\b' + re.escape(kw) + r'\b', text_lower):
-                detected_education = level
-                break
-        if detected_education != 'High School':
+    detected_education = ''
+    for level, patterns in EDUCATION_LEVELS:
+        if any(re.search(pattern, text_lower) for pattern in patterns):
+            detected_education = level
             break
 
     # 3. Extract Experience Years
-    detected_exp = 0
-    exp_matches = re.findall(r'(\d+)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+experience', text_lower)
-    if exp_matches:
-        try:
-            detected_exp = max([int(m) for m in exp_matches if int(m) < 40])
-        except Exception:
-            detected_exp = 0
-    else:
-        # Year ranges e.g. 2018 - 2023
-        year_ranges = re.findall(r'(20\d\d)\s*[-–to]+\s*(20\d\d|present|current)', text_lower)
-        total_range = 0
-        for start_yr, end_yr in year_ranges:
-            try:
-                s = int(start_yr)
-                e = 2026 if end_yr in ['present', 'current'] else int(end_yr)
-                if e >= s:
-                    total_range += (e - s)
-            except Exception:
-                pass
-        if total_range > 0:
-            detected_exp = min(total_range, 30)
+    explicit_experience = [
+        int(years)
+        for years in re.findall(
+            r'(\d+)\+?\s*(?:years?|yrs?)(?:\s+of)?\s+experience',
+            text_lower,
+        )
+        if int(years) < 40
+    ]
+    current_year = timezone.localdate().year
+    year_ranges = DATE_RANGE_PATTERN.findall(text_lower)
+    range_experience = 0
+    for start_year, end_year in year_ranges:
+        end = current_year if end_year in {'present', 'current', 'now'} else int(end_year)
+        if end >= int(start_year):
+            range_experience += end - int(start_year)
+    detected_exp = min(max(explicit_experience + [range_experience]), 30)
 
     # 4. Extract Qualifications
     db_quals = Qualification.objects.filter(status='active') if Qualification.objects.exists() else []
@@ -435,8 +509,12 @@ def parse_resume_text(text: str) -> dict:
     score += min(detected_exp * 2.5, 20.0)
     employability_score = min(round(score, 2), 100.0)
 
+    first_name, last_name = extract_resume_name(text)
     return {
         'text': text,
+        'first_name': first_name,
+        'last_name': last_name,
+        'phone': _extract_resume_phone(text),
         'skills': sorted(list(found_skills)),
         'skills_str': ', '.join(sorted(list(found_skills))),
         'education_level': detected_education,
@@ -446,20 +524,34 @@ def parse_resume_text(text: str) -> dict:
     }
 
 
-def parse_and_save_applicant_resume(applicant: Applicant, file_path: str) -> dict:
+def _extract_resume_phone(text: str) -> str:
+    phone_pattern = re.compile(r'(?<!\w)\+?\d[\d().\-\s]{5,}\d(?!\w)')
+    for match in phone_pattern.finditer(text or ''):
+        phone = match.group().strip()
+        digit_count = sum(character.isdigit() for character in phone)
+        if 7 <= digit_count <= 15:
+            return phone
+    return ''
+
+
+def parse_and_save_applicant_resume(
+    applicant: Applicant,
+    file_path: str,
+    parsed_data: dict | None = None,
+) -> dict:
     """
     Parses an uploaded resume, saves resume analysis record, and updates Applicant profile.
     """
-    text = extract_document_text(file_path)
+    text = extract_document_text(file_path) if parsed_data is None else parsed_data.get('text', '')
     if not text:
         return {}
         
-    data = parse_resume_text(text)
+    data = parsed_data or parse_resume_text(text)
     
     # Save to ResumeAnalysis
     ResumeAnalysis.objects.create(
         applicant=applicant,
-        resume_file=file_path,
+        resume_file=applicant.resume_file or file_path,
         extracted_text=text[:5000],
         skills_extracted=data['skills_str'],
         education_extracted=data['education_level'],
@@ -467,18 +559,16 @@ def parse_and_save_applicant_resume(applicant: Applicant, file_path: str) -> dic
         qualifications_extracted=data['qualification']
     )
     
-    # Update Applicant
-    if data['skills_str']:
-        applicant.skills = data['skills_str']
-    if data['education_level']:
-        applicant.education_level = data['education_level']
-    if data['experience_years'] > 0:
-        applicant.experience_years = data['experience_years']
-    if data['qualification'] and not applicant.qualifications:
-        applicant.qualifications = data['qualification']
-    if data['employability_score'] > 0:
-        applicant.employability_score = data['employability_score']
-        
+    # Replace resume-derived profile values so data from an older resume cannot linger.
+    applicant.user.first_name = data['first_name']
+    applicant.user.last_name = data['last_name']
+    applicant.user.phone = data['phone']
+    applicant.user.save()
+    applicant.skills = data['skills_str']
+    applicant.education_level = data['education_level']
+    applicant.experience_years = data['experience_years']
+    applicant.qualifications = data['qualification']
+    applicant.employability_score = data['employability_score']
     applicant.profile_completed = True
     applicant.save()
     

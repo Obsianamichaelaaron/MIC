@@ -6,6 +6,7 @@ import mimetypes
 from django.shortcuts import render, get_object_or_404, redirect
 from django.http import (
     FileResponse,
+    HttpResponse,
     HttpResponseNotFound,
     HttpResponseServerError,
     JsonResponse,
@@ -13,6 +14,7 @@ from django.http import (
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
 from django.conf import settings
+from django.core.cache import cache
 from app.models import (
     Application, Applicant, CmsSection, CmsContent, CmsHeroSlide,
     CmsTestimonial, CmsBrand, CmsNews, JobPosting, Qualification,
@@ -27,128 +29,175 @@ from app.services.job_listings import (
 
 logger = logging.getLogger(__name__)
 
+_CMS_CACHE_KEY = 'cms_content_dict'
+_CMS_CACHE_TTL = 300  # 5 minutes
+
 
 def get_cms_content_dict():
     """
     Builds a dictionary of CMS content key-values grouped by section_key.
-    Equivalent to PHP's getCMSContent() function.
+    Uses 1 single query instead of 11 queries, and caches for 5 minutes.
     """
+    cached = cache.get(_CMS_CACHE_KEY)
+    if cached is not None:
+        return cached
+
     cms = {}
     try:
-        sections = CmsSection.objects.prefetch_related('contents').all()
-        for sec in sections:
-            sec_dict = {}
-            for item in sec.contents.filter(is_active=True):
-                sec_dict[item.field_key] = item.field_value
-            cms[sec.section_key] = sec_dict
+        contents = CmsContent.objects.filter(is_active=True).select_related('section')
+        for item in contents:
+            if item.section and item.section.section_key:
+                sec_key = item.section.section_key
+                if sec_key not in cms:
+                    cms[sec_key] = {}
+                cms[sec_key][item.field_key] = item.field_value
     except Exception:
         pass
+
+    cache.set(_CMS_CACHE_KEY, cms, _CMS_CACHE_TTL)
     return cms
 
 HARDCODED_BRANDS = [
-    {'brand_name': 'Lungsod ng Bacoor',       'brand_description': 'Building progress together.',          'brand_overlay_title': 'Lungsod ng Bacoor',       'brand_overlay_description': 'Empowering local communities.',      'brand_logo': 'images/b1.png',     'brand_category': 'gov', 'sort_order': 1},
-    {'brand_name': 'Lungsod ng Imus',          'brand_description': 'Innovative city, empowered citizens.', 'brand_overlay_title': 'Lungsod ng Imus',          'brand_overlay_description': 'Advancing sustainable growth.',      'brand_logo': 'images/b1.png',     'brand_category': 'gov', 'sort_order': 2},
-    {'brand_name': 'City of Santa Rosa',       'brand_description': 'The Lion City of the South.',         'brand_overlay_title': 'City of Santa Rosa',       'brand_overlay_description': 'Driving innovation and excellence.', 'brand_logo': 'images/b3.png',     'brand_category': 'gov', 'sort_order': 3},
-    {'brand_name': 'City of Trece Martires',   'brand_description': 'Unity in progress.',                  'brand_overlay_title': 'City of Trece Martires',   'brand_overlay_description': 'Committed to public service.',       'brand_logo': 'images/b4.png',     'brand_category': 'gov', 'sort_order': 4},
-    {'brand_name': 'City of General Trias',    'brand_description': 'Championing development.',            'brand_overlay_title': 'City of General Trias',    'brand_overlay_description': 'Creating opportunities for all.',    'brand_logo': 'images/b5.png',     'brand_category': 'gov', 'sort_order': 5},
-    {'brand_name': 'City of San Pedro',        'brand_description': 'Gateway to Laguna.',                  'brand_overlay_title': 'City of San Pedro',        'brand_overlay_description': 'People-centered governance.',        'brand_logo': 'images/b6.png',     'brand_category': 'gov', 'sort_order': 6},
-    {'brand_name': 'Lalawigan ng Laguna',      'brand_description': 'Heart of Calabarzon.',                'brand_overlay_title': 'Lalawigan ng Laguna',      'brand_overlay_description': 'Promoting inclusive prosperity.',    'brand_logo': 'images/b8.png',     'brand_category': 'gov', 'sort_order': 7},
-    {'brand_name': 'Lalawigan ng Batangas',    'brand_description': 'Heart of Calabarzon.',                'brand_overlay_title': 'Lalawigan ng Batangas',    'brand_overlay_description': 'Promoting inclusive prosperity.',    'brand_logo': 'images/bnine.png',  'brand_category': 'gov', 'sort_order': 8},
-    {'brand_name': 'Globe myBusiness',         'brand_description': 'Empowering Filipino entrepreneurs.',  'brand_overlay_title': 'Globe myBusiness',         'brand_overlay_description': 'Connecting business, powering success.','brand_logo': 'images/b11.png',  'brand_category': 'cor', 'sort_order': 9},
-    {'brand_name': 'Asia Brewery Inc.',        'brand_description': 'Refreshing the nation.',              'brand_overlay_title': 'Asia Brewery Inc.',        'brand_overlay_description': 'Committed to quality and innovation.','brand_logo': 'images/b12.jpg',  'brand_category': 'cor', 'sort_order': 10},
-    {'brand_name': 'AFFI Entrepreneurs',       'brand_description': 'Fueling business dreams.',            'brand_overlay_title': 'AFFI Entrepreneurs',       'brand_overlay_description': 'Together, we grow stronger.',        'brand_logo': 'images/b13.png',    'brand_category': 'cor', 'sort_order': 11},
-    {'brand_name': 'Metrobank',                'brand_description': 'You\'re in good hands.',              'brand_overlay_title': 'Metrobank',                'brand_overlay_description': 'Meaningful banking for Filipinos.',  'brand_logo': 'images/b14.png',    'brand_category': 'cor', 'sort_order': 12},
-    {'brand_name': 'CARD SME Bank',            'brand_description': 'Financing your future.',              'brand_overlay_title': 'CARD SME Bank',            'brand_overlay_description': 'Helping small dreams grow big.',     'brand_logo': 'images/b15.png',    'brand_category': 'cor', 'sort_order': 13},
-    {'brand_name': 'Mitsubishi Motors',        'brand_description': 'Drive your ambition.',                'brand_overlay_title': 'Mitsubishi Motors',        'brand_overlay_description': 'Innovation in motion.',              'brand_logo': 'images/b17.jpg',    'brand_category': 'cor', 'sort_order': 14},
-    {'brand_name': 'Hyundai',                  'brand_description': 'Progress for humanity.',              'brand_overlay_title': 'Hyundai',                  'brand_overlay_description': 'New thinking, new possibilities.',   'brand_logo': 'images/b18.jpg',    'brand_category': 'cor', 'sort_order': 15},
-    {'brand_name': 'CITIMOTORS INC.',          'brand_description': 'Driven by trust.',                    'brand_overlay_title': 'CITIMOTORS INC.',          'brand_overlay_description': 'Your road to reliability.',          'brand_logo': 'images/b1nine.jpg', 'brand_category': 'cor', 'sort_order': 16},
-    {'brand_name': 'PrimeWater',               'brand_description': 'Clean water, better life.',           'brand_overlay_title': 'PrimeWater',               'brand_overlay_description': 'Sustaining communities nationwide.', 'brand_logo': 'images/b20.png',    'brand_category': 'cor', 'sort_order': 17},
-    {'brand_name': 'IMI',                      'brand_description': 'Engineering a smarter world.',        'brand_overlay_title': 'IMI',                      'brand_overlay_description': 'Innovating for the future.',         'brand_logo': 'images/b21.jpg',    'brand_category': 'cor', 'sort_order': 18},
-    {'brand_name': 'Concentrix',               'brand_description': 'Designing better human experiences.', 'brand_overlay_title': 'Concentrix',               'brand_overlay_description': 'People. Passion. Performance.',      'brand_logo': 'images/b23.png',    'brand_category': 'cor', 'sort_order': 19},
-    {'brand_name': 'Convergys',                'brand_description': 'Empowering people, powering business.','brand_overlay_title': 'Convergys',              'brand_overlay_description': 'Delivering customer excellence.',    'brand_logo': 'images/b24.png',    'brand_category': 'cor', 'sort_order': 20},
-    {'brand_name': 'Jollibee',                 'brand_description': 'Bida ang saya!',                      'brand_overlay_title': 'Jollibee',                 'brand_overlay_description': 'Bringing joy to every Filipino.',    'brand_logo': 'images/b25.png',    'brand_category': 'foo', 'sort_order': 21},
-    {'brand_name': 'Days Hotel',               'brand_description': 'Stay comfortable, stay inspired.',    'brand_overlay_title': 'Days Hotel',               'brand_overlay_description': 'Your home away from home.',          'brand_logo': 'images/b26.jpg',    'brand_category': 'foo', 'sort_order': 22},
-    {'brand_name': 'Manila Ocean Park',        'brand_description': 'Dive into discovery.',                'brand_overlay_title': 'Manila Ocean Park',        'brand_overlay_description': 'Where fun meets the ocean.',         'brand_logo': 'images/b28.jpg',    'brand_category': 'foo', 'sort_order': 23},
-    {'brand_name': 'STI',                      'brand_description': 'Education for real life.',             'brand_overlay_title': 'STI',                      'brand_overlay_description': 'Driven by technology and excellence.','brand_logo': 'images/b2nine.jpg','brand_category': 'edu', 'sort_order': 24},
-    {'brand_name': 'Department of Agriculture','brand_description': 'Masaganang ani, mataas na kita.',     'brand_overlay_title': 'Department of Agriculture','brand_overlay_description': 'Securing food for every Filipino.',  'brand_logo': 'images/b30.png',    'brand_category': 'gov', 'sort_order': 25},
-    {'brand_name': 'DPWH',                     'brand_description': 'Building better roads.',              'brand_overlay_title': 'DPWH',                     'brand_overlay_description': 'Connecting communities nationwide.', 'brand_logo': 'images/b32.png',    'brand_category': 'gov', 'sort_order': 26},
-    {'brand_name': 'City of Dasmariñas',       'brand_description': 'The university city.',                'brand_overlay_title': 'City of Dasmariñas',       'brand_overlay_description': 'Home of education and progress.',    'brand_logo': 'images/b6.jpg',     'brand_category': 'gov', 'sort_order': 27},
+    {'brand_name': 'Lungsod ng Bacoor',       'brand_description': 'Building progress together.',          'brand_overlay_title': 'Lungsod ng Bacoor',       'brand_overlay_description': 'Empowering local communities.',      'brand_logo': '/static/images/b1.webp',     'brand_category': 'gov', 'sort_order': 1},
+    {'brand_name': 'Lungsod ng Imus',          'brand_description': 'Innovative city, empowered citizens.', 'brand_overlay_title': 'Lungsod ng Imus',          'brand_overlay_description': 'Advancing sustainable growth.',      'brand_logo': '/static/images/b1.webp',     'brand_category': 'gov', 'sort_order': 2},
+    {'brand_name': 'City of Santa Rosa',       'brand_description': 'The Lion City of the South.',         'brand_overlay_title': 'City of Santa Rosa',       'brand_overlay_description': 'Driving innovation and excellence.', 'brand_logo': '/static/images/b3.webp',     'brand_category': 'gov', 'sort_order': 3},
+    {'brand_name': 'City of Trece Martires',   'brand_description': 'Unity in progress.',                  'brand_overlay_title': 'City of Trece Martires',   'brand_overlay_description': 'Committed to public service.',       'brand_logo': '/static/images/b4.webp',     'brand_category': 'gov', 'sort_order': 4},
+    {'brand_name': 'City of General Trias',    'brand_description': 'Championing development.',            'brand_overlay_title': 'City of General Trias',    'brand_overlay_description': 'Creating opportunities for all.',    'brand_logo': '/static/images/b5.webp',     'brand_category': 'gov', 'sort_order': 5},
+    {'brand_name': 'City of San Pedro',        'brand_description': 'Gateway to Laguna.',                  'brand_overlay_title': 'City of San Pedro',        'brand_overlay_description': 'People-centered governance.',        'brand_logo': '/static/images/b6.webp',     'brand_category': 'gov', 'sort_order': 6},
+    {'brand_name': 'Lalawigan ng Laguna',      'brand_description': 'Heart of Calabarzon.',                'brand_overlay_title': 'Lalawigan ng Laguna',      'brand_overlay_description': 'Promoting inclusive prosperity.',    'brand_logo': '/static/images/b8.webp',     'brand_category': 'gov', 'sort_order': 7},
+    {'brand_name': 'Lalawigan ng Batangas',    'brand_description': 'Heart of Calabarzon.',                'brand_overlay_title': 'Lalawigan ng Batangas',    'brand_overlay_description': 'Promoting inclusive prosperity.',    'brand_logo': '/static/images/bnine.webp',  'brand_category': 'gov', 'sort_order': 8},
+    {'brand_name': 'Globe myBusiness',         'brand_description': 'Empowering Filipino entrepreneurs.',  'brand_overlay_title': 'Globe myBusiness',         'brand_overlay_description': 'Connecting business, powering success.','brand_logo': '/static/images/b11.webp',  'brand_category': 'cor', 'sort_order': 9},
+    {'brand_name': 'Asia Brewery Inc.',        'brand_description': 'Refreshing the nation.',              'brand_overlay_title': 'Asia Brewery Inc.',        'brand_overlay_description': 'Committed to quality and innovation.','brand_logo': '/static/images/b12.webp',  'brand_category': 'cor', 'sort_order': 10},
+    {'brand_name': 'AFFI Entrepreneurs',       'brand_description': 'Fueling business dreams.',            'brand_overlay_title': 'AFFI Entrepreneurs',       'brand_overlay_description': 'Together, we grow stronger.',        'brand_logo': '/static/images/b13.webp',    'brand_category': 'cor', 'sort_order': 11},
+    {'brand_name': 'Metrobank',                'brand_description': 'You\'re in good hands.',              'brand_overlay_title': 'Metrobank',                'brand_overlay_description': 'Meaningful banking for Filipinos.',  'brand_logo': '/static/images/b14.webp',    'brand_category': 'cor', 'sort_order': 12},
+    {'brand_name': 'CARD SME Bank',            'brand_description': 'Financing your future.',              'brand_overlay_title': 'CARD SME Bank',            'brand_overlay_description': 'Helping small dreams grow big.',     'brand_logo': '/static/images/b15.webp',    'brand_category': 'cor', 'sort_order': 13},
+    {'brand_name': 'Mitsubishi Motors',        'brand_description': 'Drive your ambition.',                'brand_overlay_title': 'Mitsubishi Motors',        'brand_overlay_description': 'Innovation in motion.',              'brand_logo': '/static/images/b17.webp',    'brand_category': 'cor', 'sort_order': 14},
+    {'brand_name': 'Hyundai',                  'brand_description': 'Progress for humanity.',              'brand_overlay_title': 'Hyundai',                  'brand_overlay_description': 'New thinking, new possibilities.',   'brand_logo': '/static/images/b18.webp',    'brand_category': 'cor', 'sort_order': 15},
+    {'brand_name': 'CITIMOTORS INC.',          'brand_description': 'Driven by trust.',                    'brand_overlay_title': 'CITIMOTORS INC.',          'brand_overlay_description': 'Your road to reliability.',          'brand_logo': '/static/images/b1nine.webp', 'brand_category': 'cor', 'sort_order': 16},
+    {'brand_name': 'PrimeWater',               'brand_description': 'Clean water, better life.',           'brand_overlay_title': 'PrimeWater',               'brand_overlay_description': 'Sustaining communities nationwide.', 'brand_logo': '/static/images/b20.webp',    'brand_category': 'cor', 'sort_order': 17},
+    {'brand_name': 'IMI',                      'brand_description': 'Engineering a smarter world.',        'brand_overlay_title': 'IMI',                      'brand_overlay_description': 'Innovating for the future.',         'brand_logo': '/static/images/b21.webp',    'brand_category': 'cor', 'sort_order': 18},
+    {'brand_name': 'Concentrix',               'brand_description': 'Designing better human experiences.', 'brand_overlay_title': 'Concentrix',               'brand_overlay_description': 'People. Passion. Performance.',      'brand_logo': '/static/images/b23.webp',    'brand_category': 'cor', 'sort_order': 19},
+    {'brand_name': 'Convergys',                'brand_description': 'Empowering people, powering business.','brand_overlay_title': 'Convergys',              'brand_overlay_description': 'Delivering customer excellence.',    'brand_logo': '/static/images/b24.webp',    'brand_category': 'cor', 'sort_order': 20},
+    {'brand_name': 'Jollibee',                 'brand_description': 'Bida ang saya!',                      'brand_overlay_title': 'Jollibee',                 'brand_overlay_description': 'Bringing joy to every Filipino.',    'brand_logo': '/static/images/b25.webp',    'brand_category': 'foo', 'sort_order': 21},
+    {'brand_name': 'Days Hotel',               'brand_description': 'Stay comfortable, stay inspired.',    'brand_overlay_title': 'Days Hotel',               'brand_overlay_description': 'Your home away from home.',          'brand_logo': '/static/images/b26.webp',    'brand_category': 'foo', 'sort_order': 22},
+    {'brand_name': 'Manila Ocean Park',        'brand_description': 'Dive into discovery.',                'brand_overlay_title': 'Manila Ocean Park',        'brand_overlay_description': 'Where fun meets the ocean.',         'brand_logo': '/static/images/b28.webp',    'brand_category': 'foo', 'sort_order': 23},
+    {'brand_name': 'STI',                      'brand_description': 'Education for real life.',             'brand_overlay_title': 'STI',                      'brand_overlay_description': 'Driven by technology and excellence.','brand_logo': '/static/images/b2nine.webp','brand_category': 'edu', 'sort_order': 24},
+    {'brand_name': 'Department of Agriculture','brand_description': 'Masaganang ani, mataas na kita.',     'brand_overlay_title': 'Department of Agriculture','brand_overlay_description': 'Securing food for every Filipino.',  'brand_logo': '/static/images/b30.webp',    'brand_category': 'gov', 'sort_order': 25},
+    {'brand_name': 'DPWH',                     'brand_description': 'Building better roads.',              'brand_overlay_title': 'DPWH',                     'brand_overlay_description': 'Connecting communities nationwide.', 'brand_logo': '/static/images/b32.webp',    'brand_category': 'gov', 'sort_order': 26},
+    {'brand_name': 'City of Dasmariñas',       'brand_description': 'The university city.',                'brand_overlay_title': 'City of Dasmariñas',       'brand_overlay_description': 'Home of education and progress.',    'brand_logo': '/static/images/b6.webp',     'brand_category': 'gov', 'sort_order': 27},
 ]
+
+_INDEX_HTML_KEY = 'public_homepage_rendered_html_v1'
+_INDEX_CACHE_KEY = 'public_homepage_context_v4'
+_INDEX_CACHE_TTL = 180  # 3 minutes
 
 def index_view(request):
     """
     Homepage controller matching index.php.
+    Cached for 3 minutes to eliminate remote database network latency.
     """
-    cms = get_cms_content_dict()
-    
-    # Hero slides
-    hero_slides = list(CmsHeroSlide.objects.filter(is_active=True).order_by('sort_order', 'id'))
-    if not hero_slides:
-        hero_slides = [
-            {'title': 'Integrated Business<br><em>Solutions</em> That Scale', 'subtitle': 'Connect with opportunities that match your skills. Partner with the Philippines\' leading managed services corporation.', 'button_text': 'Browse Jobs', 'button_link': '/careers.php', 'image_path': 'images/picture1.png'},
-            {'title': 'Global <em>Partnerships</em>', 'subtitle': 'Building bridges between talent and opportunity across the Philippines and beyond.', 'button_text': 'Learn More', 'button_link': '/about.php', 'image_path': 'images/picture2.png'},
-            {'title': 'Digital <em>Transformation</em>', 'subtitle': 'Empowering businesses with cutting-edge managed services and solutions.', 'button_text': 'Our Services', 'button_link': '/services.php', 'image_path': 'images/picture3.png'}
-        ]
+    if not request.session.get('user_id'):
+        cached_html = cache.get(_INDEX_HTML_KEY)
+        if cached_html is not None:
+            response = HttpResponse(cached_html)
+            response['Content-Type'] = 'text/html; charset=utf-8'
+            return response
 
-    # Stats
-    stats_years = cms.get('stats', {}).get('years', '22+')
-    stats_clients = cms.get('stats', {}).get('clients', '500+')
-    stats_efficiency = cms.get('stats', {}).get('efficiency', '95%')
-    stats_units = cms.get('stats', {}).get('units', '3K+')
-
-    # Section titles
-    partners_title = cms.get('partners_title', {}).get('title') or cms.get('partners', {}).get('title') or 'Our Partner Brands'
-    testimonials_title = cms.get('testimonials_title', {}).get('title') or cms.get('testimonials', {}).get('title') or 'What Our Clients Say'
-    featured_jobs_title = cms.get('featured_jobs_title', {}).get('title') or 'Featured Job Openings'
+    cached_context = cache.get(_INDEX_CACHE_KEY)
+    if cached_context is None:
+        cms = get_cms_content_dict()
         
-    # Testimonials
-    testimonials = list(CmsTestimonial.objects.filter(is_active=True).order_by('sort_order', 'id'))
-    if not testimonials:
-        testimonials = [
-            {'author_name': 'John Smith', 'author_role': 'CEO', 'company': 'Tech Solutions Inc.', 'content': 'MULTIBIZ INTERNATIONAL CORPORATION transformed our document management system. Their managed print services have saved us time and reduced our costs significantly. The team is professional and always available when we need support.'},
-            {'author_name': 'Sarah Johnson', 'author_role': 'CTO', 'company': 'Global Enterprises', 'content': 'The IT solutions provided by MULTIBIZ INTERNATIONAL CORPORATION have been exceptional. They helped us streamline our operations and implement systems that have increased our productivity by 40%. Highly recommended!'},
-            {'author_name': 'Michael Brown', 'author_role': 'Operations Director', 'company': 'Retail Corp', 'content': "We've been working with MULTIBIZ INTERNATIONAL CORPORATION for over 10 years and their service has always been top-notch. Their team understands our business needs and provides solutions that help us grow."}
-        ]
-    
-    # Partner Brands
-    partner_brands = list(CmsBrand.objects.filter(is_active=True).order_by('sort_order', 'id'))
-    if not partner_brands:
-        partner_brands = HARDCODED_BRANDS
-    
-    # News & Events
-    news_articles = list(CmsNews.objects.filter(is_active=True).order_by('-news_date', '-id')[:6])
+        # Hero slides
+        try:
+            hero_slides = list(CmsHeroSlide.objects.filter(is_active=True).order_by('sort_order', 'id'))
+        except Exception:
+            hero_slides = []
 
-    # Keep landing-page jobs in sync with the applicant-visible active listings.
-    featured_jobs = unique_featured_job_postings(
-        JobPosting.objects.filter(
-            status='active',
-            employer__company_name__isnull=False,
-        ).exclude(
-            employer__company_name='',
-        ).select_related('employer').order_by('-posted_at', '-job_id'),
-        limit=6,
-    )
+        if not hero_slides:
+            hero_slides = [
+                {'title': 'Integrated Business<br><em>Solutions</em> That Scale', 'subtitle': 'Connect with opportunities that match your skills. Partner with the Philippines\' leading managed services corporation.', 'button_text': 'Browse Jobs', 'button_link': '/careers.php', 'image_path': '/static/images/picture1.webp'},
+                {'title': 'Global <em>Partnerships</em>', 'subtitle': 'Building bridges between talent and opportunity across the Philippines and beyond.', 'button_text': 'Learn More', 'button_link': '/about.php', 'image_path': '/static/images/picture2.webp'},
+                {'title': 'Digital <em>Transformation</em>', 'subtitle': 'Empowering businesses with cutting-edge managed services and solutions.', 'button_text': 'Our Services', 'button_link': '/services.php', 'image_path': '/static/images/picture3.webp'}
+            ]
 
-    context = {
-        'page_title': 'MULTIBIZ INTERNATIONAL CORPORATION',
-        'current_page': 'index.php',
-        'cms': cms,
-        'hero_slides': hero_slides,
-        'stats_years': stats_years,
-        'stats_clients': stats_clients,
-        'stats_efficiency': stats_efficiency,
-        'stats_units': stats_units,
-        'partners_title': partners_title,
-        'partner_brands': partner_brands,
-        'brands': partner_brands,
-        'testimonials_title': testimonials_title,
-        'testimonials': testimonials,
-        'featured_jobs_title': featured_jobs_title,
-        'news_articles': news_articles,
-        'news_list': news_articles,
-        'featured_jobs': featured_jobs,
-    }
-    return render(request, 'public/index.html', context)
+        # Stats
+        stats_years = cms.get('stats', {}).get('years', '22+')
+        stats_clients = cms.get('stats', {}).get('clients', '500+')
+        stats_efficiency = cms.get('stats', {}).get('efficiency', '95%')
+        stats_units = cms.get('stats', {}).get('units', '3K+')
+
+        # Section titles
+        partners_title = cms.get('partners_title', {}).get('title') or cms.get('partners', {}).get('title') or 'Our Partner Brands'
+        testimonials_title = cms.get('testimonials_title', {}).get('title') or cms.get('testimonials', {}).get('title') or 'What Our Clients Say'
+        featured_jobs_title = cms.get('featured_jobs_title', {}).get('title') or 'Featured Job Openings'
+            
+        # Testimonials
+        try:
+            testimonials = list(CmsTestimonial.objects.filter(is_active=True).order_by('sort_order', 'id'))
+        except Exception:
+            testimonials = []
+
+        if not testimonials:
+            testimonials = [
+                {'author_name': 'John Smith', 'author_role': 'CEO', 'company': 'Tech Solutions Inc.', 'content': 'MULTIBIZ INTERNATIONAL CORPORATION transformed our document management system. Their managed print services have saved us time and reduced our costs significantly. The team is professional and always available when we need support.'},
+                {'author_name': 'Sarah Johnson', 'author_role': 'CTO', 'company': 'Global Enterprises', 'content': 'The IT solutions provided by MULTIBIZ INTERNATIONAL CORPORATION have been exceptional. They helped us streamline our operations and implement systems that have increased our productivity by 40%. Highly recommended!'},
+                {'author_name': 'Michael Brown', 'author_role': 'Operations Director', 'company': 'Retail Corp', 'content': "We've been working with MULTIBIZ INTERNATIONAL CORPORATION for over 10 years and their service has always been top-notch. Their team understands our business needs and provides solutions that help us grow."}
+            ]
+        
+        # Partner Brands
+        try:
+            partner_brands = list(CmsBrand.objects.filter(is_active=True).order_by('sort_order', 'id'))
+        except Exception:
+            partner_brands = []
+
+        if not partner_brands:
+            partner_brands = HARDCODED_BRANDS
+        
+        # News & Events
+        try:
+            news_articles = list(CmsNews.objects.filter(is_active=True).order_by('-news_date', '-id')[:6])
+        except Exception:
+            news_articles = []
+
+        # Keep landing-page jobs in sync with the applicant-visible active listings.
+        try:
+            featured_jobs = unique_featured_job_postings(
+                JobPosting.objects.filter(
+                    status='active',
+                    employer__company_name__isnull=False,
+                ).exclude(
+                    employer__company_name='',
+                ).select_related('employer').order_by('-posted_at', '-job_id'),
+                limit=6,
+            )
+        except Exception:
+            featured_jobs = []
+
+        cached_context = {
+            'page_title': 'MULTIBIZ INTERNATIONAL CORPORATION',
+            'current_page': 'index.php',
+            'cms': cms,
+            'hero_slides': hero_slides,
+            'stats_years': stats_years,
+            'stats_clients': stats_clients,
+            'stats_efficiency': stats_efficiency,
+            'stats_units': stats_units,
+            'partners_title': partners_title,
+            'partner_brands': partner_brands,
+            'brands': partner_brands,
+            'testimonials_title': testimonials_title,
+            'testimonials': testimonials,
+            'featured_jobs_title': featured_jobs_title,
+            'news_articles': news_articles,
+            'news_list': news_articles,
+            'featured_jobs': featured_jobs,
+        }
+        cache.set(_INDEX_CACHE_KEY, cached_context, _INDEX_CACHE_TTL)
+
+    response = render(request, 'public/index.html', cached_context)
+    if not request.session.get('user_id'):
+        cache.set(_INDEX_HTML_KEY, response.content, _INDEX_CACHE_TTL)
+    return response
 
 
 def about_view(request):

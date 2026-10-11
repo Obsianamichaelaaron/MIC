@@ -13,11 +13,30 @@
     <link rel="shortcut icon" href="2024/favicon.png" type="image/x-icon" />
     <link rel="apple-touch-icon" href="2024/favicon.png">
 
+    <!-- DNS Prefetch for external resources -->
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+
+    <!-- Preconnect -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="js/script.js"></script>
-    <script src="js/landingPage.js"></script>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+
+    <!-- Preload LCP hero image (first slide) -->
+    <link rel="preload" as="image" type="image/webp" href="/static/images/picture1.webp">
+
+    <!-- Async Google Fonts (non-render-blocking) -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap"></noscript>
+
+    <!-- Non-render-blocking Font Awesome -->
+    <link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></noscript>
+
+    <!-- Deferred scripts -->
+    <script src="/static/js/script.js" defer></script>
+    <script src="/static/js/landingPage.js" defer></script>
 
     <style>
         /* ============================================================
@@ -88,8 +107,36 @@
             border-bottom: 1px solid rgba(184, 151, 58, 0.15);
         }
 
-        .logo { display: flex; align-items: center; text-decoration: none; }
-        .logo img { height: 38px; filter: brightness(1.05); }
+        .logo { display: flex; align-items: center; }
+        .logo a {
+            display: inline-flex;
+            align-items: center;
+            text-decoration: none !important;
+            border: none !important;
+            outline: none !important;
+            color: #ffffff !important;
+            font-size: 1.1rem;
+            font-weight: 700;
+        }
+        .logo a:hover, .logo a:focus {
+            text-decoration: none !important;
+            color: #ffffff !important;
+        }
+        .logo picture {
+            display: inline-flex;
+            align-items: center;
+        }
+        .logo img {
+            height: 38px;
+            max-height: 40px;
+            width: auto;
+            max-width: 180px;
+            display: block;
+            object-fit: contain;
+            border: none;
+            outline: none;
+            filter: brightness(1.05);
+        }
 
         .nav-toggle { display: none; background: none; border: none; color: white; font-size: 1.4rem; cursor: pointer; padding: 8px; }
 
@@ -1258,7 +1305,10 @@
         <div class="header-container">
             <div class="logo">
                 <a href="index.php">
-                    <img src="images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION">
+                    <picture>
+                        <source srcset="/static/images/mbLogo.webp" type="image/webp">
+                        <img src="/static/images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION" width="150" height="40" style="height:40px;width:auto;" loading="eager" onerror="this.onerror=null;this.src='/images/mbLogo.png';">
+                    </picture>
                 </a>
             </div>
             <button class="nav-toggle" id="navToggle"><i class="fas fa-bars"></i></button>
@@ -1300,7 +1350,7 @@
             {% for slide in hero_slides %}
                 <div class="hero-image {% if forloop.first %}active{% endif %}"
                      data-slide-index="{{ forloop.counter0 }}"
-                     style="background-image: url('{% if slide.image_path %}{{ slide.image_path }}{% else %}images/picture{{ forloop.counter }}.png{% endif %}');"></div>
+                     style="background-image: url('{% if slide.image_path %}{{ slide.image_path }}{% else %}/static/images/picture{{ forloop.counter }}.webp{% endif %}');"></div>
             {% endfor %}
         </div>
         <div class="hero-overlay"></div>
@@ -1364,7 +1414,11 @@
                     {% if brand.brand_logo %}
                         <img src="{{ brand.brand_logo }}"
                              alt="{{ brand.brand_name }}"
-                             style="height:56px;">
+                             width="120"
+                             height="56"
+                             decoding="async"
+                             style="height:56px;width:auto;max-width:140px;object-fit:contain;"
+                             loading="lazy">
                     {% else %}
                         <div style="height:56px;width:80px;background:var(--gray-100);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--gray-500);font-size:0.7rem;">No Logo</div>
                     {% endif %}
@@ -1475,7 +1529,13 @@
                     {% for news in news_articles %}
                         <div class="news-card animate-on-scroll compact-news-card">
                             <div class="news-image">
-                                <img src="{{ news.image_path|default:"https://placehold.co/400x250/0a1628/d4af55?text=News" }}" alt="{{ news.title }}">
+                                <img src="{{ news.image_path|default:"https://placehold.co/400x250/0a1628/d4af55?text=News" }}"
+                                     alt="{{ news.title }}"
+                                     width="400"
+                                     height="250"
+                                     decoding="async"
+                                     style="width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;"
+                                     loading="lazy">
                                 <div class="news-date">
                                     <span class="date-day">{{ news.news_date|date:"d" }}</span>
                                     <span class="date-month">{{ news.news_date|date:"M"|upper }}</span>
@@ -1491,15 +1551,15 @@
                     {% endfor %}
                 {% else %}
                     <div class="news-card animate-on-scroll compact-news-card">
-                        <div class="news-image"><img src="https://placehold.co/400x250/0a1628/d4af55?text=Partnership" alt="New Partnership"><div class="news-date"><span class="date-day">15</span><span class="date-month">OCT</span></div></div>
+                        <div class="news-image"><img src="https://placehold.co/400x250/0a1628/d4af55?text=Partnership" alt="New Partnership" width="400" height="250" decoding="async" style="width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;" loading="lazy"><div class="news-date"><span class="date-day">15</span><span class="date-month">OCT</span></div></div>
                         <div class="news-content"><span class="news-category">Partnership</span><h3 class="news-title">MULTIBIZ Announces Strategic Partnership with Tech Giant</h3><p class="news-excerpt">We're excited to announce our new partnership that will revolutionize business solutions across the region.</p><a href="#" class="news-link">Read More <i class="fas fa-arrow-right"></i></a></div>
                     </div>
                     <div class="news-card animate-on-scroll compact-news-card">
-                        <div class="news-image"><img src="https://placehold.co/400x250/1a4fa0/ffffff?text=Product+Launch" alt="Product Launch"><div class="news-date"><span class="date-day">08</span><span class="date-month">OCT</span></div></div>
+                        <div class="news-image"><img src="https://placehold.co/400x250/1a4fa0/ffffff?text=Product+Launch" alt="Product Launch" width="400" height="250" decoding="async" style="width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;" loading="lazy"><div class="news-date"><span class="date-day">08</span><span class="date-month">OCT</span></div></div>
                         <div class="news-content"><span class="news-category">Product Launch</span><h3 class="news-title">Introducing Our New Managed Print Solutions</h3><p class="news-excerpt">Discover our latest managed print services designed to optimize your business operations and reduce costs.</p><a href="#" class="news-link">Read More <i class="fas fa-arrow-right"></i></a></div>
                     </div>
                     <div class="news-card animate-on-scroll compact-news-card">
-                        <div class="news-image"><img src="https://placehold.co/400x250/18151f/b8973a?text=Industry+Award" alt="Award"><div class="news-date"><span class="date-day">25</span><span class="date-month">SEP</span></div></div>
+                        <div class="news-image"><img src="https://placehold.co/400x250/18151f/b8973a?text=Industry+Award" alt="Award" width="400" height="250" decoding="async" style="width:100%;height:auto;aspect-ratio:16/10;object-fit:cover;" loading="lazy"><div class="news-date"><span class="date-day">25</span><span class="date-month">SEP</span></div></div>
                         <div class="news-content"><span class="news-category">Award</span><h3 class="news-title">MULTIBIZ Wins Prestigious Industry Innovation Award</h3><p class="news-excerpt">Recognized for excellence in business solutions and customer service for the third consecutive year.</p><a href="#" class="news-link">Read More <i class="fas fa-arrow-right"></i></a></div>
                     </div>
                 {% endif %}

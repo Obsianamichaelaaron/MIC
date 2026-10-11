@@ -33,6 +33,7 @@
 .job-item-old h2 { margin: .6rem 0 .25rem; color: #1a1a2e; font-size: .92rem; }
 .job-item-old p { margin: .15rem 0; color: #687386; font-size: .72rem; }
 .job-item-footer { display: flex; justify-content: space-between; padding-top: .55rem; margin-top: .65rem; border-top: 1px solid #edf0f4; color: #2e7d32; font-size: .72rem; font-weight: 600; }
+.job-application-status { display: none; }
 .job-score-old { padding: .22rem .4rem; border-radius: 999px; background: #e8f5e9; color: #2e7d32; font-size: .66rem; font-weight: 700; white-space: nowrap; }
 .jobs-dossier { position: sticky; top: 80px; max-height: calc(100vh - 105px); overflow-y: auto; padding: 1.35rem; border: 1px solid #cbd5e1; border-radius: 16px; background: #fff; box-shadow: 0 8px 24px rgba(15,23,42,.08); }
 .dossier-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .8rem; padding-bottom: 1rem; margin-bottom: 1rem; border-bottom: 1px solid #e5eaf1; }
@@ -41,8 +42,9 @@
 .dossier-avatar { display: grid; place-items: center; width: 52px; height: 52px; flex: 0 0 52px; border-radius: 10px; background: #ffffff; color: #1866a3; font-size: 1.35rem; font-weight: 700; overflow: hidden; border: 1px solid #e2e8f0; }
 .dossier-avatar img { width: 100%; height: 100%; padding: 6px; object-fit: contain; object-position: center; display: block; box-sizing: border-box; background: #fff; }
 .dossier-apply { padding: .55rem .7rem; border-radius: 6px; background: #0056b3; color: #fff; font-size: .72rem; font-weight: 600; text-decoration: none; white-space: nowrap; }
+.dossier-apply.is-applied { display: inline-flex; align-items: center; gap: .35rem; background: #e8f5e9; color: #256c35; cursor: default; }
 .dossier-badge { display: inline-block; padding: .22rem .4rem; border-radius: 999px; background: #e8f0fe; color: #1866a3; font-size: .64rem; font-weight: 600; }
-.dossier-specs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .55rem; margin-bottom: 1rem; }
+.dossier-specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); gap: .55rem; margin-bottom: 1rem; }
 .dossier-spec { padding: .65rem; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; }
 .dossier-spec label { display: block; color: #687386; font-size: .6rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .dossier-spec strong { display: block; margin-top: .25rem; color: #334155; font-size: .75rem; }
@@ -71,18 +73,46 @@
 [data-theme="dark"] .jobs-filter-old input, [data-theme="dark"] .jobs-filter-old select, [data-theme="dark"] .dossier-spec, [data-theme="dark"] .dossier-bottom { background: #1e2235; border-color: #2d3348; color: #e2e8f0; }
 </style>
 
+<style>
+.jobs-split { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.jobs-split > section { grid-column: 1 / -1; }
+.jobs-list-scroll { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; max-height: none; overflow: visible; padding: 0; }
+.job-item-old { height: 100%; margin: 0; }
+.jobs-dossier { display: none; position: relative; }
+.jobs-split.detail-view { grid-template-columns: minmax(300px, .9fr) minmax(0, 1.35fr); }
+.jobs-split.detail-view > section { grid-column: auto; }
+.jobs-split.detail-view .jobs-list-scroll { display: block; max-height: calc(100vh - 250px); overflow-y: auto; padding-right: .35rem; }
+.jobs-split.detail-view .job-item-old { height: auto; margin-bottom: .75rem; }
+.jobs-split.detail-view .jobs-dossier { display: block; position: sticky; top: 165px; max-height: calc(100vh - 185px); overflow-y: auto; overscroll-behavior: contain; }
+.jobs-dossier .dossier-head { padding-right: 2.5rem; }
+.dossier-close { position: absolute; top: .65rem; right: .65rem; z-index: 1; width: 2rem; height: 2rem; border: 1px solid #cbd5e1; border-radius: 50%; background: #fff; color: #334155; font-size: 1.25rem; line-height: 1; cursor: pointer; }
+.dossier-close:hover { background: #e8f0fe; color: #1866a3; }
+@media (max-width: 1000px) {
+    .jobs-split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .jobs-split.detail-view { grid-template-columns: minmax(280px, .85fr) minmax(0, 1.15fr); }
+}
+@media (max-width: 900px) {
+    .jobs-split.detail-view { grid-template-columns: minmax(0, 1fr); }
+    .jobs-split.detail-view .jobs-list-scroll { max-height: none; }
+    .jobs-split.detail-view .jobs-dossier { position: static; top: auto; max-height: none; overflow: visible; }
+}
+@media (max-width: 620px) {
+    .jobs-split, .jobs-split.detail-view { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
 <div class="old-jobs-page">
     <div class="old-jobs-shell">
-        <section class="jobs-hero-old"><div class="jobs-hero-content-old"><div><p class="jobs-crumb"><a href="dashboard.php">Dashboard</a> / Matched Jobs</p><h1><i class="fas fa-briefcase"></i> Personalized Job Directory <span class="jobs-hero-badge"><i class="fas fa-brain"></i> Pre-trained AI</span></h1></div><a href="profile.php" class="jobs-hero-action"><i class="fas fa-user-pen"></i> Update Skills</a></div></section>
+        <section class="jobs-hero-old"><div class="jobs-hero-content-old"><div><p class="jobs-crumb"><a href="dashboard.php">Dashboard</a> / Matched Jobs</p><h1><i class="fas fa-briefcase"></i> Personalized Job Directory <span class="jobs-hero-badge"><i class="fas fa-brain"></i> {% if semantic_scores_available %}Pre-trained AI{% else %}Profile Match{% endif %}</span></h1></div><a href="profile.php" class="jobs-hero-action"><i class="fas fa-user-pen"></i> Update Skills</a></div></section>
         <section class="jobs-filter-old"><form method="GET" action="jobs.php"><input name="search" value="{{ query }}" placeholder="Job title, skill, or keyword..."><select name="type" onchange="this.form.submit()"><option value="">All Employment Types</option><option value="full-time" {% if emp_type == 'full-time' %}selected{% endif %}>Full-time</option><option value="part-time" {% if emp_type == 'part-time' %}selected{% endif %}>Part-time</option><option value="contract" {% if emp_type == 'contract' %}selected{% endif %}>Contract</option><option value="internship" {% if emp_type == 'internship' %}selected{% endif %}>Internship</option></select><select name="min_match" onchange="this.form.submit()" {% if not match_filter_available %}disabled title="No profile or model match estimate is available to filter."{% endif %}>{% if match_filter_available %}<option value="" {% if not min_match %}selected{% endif %}>All Match %</option><option value="80" {% if min_match == '80' %}selected{% endif %}>80%+ match</option><option value="60" {% if min_match == '60' %}selected{% endif %}>60%+ match</option><option value="40" {% if min_match == '40' %}selected{% endif %}>40%+ match</option>{% else %}<option value="" selected>Match filter unavailable</option>{% endif %}</select><button type="submit"><i class="fas fa-filter"></i> Filter</button></form></section>
         <div class="small text-muted mb-2" role="status">
-            {% if match_model_status.ready %}
+            {% if semantic_scores_available %}
                 Uses the pre-trained all-MiniLM-L6-v2 sentence-transformer to compare your profile or resume with each job. It runs inside this app; resume text is not sent to an AI API. The percentage is semantic relevance, not a hiring probability, and does not depend on admin-reviewed outcomes.
-            {% else %}
+            {% elif not profile_completed %}
                 {{ match_model_status.reason }}
             {% endif %}
         </div>
-        <div class="jobs-split">
+        <div class="jobs-split" id="jobsSplit">
             <section>
                 <div class="jobs-list-title">
                     <span><i class="fas fa-list-ul"></i> Matched Roles ({{ scored_jobs|length }})</span>
@@ -90,7 +120,7 @@
                 </div>
                 <div class="jobs-list-scroll">
                     {% for item in scored_jobs %}
-                        <article class="job-item-old {% if forloop.first %}active{% endif %}" id="job-card-{{ item.job.job_id }}" data-job-id="{{ item.job.job_id }}">
+                        <article class="job-item-old" id="job-card-{{ item.job.job_id }}" data-job-id="{{ item.job.job_id }}">
                             <div class="job-item-top">
                                 <div class="job-company-block">
                                     <img class="job-company-logo" src="{{ item.company_logo|default:'' }}" alt="{{ item.company_name }}" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';" style="{% if not item.company_logo %}display:none;{% endif %}">
@@ -101,10 +131,8 @@
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
-                                    {% if item.match_score != None and item.match_score_type == 'semantic_model' %}
-                                        <span class="job-score-old" title="Pre-trained semantic relevance; not a probability of being hired"><i class="fas fa-brain"></i> {{ item.match_score|floatformat:0 }}% AI relevance</span>
-                                    {% else %}
-                                        <span class="job-score-old" title="{{ item.match_reason }}">{{ item.match_reason|default:"Estimate unavailable" }}</span>
+                                    {% if profile_completed and item.match_score != None %}
+                                        <span class="job-score-old" title="{% if item.match_score_type == 'semantic_model' %}Semantic relevance; not a probability of being hired{% else %}Profile match estimate; not a probability of being hired{% endif %}"><i class="fas {% if item.match_score_type == 'semantic_model' %}fa-brain{% else %}fa-chart-line{% endif %}"></i> {{ item.match_score|floatformat:0 }}% {% if item.match_score_type == 'semantic_model' %}AI relevance{% else %}profile match{% endif %}</span>
                                     {% endif %}
                                 </div>
                             </div>
@@ -114,7 +142,8 @@
                                 <span>{{ item.job.salary_range|default:"Negotiable" }}</span>
                                 {% if item.has_applied %}<span style="color:#687386">Applied</span>{% else %}<span>Available</span>{% endif %}
                             </div>
-                            <div class="job-meta-old" id="job-meta-{{ item.job.job_id }}" data-title="{{ item.job.title }}" data-company="{{ item.company_name|default:'Multibiz Partner' }}" data-company-logo="{{ item.company_logo|default:'' }}" data-location="{{ item.job.location }}" data-type="{{ item.job.employment_type|title }}" data-salary="{{ item.job.salary_range|default:'Negotiable' }}" data-score="{{ item.match_score }}" data-applied="{% if item.has_applied %}true{% else %}false{% endif %}" data-apply-url="apply_job.php?id={{ item.job.job_id }}" data-skills="{{ item.job.skills_required|default:'' }}">
+                            <span class="job-application-status">{{ item.application_status }}</span>
+                            <div class="job-meta-old" id="job-meta-{{ item.job.job_id }}" data-title="{{ item.job.title }}" data-company="{{ item.company_name|default:'Multibiz Partner' }}" data-company-logo="{{ item.company_logo|default:'' }}" data-location="{{ item.job.location }}" data-type="{{ item.job.employment_type|title }}" data-salary="{{ item.job.salary_range|default:'Negotiable' }}" data-score="{{ item.match_score|default_if_none:'' }}" data-score-type="{{ item.match_score_type|default:'' }}" data-profile-completed="{% if profile_completed %}true{% else %}false{% endif %}" data-applied="{% if item.has_applied %}true{% else %}false{% endif %}" data-apply-url="apply_job.php?id={{ item.job.job_id }}" data-skills="{{ item.job.skills_required|default:'' }}">
                                 <div class="job-desc-source">{{ item.job.description|linebreaksbr }}</div>
                                 <div class="job-req-source">{{ item.job.requirements|linebreaksbr|default:'Demonstrated relevant experience and strong foundational competencies.' }}</div>
                             </div>
@@ -124,25 +153,66 @@
                     {% endfor %}
                 </div>
             </section>
-            <aside class="jobs-dossier" id="jobsDossier">{% if scored_jobs.0 %}{% with first=scored_jobs.0 %}<div class="dossier-head"><div style="display:flex;gap:.7rem"><div class="dossier-avatar" id="dossierAvatar">{% if first.company_logo %}<img src="{{ first.company_logo }}" alt="{{ first.company_name }}" onerror="this.parentElement.innerHTML='{{ first.company_name|slice:':1'|upper|default:'M' }}';">{% else %}{{ first.company_name|slice:':1'|upper|default:'M' }}{% endif %}</div><div><span class="dossier-badge" id="dossierType">{{ first.job.employment_type|title }}</span><h2 id="dossierTitle">{{ first.job.title }}</h2><p><i class="fas fa-building"></i> <span id="dossierCompany">{{ first.company_name|default:'Multibiz Partner' }}</span> · <i class="fas fa-location-dot"></i> <span id="dossierLocation">{{ first.job.location }}</span></p></div></div><a class="dossier-apply" id="dossierApply" href="apply_job.php?id={{ first.job.job_id }}">Quick Apply</a></div><div class="dossier-specs"><div class="dossier-spec"><label>Compensation</label><strong id="dossierSalary">{{ first.job.salary_range|default:'Negotiable' }}</strong></div><div class="dossier-spec"><label>Work Arrangement</label><strong id="dossierWorkType">{{ first.job.employment_type|title }}</strong></div><div class="dossier-spec"><label>Date Posted</label><strong>{{ first.job.posted_at|timesince }} ago</strong></div></div><div class="dossier-section"><h3><i class="fas fa-tags" style="color:#1866a3"></i> Required Skills</h3><div class="dossier-skills" id="dossierSkills">{% if first.skills_list %}{% for skill in first.skills_list %}<span class="dossier-skill">{{ skill }}</span>{% endfor %}{% else %}<span class="dossier-skill">No specific skills listed.</span>{% endif %}</div></div><div class="dossier-section"><h3><i class="fas fa-align-left" style="color:#1866a3"></i> Position Description</h3><p id="dossierDescription">{{ first.job.description|linebreaksbr }}</p></div><div class="dossier-section"><h3><i class="fas fa-circle-check" style="color:#1866a3"></i> Requirements</h3><p id="dossierRequirements">{{ first.job.requirements|linebreaksbr|default:'Demonstrated professional experience and strong problem-solving skills.' }}</p></div><div class="dossier-bottom"><strong>Ready to take the next step?</strong><a class="dossier-apply" id="dossierBottomApply" href="apply_job.php?id={{ first.job.job_id }}">Quick Apply</a></div>{% endwith %}{% else %}<div class="application-empty">Select an opening to view details.</div>{% endif %}</aside>
+            <aside class="jobs-dossier" id="jobsDossier"><button class="dossier-close" id="closeJobDetails" type="button" aria-label="Back to jobs grid" title="Back to jobs grid">&times;</button>{% if scored_jobs.0 %}{% with first=scored_jobs.0 %}<div class="dossier-head"><div style="display:flex;gap:.7rem"><div class="dossier-avatar" id="dossierAvatar">{% if first.company_logo %}<img src="{{ first.company_logo }}" alt="{{ first.company_name }}" onerror="this.parentElement.innerHTML='{{ first.company_name|slice:':1'|upper|default:'M' }}';">{% else %}{{ first.company_name|slice:':1'|upper|default:'M' }}{% endif %}</div><div><span class="dossier-badge" id="dossierType">{{ first.job.employment_type|title }}</span><h2 id="dossierTitle">{{ first.job.title }}</h2><p><i class="fas fa-building"></i> <span id="dossierCompany">{{ first.company_name|default:'Multibiz Partner' }}</span> · <i class="fas fa-location-dot"></i> <span id="dossierLocation">{{ first.job.location }}</span></p></div></div><a class="dossier-apply" id="dossierApply" href="apply_job.php?id={{ first.job.job_id }}">Quick Apply</a></div><div class="dossier-specs"><div class="dossier-spec"><label>Compensation</label><strong id="dossierSalary">{{ first.job.salary_range|default:'Negotiable' }}</strong></div><div class="dossier-spec"><label>Work Arrangement</label><strong id="dossierWorkType">{{ first.job.employment_type|title }}</strong></div><div class="dossier-spec"><label>Date Posted</label><strong>{{ first.job.posted_at|timesince }} ago</strong></div><div class="dossier-spec"><label>Match Score</label><strong id="dossierMatchScore">{% if profile_completed and first.match_score != None %}{{ first.match_score|floatformat:0 }}%{% elif not profile_completed %}Complete profile{% else %}Unavailable{% endif %}</strong></div></div><div class="dossier-section"><h3><i class="fas fa-tags" style="color:#1866a3"></i> Required Skills</h3><div class="dossier-skills" id="dossierSkills">{% if first.skills_list %}{% for skill in first.skills_list %}<span class="dossier-skill">{{ skill }}</span>{% endfor %}{% else %}<span class="dossier-skill">No specific skills listed.</span>{% endif %}</div></div><div class="dossier-section"><h3><i class="fas fa-align-left" style="color:#1866a3"></i> Position Description</h3><p id="dossierDescription">{{ first.job.description|linebreaksbr }}</p></div><div class="dossier-section"><h3><i class="fas fa-circle-check" style="color:#1866a3"></i> Requirements</h3><p id="dossierRequirements">{{ first.job.requirements|linebreaksbr|default:'Demonstrated professional experience and strong problem-solving skills.' }}</p></div><div class="dossier-bottom"><strong>Ready to take the next step?</strong><a class="dossier-apply" id="dossierBottomApply" href="apply_job.php?id={{ first.job.job_id }}">Quick Apply</a></div>{% endwith %}{% else %}<div class="application-empty">Select an opening to view details.</div>{% endif %}</aside>
         </div>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    var jobsSplit = document.getElementById('jobsSplit');
+    var closeJobDetails = document.getElementById('closeJobDetails');
+    function updateApplyActions(meta, card) {
+        var applyActions = [
+            document.getElementById('dossierApply'),
+            document.getElementById('dossierBottomApply')
+        ];
+        var applied = meta.dataset.applied === 'true';
+        var status = card.querySelector('.job-application-status');
+        applyActions.forEach(function (action) {
+            if (!action) return;
+            action.classList.toggle('is-applied', applied);
+            if (applied) {
+                action.removeAttribute('href');
+                action.setAttribute('aria-disabled', 'true');
+                action.innerHTML = '<i class="fas fa-clock" aria-hidden="true"></i> ' +
+                    (status && status.textContent.trim() ? status.textContent.trim() : 'Pending Review');
+            } else {
+                action.href = meta.dataset.applyUrl;
+                action.removeAttribute('aria-disabled');
+                action.textContent = 'Quick Apply';
+            }
+        });
+    }
+    var firstJobCard = document.querySelector('.job-item-old');
+    if (firstJobCard) {
+        var firstJobMeta = document.getElementById('job-meta-' + firstJobCard.dataset.jobId);
+        if (firstJobMeta) updateApplyActions(firstJobMeta, firstJobCard);
+    }
+    if (closeJobDetails) {
+        closeJobDetails.addEventListener('click', function () {
+            jobsSplit.classList.remove('detail-view');
+            document.querySelectorAll('.job-item-old').forEach(function (item) {
+                item.classList.remove('active');
+            });
+        });
+    }
     document.querySelectorAll('.job-item-old').forEach(function (card) {
         card.addEventListener('click', function () {
             document.querySelectorAll('.job-item-old').forEach(function (item) { item.classList.remove('active'); });
             card.classList.add('active');
             var meta = document.getElementById('job-meta-' + card.dataset.jobId);
             if (!meta) return;
+            jobsSplit.classList.add('detail-view');
             document.getElementById('dossierTitle').textContent = meta.dataset.title;
             document.getElementById('dossierCompany').textContent = meta.dataset.company;
             document.getElementById('dossierLocation').textContent = meta.dataset.location;
             document.getElementById('dossierType').textContent = meta.dataset.type;
             document.getElementById('dossierWorkType').textContent = meta.dataset.type;
             document.getElementById('dossierSalary').textContent = meta.dataset.salary;
+            document.getElementById('dossierMatchScore').textContent = meta.dataset.score
+                ? Math.round(Number(meta.dataset.score)) + '%'
+                : (meta.dataset.profileCompleted === 'true' ? 'Unavailable' : 'Complete profile');
             var avatar = document.getElementById('dossierAvatar');
             if (meta.dataset.companyLogo) {
                 avatar.innerHTML = '<img src="' + meta.dataset.companyLogo + '" alt="' + meta.dataset.company + '" onerror="this.parentElement.innerHTML = this.alt.charAt(0).toUpperCase();">';
@@ -151,8 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             document.getElementById('dossierDescription').innerHTML = meta.querySelector('.job-desc-source').innerHTML;
             document.getElementById('dossierRequirements').innerHTML = meta.querySelector('.job-req-source').innerHTML;
-            document.getElementById('dossierApply').href = meta.dataset.applyUrl;
-            document.getElementById('dossierBottomApply').href = meta.dataset.applyUrl;
+            updateApplyActions(meta, card);
             var skillList = meta.dataset.skills ? meta.dataset.skills.split(',') : [];
             var dossierSkills = document.getElementById('dossierSkills');
             dossierSkills.innerHTML = '';

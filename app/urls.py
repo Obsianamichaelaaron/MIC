@@ -65,6 +65,8 @@ urlpatterns = [
     re_path(r'^(?:frontend/)?(?:applicant/)?[Aa]pply_job(?:\.php|/)?$', views_applicant.apply_job_view),
     path('applicant/applications/', views_applicant.applications_view, name='applicant_applications'),
     re_path(r'^(?:frontend/)?(?:applicant/)?[Aa]pplications(?:\.php|/)?$', views_applicant.applications_view),
+    path('applicant/notifications/', views_applicant.notifications_view, name='applicant_notifications'),
+    re_path(r'^(?:frontend/)?(?:applicant/)?[Nn]otifications(?:\.php|/)?$', views_applicant.notifications_view),
     path('applicant/profile/', views_applicant.profile_view, name='applicant_profile'),
     re_path(r'^(?:frontend/)?(?:applicant/)?[Pp]rofile(?:\.php|/)?$', views_applicant.profile_view),
     re_path(r'^(?:frontend/)?(?:applicant/)?[Ss]ave_job(?:\.php|/)?$', views_applicant.save_job_view),
@@ -73,6 +75,7 @@ urlpatterns = [
     re_path(r'^(?:frontend/)?(?:applicant/)?[Uu]pdate_application(?:\.php|/)?$', views_applicant.update_application_view),
     re_path(r'^(?:frontend/)?(?:applicant/)?[Ee]mployer(?:\.php|/)?$', views_applicant.employer_view),
     re_path(r'^(?:frontend/)?(?:applicant/)?[Cc]hat(?:\.php|/)?$', views_chat.chat_view),
+    path('applicant/api/job-match/', views_applicant.job_match_api, name='applicant_job_match_api'),
 
     # ── Employer Portal ──
     path('employer/dashboard/', views_employer.dashboard_view, name='employer_dashboard'),
@@ -142,6 +145,8 @@ urlpatterns = [
     re_path(r'^(?:frontend/)?admin/messages\.php$', views_admin.messages_view),
     path('admin/inquiries/', views_admin.messages_view, name='admin_inquiries'),
     re_path(r'^(?:frontend/)?admin/inquiries\.php$', views_admin.messages_view),
+    path('admin/notifications/', views_admin.notifications_view, name='admin_notifications'),
+    re_path(r'^(?:frontend/)?admin/notifications\.php$', views_admin.notifications_view),
     re_path(r'^(?:frontend/)?admin/contact_api\.php$', views_admin.contact_api_view),
     path('admin/audit_trail/', views_admin.audit_trail_view, name='admin_audit_trail'),
     re_path(r'^(?:frontend/)?admin/audit_trail\.php$', views_admin.audit_trail_view),

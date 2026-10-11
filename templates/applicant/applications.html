@@ -20,7 +20,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: url('../images/bg.jpg') center/cover no-repeat;
+    background: url('/static/images/bg.webp') center/cover no-repeat;
     opacity: .18;
 }
 .apps-hero::after {
@@ -131,6 +131,34 @@
     gap: 0.75rem;
     font-size: 0.9rem;
     font-weight: 500;
+}
+.application-toast {
+    position: fixed;
+    top: 92px;
+    right: 1.25rem;
+    z-index: 1200;
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    width: min(390px, calc(100vw - 2rem));
+    padding: 1rem 1.1rem;
+    border: 1px solid #a7f3d0;
+    border-left: 4px solid #059669;
+    border-radius: 12px;
+    background: #ecfdf5;
+    color: #065f46;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, .18);
+    animation: application-toast-in .25s ease-out;
+}
+.application-toast[hidden] { display: none; }
+.application-toast-icon { flex: 0 0 auto; font-size: 1.15rem; }
+.application-toast-copy { min-width: 0; }
+.application-toast-copy strong { display: block; margin-bottom: .15rem; font-size: .9rem; }
+.application-toast-copy span { display: block; font-size: .82rem; line-height: 1.4; overflow-wrap: anywhere; }
+.application-toast-close { margin: -.35rem -.35rem 0 auto; padding: .25rem; border: 0; background: transparent; color: #065f46; font-size: 1rem; cursor: pointer; }
+@keyframes application-toast-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 550px) {
+    .application-toast { top: 80px; right: .75rem; width: calc(100vw - 1.5rem); }
 }
 
 /* ── Application Cards Grid ── */
@@ -623,17 +651,30 @@
 
     <!-- ── Shell ── -->
     <div class="apps-shell">
-
         {% if applied_success %}
-            <div class="alert-success">
-                <i class="fas fa-check-circle" style="font-size:1.2rem;"></i>
-                <div>Your application was submitted successfully! The employer will review it soon.</div>
+            <div class="application-toast" id="applicationSuccessToast" role="status" aria-live="polite">
+                <i class="fas fa-circle-check application-toast-icon" aria-hidden="true"></i>
+                <div class="application-toast-copy">
+                    <strong>Application submitted</strong>
+                    <span>
+                        {% if successful_application %}
+                            You applied for {{ successful_application.job.title }}.
+                        {% else %}
+                            Your application was submitted successfully.
+                        {% endif %}
+                    </span>
+                </div>
+                <button class="application-toast-close" type="button" aria-label="Dismiss notification" onclick="this.parentElement.hidden = true;">
+                    <i class="fas fa-xmark" aria-hidden="true"></i>
+                </button>
             </div>
         {% endif %}
         {% if application_email_failed %}
             <div class="alert-warning" role="status">
                 Your application is available here, but we could not send the confirmation email. Please verify your email address and try again later.
             </div>
+
+
         {% endif %}
 
         <!-- ── Toolbar: Count & Status Filters ── -->
@@ -998,5 +1039,14 @@ window.addEventListener('click', function(e) {
     }
 });
 </script>
+
+{% if applied_success %}
+<script>
+    window.setTimeout(function () {
+        var toast = document.getElementById('applicationSuccessToast');
+        if (toast) toast.hidden = true;
+    }, 7000);
+</script>
+{% endif %}
 
 {% include 'includes/footer.html' %}

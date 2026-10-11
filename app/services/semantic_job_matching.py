@@ -14,6 +14,8 @@ import numpy as np
 import onnxruntime
 import requests
 
+from django.core.cache import cache
+
 from app.models import Applicant, JobPosting
 
 
@@ -35,9 +37,9 @@ MODEL_FILES = {
         'git_sha1': 'c17ed520ed8438736732a54957a69306b8822215',
     },
 }
-MAX_SEQUENCE_LENGTH = 256
-MAX_PROFILE_CHUNKS = 32
-MAX_CRITERIA_PER_GROUP = 12
+MAX_SEQUENCE_LENGTH = 128
+MAX_PROFILE_CHUNKS = 16
+MAX_CRITERIA_PER_GROUP = 8
 
 
 @dataclass(frozen=True)
@@ -352,7 +354,8 @@ def _initialize_model_runtime():
     try:
         tokenizer = _load_wordpiece_tokenizer(tokenizer_path)
         options = onnxruntime.SessionOptions()
-        options.intra_op_num_threads = 1
+        cpu_count = os.cpu_count() or 1
+        options.intra_op_num_threads = min(4, cpu_count)
         options.inter_op_num_threads = 1
         session = onnxruntime.InferenceSession(
             str(model_path),
@@ -446,8 +449,8 @@ def _criteria_groups(job):
 
     qualifications = [
         mapping.qualification.name.strip()
-        for mapping in job.qualification_mappings.select_related('qualification').all()
-        if mapping.qualification and mapping.qualification.name.strip()
+        for mapping in job.qualification_mappings.all()
+        if getattr(mapping, 'qualification', None) and mapping.qualification.name.strip()
     ][:MAX_CRITERIA_PER_GROUP]
     if qualifications:
         groups.append(('Qualifications', qualifications))
@@ -490,10 +493,32 @@ def compute_semantic_match(
         }
 
     tokenizer, session = _load_model_runtime()
-    profile_embeddings = _embeddings(profile_chunks, tokenizer, session)
+
+    # 1. Cache applicant profile embeddings across all job evaluations
+    profile_hash = hashlib.sha256(profile_text.encode('utf-8')).hexdigest()
+    profile_cache_key = f"sem_prof_emb_v2:{getattr(applicant, 'pk', 0)}:{profile_hash}"
+    profile_embeddings = cache.get(profile_cache_key)
+    if profile_embeddings is None:
+        profile_embeddings = _embeddings(profile_chunks, tokenizer, session)
+        cache.set(profile_cache_key, profile_embeddings, timeout=86400 * 7)
+
+    # 2. Cache job criteria embeddings by job content
+    job_pk = getattr(job, 'pk', 0)
+    crit_hash_input = f"{job_pk}:{job.title}:{job.skills_required}:{repr(groups)}"
+    job_crit_hash = hashlib.sha256(crit_hash_input.encode('utf-8')).hexdigest()
+    job_crit_cache_key = f"sem_job_crit_v2:{job_pk}:{job_crit_hash}"
+    cached_criteria_groups = cache.get(job_crit_cache_key)
+
+    if cached_criteria_groups is None:
+        cached_criteria_groups = []
+        for label, criteria in groups:
+            criteria_embeddings = _embeddings(criteria, tokenizer, session)
+            cached_criteria_groups.append((label, criteria_embeddings))
+        cache.set(job_crit_cache_key, cached_criteria_groups, timeout=86400 * 7)
+
+    # 3. Microsecond cosine relevance against cached vector matrices
     breakdown = []
-    for label, criteria in groups:
-        criteria_embeddings = _embeddings(criteria, tokenizer, session)
+    for label, criteria_embeddings in cached_criteria_groups:
         group_score = _cosine_relevance(criteria_embeddings, profile_embeddings)
         breakdown.append({
             'label': label,

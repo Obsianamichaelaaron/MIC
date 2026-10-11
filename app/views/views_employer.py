@@ -78,6 +78,26 @@ def _allowed_employer_statuses(application):
     )
 
 
+def _normalize_employer_status(value):
+    """Accept both legacy application-status values and internal employer-status values."""
+    normalized = (value or '').strip()
+    status_map = {
+        'pending': 'for_review',
+        'for_review': 'for_review',
+        'shortlisted': 'qualified',
+        'qualified': 'qualified',
+        'reviewed': 'not_qualified',
+        'not_qualified': 'not_qualified',
+        'for_interview': 'for_interview',
+        'interviewed': 'for_interview',
+        'interview_completed': 'interview_completed',
+        'accepted': 'hired',
+        'hired': 'hired',
+        'rejected': 'rejected',
+    }
+    return status_map.get(normalized, normalized)
+
+
 def _notify_applicant_for_employer_application(application, title, message):
     if connection.vendor == 'postgresql':
         with connection.cursor() as cursor:
@@ -188,6 +208,21 @@ def dashboard_view(request):
     except Exception:
         pass
 
+    # Match the dashboard template contract used by the employer portal.
+    recent_applications = [
+        {
+            'application_id': app['application_id'],
+            'first_name': app['first_name'],
+            'last_name': app['last_name'],
+            'email': app['email'],
+            'job_title': app['job_title'],
+            'match_score': app.get('match_score') or 0,
+            'qualification_status': app.get('qualification_status') or 'unavailable',
+            'employer_status': app.get('employer_status') or app.get('status') or 'for_review',
+        }
+        for app in recent_candidates
+    ]
+
     context = {
         'page_title': 'Employer Dashboard - MultiBiz',
         'current_page': 'dashboard.php',
@@ -199,16 +234,21 @@ def dashboard_view(request):
         'approved_job_requests': approved_job_requests,
         'rejected_job_requests': rejected_job_requests,
         'total_applicants': total_applicants,
+        'total_applications': total_applicants,
         'applicants_for_review': applicants_for_review,
         'qualified_applicants': qualified_applicants,
+        'qualified_count': qualified_applicants,
         'not_qualified_applicants': not_qualified_applicants,
+        'not_qualified_count': not_qualified_applicants,
         'applicants_for_interview': applicants_for_interview,
         'interview_completed_count': interview_completed_count,
         'hired_applicants': hired_applicants,
+        'hired_count': hired_applicants,
         'rejected_applicants': rejected_applicants,
         'upcoming_interviews_count': upcoming_interviews_count,
         'upcoming_interviews': upcoming_interviews_qs[:4],
         'recent_candidates': recent_candidates,
+        'recent_applications': recent_applications,
         'recent_job_requests': recent_job_requests,
         'unread_count': unread_count,
     }
@@ -764,7 +804,6 @@ def view_candidate_view(request, application_id=None):
         Application.objects.select_related('applicant', 'applicant__user', 'job'),
         pk=app_id,
         job__employer=employer,
-        forwarded_to_employer=True # Must be forwarded by admin
     )
 
     applicant = application.applicant
@@ -778,10 +817,9 @@ def view_candidate_view(request, application_id=None):
         action = request.POST.get('action')
 
         if action == 'update_status':
-            new_status = request.POST.get(
-                'employer_status',
-                request.POST.get('status', ''),
-            ).strip()
+            new_status = _normalize_employer_status(
+                request.POST.get('employer_status', request.POST.get('status', '')),
+            )
             employer_notes = request.POST.get(
                 'employer_notes',
                 request.POST.get('remarks', ''),
@@ -1028,10 +1066,11 @@ def update_status_api(request):
         return JsonResponse({'success': False, 'message': 'Invalid method'})
 
     app_id = request.POST.get('application_id')
-    status = request.POST.get('status', '').strip()
+    requested_status = request.POST.get('employer_status', request.POST.get('status', '')).strip()
+    status = _normalize_employer_status(requested_status)
     notes = request.POST.get('notes', '').strip() or request.POST.get('remarks', '').strip()
 
-    application = get_object_or_404(Application, pk=app_id, job__employer=employer, forwarded_to_employer=True)
+    application = get_object_or_404(Application, pk=app_id, job__employer=employer)
     valid_statuses = _allowed_employer_statuses(application)
 
     if status in valid_statuses:
@@ -1074,7 +1113,7 @@ def update_status_api(request):
                 f"Your application status at {employer.company_name} was updated to '{status_label}'.",
             )
             try:
-                send_application_status_update_email(
+                email_result = send_application_status_update_email(
                     to_email=cand_user.email,
                     applicant_name=cand_user.full_name or cand_user.email,
                     job_title=application.job.title,
@@ -1124,7 +1163,7 @@ def schedule_interview_api(request):
     if not app_id or not interview_date or not interview_time:
         return JsonResponse({'success': False, 'message': 'Missing required interview date or time'})
 
-    application = get_object_or_404(Application, pk=app_id, job__employer=employer, forwarded_to_employer=True)
+    application = get_object_or_404(Application, pk=app_id, job__employer=employer)
     candidate_user = application.applicant.user
 
     # Create interview schedule
@@ -1178,10 +1217,17 @@ def schedule_interview_api(request):
         )
     except Exception as e:
         print(f"[Schedule Interview API Mailer] Error: {e}")
+        email_result = {'success': False}
 
     return JsonResponse({
         'success': True,
-        'message': f"Interview scheduled successfully for {interview_date} at {interview_time}!",
+        'message': (
+            f"Interview scheduled successfully for {interview_date} at {interview_time}!"
+            if email_result.get('success')
+            else f"Interview scheduled for {interview_date} at {interview_time}; "
+                 "the applicant has an in-app notification, but email delivery failed."
+        ),
+        'email_sent': bool(email_result.get('success')),
         'interview_date': interview_date,
         'interview_time': interview_time,
         'interview_type': interview_type

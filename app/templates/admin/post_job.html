@@ -60,6 +60,9 @@
     align-items: center;
     gap: 0.65rem;
 }
+.admin-post-job-wrapper .job-form-hero .job-form-title {
+    color: #ffffff !important;
+}
 
 .job-form-card {
     background: #ffffff;
@@ -266,49 +269,6 @@
                 </div>
             </div>
 
-            <div id="partner-account-fields" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:1.25rem;margin-bottom:1.75rem;">
-                <h4 style="font-size:1rem;font-weight:700;color:#1e3a8a;margin:0 0 .5rem;">
-                    <i class="fas fa-user-plus me-1"></i> Create This Company's Employer Login
-                </h4>
-                <p style="font-size:.82rem;color:#475569;margin:0 0 1rem;">
-                    No employer login exists for this company yet. These details will create an active account and link this job and any previous admin-posted jobs for this company to its dashboard. Share the temporary password securely with the company contact.
-                </p>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem;">
-                    <div>
-                        <label class="form-field-label">Contact First Name <span class="req">*</span></label>
-                        <input type="text" name="contact_first_name" class="form-control-custom" value="{{ form_values.contact_first_name|default:initial_contact_first_name|default:'' }}" autocomplete="given-name">
-                    </div>
-                    <div>
-                        <label class="form-field-label">Contact Last Name <span class="req">*</span></label>
-                        <input type="text" name="contact_last_name" class="form-control-custom" value="{{ form_values.contact_last_name|default:initial_contact_last_name|default:'' }}" autocomplete="family-name">
-                    </div>
-                    <div>
-                        <label class="form-field-label">Employer Login Email <span class="req">*</span></label>
-                        <input type="email" name="account_email" class="form-control-custom" value="{{ form_values.account_email|default:initial_contact_email|default:'' }}" autocomplete="username">
-                    </div>
-                    <div>
-                        <label class="form-field-label">Temporary Password <span class="req">*</span></label>
-                        <input type="password" name="account_password" class="form-control-custom" minlength="6" autocomplete="new-password">
-                    </div>
-                    <div>
-                        <label class="form-field-label">Contact Phone</label>
-                        <input type="tel" name="contact_phone" class="form-control-custom" value="{{ form_values.contact_phone|default:'' }}" autocomplete="tel">
-                    </div>
-                    <div>
-                        <label class="form-field-label">Industry</label>
-                        <input type="text" name="industry" class="form-control-custom" value="{{ form_values.industry|default:'' }}">
-                    </div>
-                    <div>
-                        <label class="form-field-label">Company Website</label>
-                        <input type="url" name="company_website" class="form-control-custom" value="{{ form_values.company_website|default:'' }}" placeholder="https://example.com">
-                    </div>
-                    <div>
-                        <label class="form-field-label">Company Address</label>
-                        <input type="text" name="company_address" class="form-control-custom" value="{{ form_values.company_address|default:'' }}">
-                    </div>
-                </div>
-            </div>
-
             <h3 class="form-section-heading">
                 <i class="fas fa-brain"></i> 2. AI Matching Skills &amp; Criteria
             </h3>
@@ -349,31 +309,5 @@
         </form>
     </div>
 </div>
-
-{{ existing_partner_companies|json_script:"existing-partner-companies" }}
-<script>
-(() => {
-    const companyInput = document.querySelector('input[name="company_name"]');
-    const accountFields = document.getElementById('partner-account-fields');
-    const companyData = document.getElementById('existing-partner-companies');
-    if (!companyInput || !accountFields || !companyData) return;
-
-    const existingCompanies = JSON.parse(companyData.textContent).map((name) => name.trim().toLowerCase());
-    const accountInputs = accountFields.querySelectorAll('input');
-    const updateAccountFields = () => {
-        const hasAccount = existingCompanies.includes(companyInput.value.trim().toLowerCase());
-        accountFields.hidden = hasAccount;
-        accountInputs.forEach((input) => {
-            input.required = !hasAccount && input.name !== 'contact_phone' &&
-                input.name !== 'industry' && input.name !== 'company_website' &&
-                input.name !== 'company_address';
-            input.disabled = hasAccount;
-        });
-    };
-
-    companyInput.addEventListener('input', updateAccountFields);
-    updateAccountFields();
-})();
-</script>
 
 {% include 'includes/footer.html' %}
