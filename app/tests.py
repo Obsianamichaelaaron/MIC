@@ -1087,6 +1087,17 @@ class MultiBizConversionTests(TestCase):
             'title': '  PRINCIPAL PYTHON AI ARCHITECT ',
         }
         cross_account_duplicate = JobPosting.objects.create(**cross_account_duplicate_fields)
+        latest_applied_at = timezone.now()
+        Application.objects.create(
+            job=first_job,
+            applicant=self.applicant,
+            applied_at=latest_applied_at - timedelta(days=1),
+        )
+        latest_application = Application.objects.create(
+            job=second_job,
+            applicant=self.applicant,
+            applied_at=latest_applied_at,
+        )
 
         session = self.client.session
         session['user_id'] = self.admin_user.user_id
@@ -1109,6 +1120,10 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(len(careers_ids & duplicate_ids), 1)
         grouped_row = next(job for job in admin_response.context['jobs'] if job.job_id in duplicate_ids)
         self.assertCountEqual(grouped_row.duplicate_job_ids, duplicate_ids)
+        self.assertEqual(grouped_row.applicant_count, 1)
+        self.assertEqual(grouped_row.latest_applied_at, latest_applied_at)
+        self.assertEqual(grouped_row.latest_application_id, latest_application.application_id)
+        self.assertEqual(admin_response.context['total_application_count'], 2)
 
         action_response = self.client.post('/admin/jobs.php', {
             'action': 'toggle_status',

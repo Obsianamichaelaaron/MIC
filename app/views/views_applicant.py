@@ -29,15 +29,17 @@ from app.services.resume_storage import (
     store_profile_picture,
     store_verified_resume,
 )
-from app.services.semantic_job_matching import (
-    SemanticMatchingUnavailable,
-    compute_semantic_match,
-)
 from app.services.ml_ranking import compute_rule_based_match_score
 from app.services.mailer import send_application_submitted_email
 
 MAX_JOB_MATCHES_FOR_DASHBOARD = 12
 SEMANTIC_MATCH_CACHE_TTL_SECONDS = 86400
+
+
+def compute_semantic_match(*args, **kwargs):
+    from app.services.semantic_job_matching import compute_semantic_match as semantic_match
+
+    return semantic_match(*args, **kwargs)
 
 
 def _semantic_match_cache_key(applicant: Applicant, job: JobPosting, resume_text: str = '') -> str:

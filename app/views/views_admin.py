@@ -16,8 +16,8 @@ from django.http import (
 )
 from django.views.decorators.csrf import csrf_exempt
 from django.db import IntegrityError, transaction
-from django.db.models import Q, Count, Case, When, IntegerField, F
-from django.db.models.functions import TruncMonth
+from django.db.models import Q, Count, Case, When, IntegerField, F, Value, Window
+from django.db.models.functions import RowNumber, TruncMonth
 from django.conf import settings
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -963,9 +963,7 @@ def jobs_view(request):
             log_audit_trail(request, admin_id, 'delete_job', f"Deleted job {title}", 'job', int(job_id), title)
             return redirect('/admin/jobs.php')
 
-    jobs_base_qs = JobPosting.objects.select_related('employer', 'employer__user').annotate(
-        applicant_count=Count('applications')
-    )
+    jobs_base_qs = JobPosting.objects.select_related('employer')
     all_job_groups = _group_duplicate_job_postings(
         jobs_base_qs.order_by('-posted_at', '-job_id')
     )
@@ -993,23 +991,68 @@ def jobs_view(request):
         jobs_qs = jobs_qs.filter(status=status_filter)
 
     visible_job_groups = _group_duplicate_job_postings(jobs_qs)
+    visible_job_ids_by_group = [
+        [duplicate_job.job_id for duplicate_job in duplicate_jobs]
+        for duplicate_jobs in visible_job_groups
+    ]
+    visible_job_ids = [
+        job_id
+        for group_job_ids in visible_job_ids_by_group
+        for job_id in group_job_ids
+    ]
+    group_index_expression = Case(
+        *[
+            When(job_id__in=group_job_ids, then=Value(group_index))
+            for group_index, group_job_ids in enumerate(visible_job_ids_by_group)
+        ],
+        output_field=IntegerField(),
+    )
+    application_stats = {}
+    latest_applications_by_group = {}
+    if visible_job_ids:
+        application_stats = {
+            row['job_group']: row
+            for row in Application.objects.filter(
+                job_id__in=visible_job_ids,
+            ).annotate(
+                job_group=group_index_expression,
+            ).values(
+                'job_group',
+            ).annotate(
+                applicant_count=Count('applicant_id', distinct=True),
+                total_application_count=Count('application_id'),
+            )
+        }
+        latest_applications_by_group = {
+            row['job_group']: row
+            for row in Application.objects.filter(
+                job_id__in=visible_job_ids,
+            ).annotate(
+                job_group=group_index_expression,
+            ).annotate(
+                group_rank=Window(
+                    expression=RowNumber(),
+                    partition_by=[F('job_group')],
+                    order_by=[F('applied_at').desc(), F('application_id').desc()],
+                ),
+            ).filter(
+                group_rank=1,
+            ).values(
+                'job_group',
+                'application_id',
+                'applied_at',
+            )
+        }
+
     jobs = []
-    for duplicate_jobs in visible_job_groups:
+    for group_index, duplicate_jobs in enumerate(visible_job_groups):
         job = duplicate_jobs[0]
-        job.duplicate_job_ids = [duplicate_job.job_id for duplicate_job in duplicate_jobs]
-        group_applications = Application.objects.filter(
-            job_id__in=job.duplicate_job_ids,
-        )
-        job.applicant_count = group_applications.values('applicant_id').distinct().count()
-        latest_application = group_applications.order_by(
-            '-applied_at', '-application_id'
-        ).values('application_id', 'applied_at').first()
-        job.latest_application_id = (
-            latest_application['application_id'] if latest_application else None
-        )
-        job.latest_applied_at = (
-            latest_application['applied_at'] if latest_application else None
-        )
+        job.duplicate_job_ids = visible_job_ids_by_group[group_index]
+        job_stats = application_stats.get(group_index, {})
+        latest_application = latest_applications_by_group.get(group_index)
+        job.applicant_count = job_stats.get('applicant_count', 0)
+        job.latest_application_id = latest_application['application_id'] if latest_application else None
+        job.latest_applied_at = latest_application['applied_at'] if latest_application else None
         jobs.append(job)
 
     jobs.sort(
@@ -1021,11 +1064,6 @@ def jobs_view(request):
         reverse=True,
     )
 
-    visible_job_ids = [
-        job_id
-        for job in jobs
-        for job_id in job.duplicate_job_ids
-    ]
     latest_application = (
         Application.objects.filter(job_id__in=visible_job_ids)
         .order_by('-applied_at', '-application_id')
@@ -1038,9 +1076,10 @@ def jobs_view(request):
 
     if request.GET.get('check_updates') == '1':
         return JsonResponse({
-            'total_application_count': Application.objects.filter(
-                job_id__in=visible_job_ids
-            ).count(),
+            'total_application_count': sum(
+                row['total_application_count']
+                for row in application_stats.values()
+            ),
             'latest_application_id': latest_application_id,
         })
 
@@ -1048,9 +1087,10 @@ def jobs_view(request):
         'page_title': 'All Jobs & Requests - MultiBiz Admin',
         'current_page': 'jobs.php',
         'jobs': jobs,
-        'total_application_count': Application.objects.filter(
-            job_id__in=visible_job_ids
-        ).count(),
+        'total_application_count': sum(
+            row['total_application_count']
+            for row in application_stats.values()
+        ),
         'latest_application_id': latest_application_id,
         'counts': counts,
         'search': search,
