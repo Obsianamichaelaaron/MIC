@@ -13,12 +13,6 @@ from app.auth_utils import (
     password_needs_rehash,
     verify_password,
 )
-from app.services.database_rls import (
-    find_user_for_login,
-    prepare_registration_user_id,
-    set_authenticated_rls_context,
-    user_email_exists,
-)
 from app.services.mailer import send_otp_email, send_welcome_email, send_employer_welcome_email
 from app.services.resume_parser import (
     parse_and_save_applicant_resume,
@@ -104,14 +98,12 @@ def login_register_view(request):
                 error = "Passwords do not match"
             elif len(password) < 6:
                 error = "Password must be at least 6 characters"
-            elif user_email_exists(email):
+            elif User.objects.filter(email__iexact=email).exists():
                 error = "This email is already registered. Please log in instead."
             else:
                 if role == 'employer':
                     hashed_pwd = hash_password(password)
-                    new_user_id = prepare_registration_user_id('employer', email)
                     new_user = User.objects.create(
-                        **({'user_id': new_user_id} if new_user_id is not None else {}),
                         email=email,
                         password=hashed_pwd,
                         role='employer',
@@ -121,7 +113,6 @@ def login_register_view(request):
                         status='active',
                         created_by_admin=False
                     )
-                    set_authenticated_rls_context(new_user)
 
                     employer = Employer.objects.create(
                         user=new_user,
@@ -189,9 +180,7 @@ def login_register_view(request):
 
                     if not error:
                         hashed_pwd = hash_password(password)
-                        new_user_id = prepare_registration_user_id('applicant', email)
                         new_user = User.objects.create(
-                            **({'user_id': new_user_id} if new_user_id is not None else {}),
                             email=email,
                             password=hashed_pwd,
                             role='applicant',
@@ -201,7 +190,6 @@ def login_register_view(request):
                             status='active',
                             created_by_admin=False
                         )
-                        set_authenticated_rls_context(new_user)
 
                         # Qualification name
                         qual_name = None
@@ -249,11 +237,10 @@ def login_register_view(request):
             if not email or not password:
                 error = "Please fill in all fields"
             else:
-                user = find_user_for_login(email)
+                user = User.objects.filter(email__iexact=email).first()
                 if user and verify_password(password, user.password):
                     if user.status == 'active':
                         if password_needs_rehash(user.password):
-                            set_authenticated_rls_context(user)
                             user.password = hash_password(password)
                             User.objects.filter(pk=user.pk).update(
                                 password=user.password
@@ -324,7 +311,7 @@ def send_otp_view(request):
     if not email or '@' not in email or '.' not in email:
         return JsonResponse({'success': False, 'message': 'A valid email address is required.'})
 
-    if user_email_exists(email):
+    if User.objects.filter(email__iexact=email).exists():
         return JsonResponse({'success': False, 'message': 'This email is already registered. Please log in instead.'})
 
     # Rate limiting: max 3 OTP requests per 10 minutes

@@ -5,7 +5,6 @@ from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
-from django.db import connection
 from django.db.models import Q, Count
 from django.conf import settings
 from django.utils import timezone
@@ -99,14 +98,6 @@ def _normalize_employer_status(value):
 
 
 def _notify_applicant_for_employer_application(application, title, message):
-    if connection.vendor == 'postgresql':
-        with connection.cursor() as cursor:
-            cursor.execute(
-                'SELECT public.mic_rls_create_employer_notification(%s, %s, %s, %s)',
-                [application.application_id, title, message, 'application'],
-            )
-        return
-
     Notification.objects.create(
         user=application.applicant.user,
         title=title,

@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: multibiz-sqlite
+    runtime: python
+    region: singapore
+    plan: starter
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate --noinput && gunicorn multibiz.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    autoDeploy: true
+    disk:
+      name: multibiz-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: PERSISTENT_DATA_DIR
+        value: /var/data
+      - key: SQLITE_PATH
+        value: /var/data/db.sqlite3
+      - key: MEDIA_ROOT
+        value: /var/data/uploads
+      - key: CACHE_LOCATION
+        value: /var/data/django_cache
+      - key: SITE_URL
+        value: https://multibiz.global

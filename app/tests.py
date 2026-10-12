@@ -7,9 +7,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock, patch
-from django.db import connection, transaction
-from django.test import TestCase, Client, TransactionTestCase, override_settings
-from django.test.utils import CaptureQueriesContext
+from django.test import TestCase, Client, override_settings
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
@@ -36,7 +34,6 @@ from app.services.semantic_job_matching import (
     compute_semantic_match,
 )
 from app.services.qualification import classify_match_score
-from app.services.database_rls import set_authenticated_rls_context
 
 class MultiBizConversionTests(TestCase):
     def setUp(self):
@@ -2360,32 +2357,8 @@ class MultiBizConversionTests(TestCase):
         self.assertFalse(User.objects.filter(email='short-password@example.com').exists())
 
 
-class PostgreSQLRLSContextTests(TransactionTestCase):
-    def test_static_assets_skip_database_rls_setup(self):
-        with CaptureQueriesContext(connection) as queries:
-            response = Client().get('/static/css/typography.css')
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(queries), 0)
-
-    def test_anonymous_request_sets_rls_context_in_one_database_round_trip(self):
-        if connection.vendor != 'postgresql':
-            self.skipTest('PostgreSQL row-level security is only available on PostgreSQL.')
-
-        with CaptureQueriesContext(connection) as queries:
-            response = Client().get('/about/')
-
-        self.assertEqual(response.status_code, 200)
-        rls_context_queries = [
-            query for query in queries
-            if "set_config('app.session_key'" in query['sql']
-        ]
-        self.assertEqual(len(rls_context_queries), 1)
-
+class RoleAuthorizationTests(TestCase):
     def test_session_role_is_reloaded_from_account_record(self):
-        if connection.vendor != 'postgresql':
-            self.skipTest('PostgreSQL row-level security is only available on PostgreSQL.')
-
         applicant = User.objects.create(
             email='rls-session-applicant@example.com',
             password='not-a-real-account',
@@ -2403,60 +2376,6 @@ class PostgreSQLRLSContextTests(TransactionTestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn('error=unauthorized', response['Location'])
-
-    def test_forged_rls_identity_settings_are_rejected(self):
-        if connection.vendor != 'postgresql':
-            self.skipTest('PostgreSQL row-level security is only available on PostgreSQL.')
-
-        applicant = User.objects.create(
-            email='rls-context-applicant@example.com',
-            password='not-a-real-account',
-            role='applicant',
-            status='active',
-        )
-
-        with transaction.atomic():
-            with connection.cursor() as cursor:
-                cursor.execute('SET LOCAL ROLE mic_app_rls')
-                cursor.execute(
-                    "SELECT set_config('app.session_key', 'rls-test-session', true)"
-                )
-
-            set_authenticated_rls_context(applicant)
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT public.mic_rls_context_valid(),
-                           public.mic_rls_user_id(),
-                           public.mic_rls_user_role()
-                    """
-                )
-                valid, user_id, role = cursor.fetchone()
-
-            self.assertTrue(valid)
-            self.assertEqual(user_id, applicant.pk)
-            self.assertEqual(role, 'applicant')
-
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "SELECT set_config('app.user_id', %s, true), "
-                    "set_config('app.user_role', 'admin', true)",
-                    [str(applicant.pk + 1000000)],
-                )
-                cursor.execute(
-                    """
-                    SELECT public.mic_rls_context_valid(),
-                           public.mic_rls_user_id(),
-                           public.mic_rls_user_role(),
-                           public.mic_rls_is_admin()
-                    """
-                )
-                valid, user_id, role, is_admin = cursor.fetchone()
-
-            self.assertFalse(valid)
-            self.assertIsNone(user_id)
-            self.assertEqual(role, '')
-            self.assertFalse(is_admin)
 
 
 class PrivateResumeAccessTests(TestCase):
@@ -2558,31 +2477,19 @@ class PrivateResumeAccessTests(TestCase):
         self.assertEqual(denied_response.status_code, 404)
         self.assertEqual(allowed_response.status_code, 200)
 
-    @patch('app.services.resume_storage.requests.request')
-    def test_vercel_resume_upload_uses_private_supabase_bucket(self, storage_request):
-        from app.services.resume_storage import (
-            SUPABASE_RESUME_PREFIX,
-            store_verified_resume,
-        )
+    def test_resume_upload_is_stored_on_local_media_disk(self):
+        from app.services.resume_storage import store_verified_resume
 
-        storage_request.return_value.raise_for_status.return_value = None
         with tempfile.TemporaryDirectory() as temp_dir:
             source_path = Path(temp_dir) / 'resume.pdf'
             source_path.write_bytes(b'private test resume')
-            with override_settings(
-                SUPABASE_URL='https://storage.example.invalid',
-                SUPABASE_SERVICE_ROLE_KEY='test-only-service-key',
-                RESUME_STORAGE_BUCKET='private-resumes',
-            ):
-                with patch.dict(os.environ, {'VERCEL': '1'}):
-                    reference = store_verified_resume(source_path, '.pdf')
-
-        self.assertTrue(reference.startswith(SUPABASE_RESUME_PREFIX))
-        self.assertTrue(reference.startswith('supabase://resumes/'))
-        self.assertIn(
-            '/storage/v1/object/private-resumes/resumes/',
-            storage_request.call_args.args[1],
-        )
+            with override_settings(MEDIA_ROOT=Path(temp_dir) / 'media'):
+                reference = store_verified_resume(source_path, '.pdf')
+                self.assertTrue(reference.startswith('uploads/resumes/'))
+                self.assertEqual(
+                    (Path(temp_dir) / 'media' / reference.removeprefix('uploads/')).read_bytes(),
+                    b'private test resume',
+                )
 
 
 class ApplicantNotificationTests(TestCase):
