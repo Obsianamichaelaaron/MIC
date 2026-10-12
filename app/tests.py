@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from django.db import connection, transaction
 from django.test import TestCase, Client, TransactionTestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.core import mail
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
@@ -2360,6 +2361,27 @@ class MultiBizConversionTests(TestCase):
 
 
 class PostgreSQLRLSContextTests(TransactionTestCase):
+    def test_static_assets_skip_database_rls_setup(self):
+        with CaptureQueriesContext(connection) as queries:
+            response = Client().get('/static/css/typography.css')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(queries), 0)
+
+    def test_anonymous_request_sets_rls_context_in_one_database_round_trip(self):
+        if connection.vendor != 'postgresql':
+            self.skipTest('PostgreSQL row-level security is only available on PostgreSQL.')
+
+        with CaptureQueriesContext(connection) as queries:
+            response = Client().get('/about/')
+
+        self.assertEqual(response.status_code, 200)
+        rls_context_queries = [
+            query for query in queries
+            if "set_config('app.session_key'" in query['sql']
+        ]
+        self.assertEqual(len(rls_context_queries), 1)
+
     def test_session_role_is_reloaded_from_account_record(self):
         if connection.vendor != 'postgresql':
             self.skipTest('PostgreSQL row-level security is only available on PostgreSQL.')

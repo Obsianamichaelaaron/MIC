@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db import connection
 
 
-def _set_rls_context(user_id='', role='', email='', registration=False):
+def _set_rls_context(user_id='', role='', email='', registration=False, session_key=None):
     if connection.vendor != 'postgresql':
         return
 
@@ -22,10 +22,12 @@ def _set_rls_context(user_id='', role='', email='', registration=False):
     registration = bool(registration)
 
     with connection.cursor() as cursor:
-        cursor.execute(
-            "SELECT COALESCE(current_setting('app.session_key', true), '')"
-        )
-        session_key = cursor.fetchone()[0]
+        set_session_key = session_key is not None
+        if not set_session_key:
+            cursor.execute(
+                "SELECT COALESCE(current_setting('app.session_key', true), '')"
+            )
+            session_key = cursor.fetchone()[0]
         context = '\n'.join((
             user_id,
             role,
@@ -38,30 +40,50 @@ def _set_rls_context(user_id='', role='', email='', registration=False):
             context.encode('utf-8'),
             hashlib.sha256,
         ).hexdigest()
-        cursor.execute(
-            """
-            SELECT set_config('app.user_id', %s, true),
-                   set_config('app.user_role', %s, true),
-                   set_config('app.user_email', %s, true),
-                   set_config('app.registration', %s, true),
-                   set_config('app.context_signature', %s, true)
-            """,
-            [
-                user_id,
-                role,
-                email,
-                'true' if registration else 'false',
-                signature,
-            ],
-        )
+        if set_session_key:
+            cursor.execute(
+                """
+                SELECT set_config('app.session_key', %s, true),
+                       set_config('app.user_id', %s, true),
+                       set_config('app.user_role', %s, true),
+                       set_config('app.user_email', %s, true),
+                       set_config('app.registration', %s, true),
+                       set_config('app.context_signature', %s, true)
+                """,
+                [
+                    session_key,
+                    user_id,
+                    role,
+                    email,
+                    'true' if registration else 'false',
+                    signature,
+                ],
+            )
+        else:
+            cursor.execute(
+                """
+                SELECT set_config('app.user_id', %s, true),
+                       set_config('app.user_role', %s, true),
+                       set_config('app.user_email', %s, true),
+                       set_config('app.registration', %s, true),
+                       set_config('app.context_signature', %s, true)
+                """,
+                [
+                    user_id,
+                    role,
+                    email,
+                    'true' if registration else 'false',
+                    signature,
+                ],
+            )
 
 
-def set_authenticated_rls_context(user):
-    _set_rls_context(user.pk, user.role, user.email)
+def set_authenticated_rls_context(user, session_key=None):
+    _set_rls_context(user.pk, user.role, user.email, session_key=session_key)
 
 
-def set_rls_identity_for_lookup(user_id):
-    _set_rls_context(user_id)
+def set_rls_identity_for_lookup(user_id, session_key=None):
+    _set_rls_context(user_id, session_key=session_key)
 
 
 def prepare_registration_user_id(role, email):
@@ -88,8 +110,8 @@ def user_email_exists(email):
     return User.objects.filter(email__iexact=email).exists()
 
 
-def clear_rls_identity():
-    _set_rls_context()
+def clear_rls_identity(session_key=None):
+    _set_rls_context(session_key=session_key)
 
 
 def find_user_for_login(email):
