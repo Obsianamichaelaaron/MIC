@@ -4,13 +4,14 @@ from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+IS_VERCEL = os.environ.get('VERCEL') == '1'
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DJANGO_DEBUG', 'false').lower() == 'true'
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
-    if os.environ.get('VERCEL') == '1':
+    if IS_VERCEL:
         raise RuntimeError('DJANGO_SECRET_KEY must be configured in production.')
     SECRET_KEY = secrets.token_urlsafe(50)
 
@@ -74,13 +75,12 @@ TEMPLATES = [
 WSGI_APPLICATION = 'multibiz.wsgi.application'
 ASGI_APPLICATION = 'multibiz.asgi.application'
 
-if os.environ.get('VERCEL') == '1':
-    raise RuntimeError(
-        'This deployment requires persistent SQLite storage and is not '
-        'supported on Vercel. Deploy using the Render blueprint instead.'
+PERSISTENT_DATA_DIR = Path(
+    os.environ.get(
+        'PERSISTENT_DATA_DIR',
+        '/tmp' if IS_VERCEL else str(BASE_DIR),
     )
-
-PERSISTENT_DATA_DIR = Path(os.environ.get('PERSISTENT_DATA_DIR', str(BASE_DIR)))
+)
 SQLITE_PATH = Path(
     os.environ.get('SQLITE_PATH', str(PERSISTENT_DATA_DIR / 'db.sqlite3'))
 )
@@ -183,7 +183,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # ── Caching ──────────────────────────────────────────────────────────────────
 CACHE_DIR = BASE_DIR / '.django_cache'
-CACHE_BACKEND = os.environ.get('CACHE_BACKEND', 'django.core.cache.backends.filebased.FileBasedCache')
+CACHE_BACKEND = os.environ.get(
+    'CACHE_BACKEND',
+    (
+        'django.core.cache.backends.locmem.LocMemCache'
+        if IS_VERCEL
+        else 'django.core.cache.backends.filebased.FileBasedCache'
+    ),
+)
 CACHE_LOCATION = os.environ.get(
     'CACHE_LOCATION',
     str(PERSISTENT_DATA_DIR / '.django_cache'),
