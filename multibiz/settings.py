@@ -84,13 +84,35 @@ PERSISTENT_DATA_DIR = Path(
 SQLITE_PATH = Path(
     os.environ.get('SQLITE_PATH', str(PERSISTENT_DATA_DIR / 'db.sqlite3'))
 )
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': SQLITE_PATH,
-        'OPTIONS': {'timeout': 20},
+DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+if DATABASE_URL:
+    import dj_database_url
+
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=0,
+            ssl_require=True,
+        )
     }
-}
+elif IS_VERCEL:
+    raise RuntimeError(
+        'Set DATABASE_URL to a persistent PostgreSQL database for Vercel. '
+        'SQLite in /tmp is not persistent.'
+    )
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': SQLITE_PATH,
+            'OPTIONS': {'timeout': 20},
+        }
+    }
+
+if IS_VERCEL and DATABASES['default']['ENGINE'].endswith('sqlite3'):
+    raise RuntimeError(
+        'Vercel deployments require persistent PostgreSQL via DATABASE_URL.'
+    )
 
 # Optional source databases used only by the one-time data import command.
 # The application itself always uses SQLite.

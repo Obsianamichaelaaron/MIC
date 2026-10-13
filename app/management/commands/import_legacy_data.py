@@ -12,7 +12,6 @@ from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections
-from django.db.utils import OperationalError
 
 from app.models import Applicant, Application, Employer
 
@@ -35,13 +34,29 @@ class Command(BaseCommand):
                 'MIGRATION_SOURCE_SQLITE_URL before importing.'
             )
 
+        target_database = connections['default']
         target_path = Path(connections.databases['default']['NAME'])
-        target_path.parent.mkdir(parents=True, exist_ok=True)
+        if target_database.vendor == 'sqlite':
+            target_path.parent.mkdir(parents=True, exist_ok=True)
         temporary_path = None
         try:
             self._ensure_target_is_empty()
-            self._validate_source(target_path)
+            self._validate_source(
+                target_path if target_database.vendor == 'sqlite' else None
+            )
             self._require_storage_credentials()
+
+            if target_database.vendor == 'postgresql':
+                self._import_to_postgresql()
+                self.stdout.write(self.style.SUCCESS(
+                    'Imported legacy records into the persistent PostgreSQL '
+                    'database. Restart the web service before switching traffic.'
+                ))
+                return
+            if target_database.vendor != 'sqlite':
+                raise CommandError(
+                    'The target database must be SQLite or PostgreSQL.'
+                )
 
             descriptor, temporary_name = tempfile.mkstemp(
                 prefix=f'{target_path.stem}-import-',
@@ -169,9 +184,9 @@ class Command(BaseCommand):
         return temporary_source_path
 
     @staticmethod
-    def _validate_source(target_path):
+    def _validate_source(target_path=None):
         source_path = Path(connections.databases['legacy']['NAME']).resolve()
-        if source_path == target_path.resolve():
+        if target_path and source_path == target_path.resolve():
             raise CommandError('The source and target database paths must differ.')
         if connections['legacy'].vendor != 'sqlite':
             return
@@ -205,20 +220,73 @@ class Command(BaseCommand):
 
     def _ensure_target_is_empty(self):
         connection = connections['default']
-        if connection.vendor != 'sqlite':
-            raise CommandError('The default database must be SQLite.')
+        existing_tables = set(connection.introspection.table_names())
         for model in apps.get_app_config('app').get_models():
-            try:
-                has_records = model.objects.using('default').exists()
-            except OperationalError as exc:
-                if 'no such table' in str(exc).lower():
-                    continue
-                raise
+            if model._meta.db_table not in existing_tables:
+                continue
+            has_records = model.objects.using('default').exists()
             if has_records:
                 raise CommandError(
                     'The target SQLite database already contains application '
                     'records; refusing to overwrite it.'
                 )
+
+    def _import_to_postgresql(self):
+        target_database_config = connections.databases['default'].copy()
+        settings.PERSISTENT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        descriptor, staging_name = tempfile.mkstemp(
+            prefix='legacy-import-stage-',
+            suffix='.sqlite3',
+            dir=settings.PERSISTENT_DATA_DIR,
+        )
+        os.close(descriptor)
+        staging_path = Path(staging_name)
+        fixture_descriptor, fixture_name = tempfile.mkstemp(
+            prefix='legacy-import-fixture-',
+            suffix='.json',
+            dir=settings.PERSISTENT_DATA_DIR,
+        )
+        os.close(fixture_descriptor)
+        fixture_path = Path(fixture_name)
+        try:
+            connections['default'].close()
+            connections.databases['default'] = {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': str(staging_path),
+                'OPTIONS': {'timeout': 20},
+            }
+            call_command('migrate', database='default', interactive=False, verbosity=0)
+            self._import_fixture()
+            self._import_storage_files()
+
+            with fixture_path.open('w', encoding='utf-8') as fixture:
+                call_command(
+                    'dumpdata',
+                    'app',
+                    database='default',
+                    natural_foreign=True,
+                    natural_primary=True,
+                    stdout=fixture,
+                    verbosity=0,
+                )
+        finally:
+            connections['default'].close()
+            connections.databases['default'] = target_database_config
+            staging_path.unlink(missing_ok=True)
+
+        try:
+            call_command('migrate', database='default', interactive=False, verbosity=0)
+            from django.db import transaction
+
+            with transaction.atomic(using='default'):
+                call_command(
+                    'loaddata',
+                    str(fixture_path),
+                    database='default',
+                    verbosity=0,
+                )
+        finally:
+            fixture_path.unlink(missing_ok=True)
 
     def _import_fixture(self):
         settings.PERSISTENT_DATA_DIR.mkdir(parents=True, exist_ok=True)
