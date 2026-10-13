@@ -1,5 +1,7 @@
 import hashlib
 import os
+import re
+import sqlite3
 import tempfile
 from pathlib import Path
 from urllib.parse import quote, unquote, urlsplit
@@ -16,34 +18,41 @@ from app.models import Applicant, Application, Employer
 
 
 class Command(BaseCommand):
+    max_sqlite_source_bytes = 800 * 1024 * 1024
     help = (
-        'Copy existing application records and Supabase Storage files into '
-        'the persistent SQLite and media directories.'
+        'Copy existing application records and storage files into the '
+        'persistent SQLite and media directories.'
     )
 
     def handle(self, *args, **options):
+        temporary_source_path = None
+        if 'legacy' not in connections.databases:
+            temporary_source_path = self._configure_sqlite_source()
         if 'legacy' not in connections.databases:
             raise CommandError(
-                'Set MIGRATION_SOURCE_DATABASE_URL to the existing PostgreSQL '
-                'connection before importing.'
+                'Configure MIGRATION_SOURCE_DATABASE_URL, '
+                'MIGRATION_SOURCE_SQLITE_PATH, or '
+                'MIGRATION_SOURCE_SQLITE_URL before importing.'
             )
 
         target_path = Path(connections.databases['default']['NAME'])
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        self._ensure_target_is_empty()
-        self._require_storage_credentials()
-
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f'{target_path.stem}-import-',
-            suffix='.sqlite3',
-            dir=target_path.parent,
-        )
-        os.close(descriptor)
-        temporary_path = Path(temporary_name)
-        temporary_path.unlink()
-
-        original_database_name = connections.databases['default']['NAME']
+        temporary_path = None
         try:
+            self._ensure_target_is_empty()
+            self._validate_source(target_path)
+            self._require_storage_credentials()
+
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f'{target_path.stem}-import-',
+                suffix='.sqlite3',
+                dir=target_path.parent,
+            )
+            os.close(descriptor)
+            temporary_path = Path(temporary_name)
+            temporary_path.unlink()
+
+            original_database_name = connections.databases['default']['NAME']
             connections['default'].close()
             connections.databases['default']['NAME'] = str(temporary_path)
             call_command('migrate', database='default', interactive=False, verbosity=0)
@@ -53,18 +62,146 @@ class Command(BaseCommand):
             os.replace(temporary_path, target_path)
         except Exception as exc:
             connections['default'].close()
-            temporary_path.unlink(missing_ok=True)
+            if temporary_path:
+                temporary_path.unlink(missing_ok=True)
             if isinstance(exc, CommandError):
                 raise
             raise CommandError(f'Legacy data import failed: {exc}') from exc
         finally:
-            connections.databases['default']['NAME'] = original_database_name
             connections['default'].close()
+            if 'original_database_name' in locals():
+                connections.databases['default']['NAME'] = original_database_name
+            if temporary_source_path:
+                connections['legacy'].close()
+                temporary_source_path.unlink(missing_ok=True)
 
         self.stdout.write(self.style.SUCCESS(
             f'Imported legacy records into {target_path}. Restart the web service '
             'before switching traffic to it.'
         ))
+
+    def _configure_sqlite_source(self):
+        source_path = os.environ.get('MIGRATION_SOURCE_SQLITE_PATH')
+        source_url = os.environ.get('MIGRATION_SOURCE_SQLITE_URL')
+        if bool(source_path) == bool(source_url):
+            return None
+
+        if source_url:
+            parsed_url = urlsplit(source_url)
+            checksum = os.environ.get('MIGRATION_SOURCE_SQLITE_SHA256', '')
+            if parsed_url.scheme != 'https' or not parsed_url.netloc:
+                raise CommandError(
+                    'MIGRATION_SOURCE_SQLITE_URL must be a private HTTPS '
+                    'download URL.'
+                )
+            if not re.fullmatch(r'[0-9a-fA-F]{64}', checksum):
+                raise CommandError(
+                    'Set MIGRATION_SOURCE_SQLITE_SHA256 to the source file '
+                    'SHA-256 checksum.'
+                )
+
+            settings.PERSISTENT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix='local-database-import-',
+                suffix='.sqlite3',
+                dir=settings.PERSISTENT_DATA_DIR,
+            )
+            temporary_path = Path(temporary_name)
+            digest = hashlib.sha256()
+            total_bytes = 0
+            try:
+                with os.fdopen(descriptor, 'wb') as destination:
+                    with requests.get(
+                        source_url,
+                        stream=True,
+                        timeout=(10, 60),
+                    ) as response:
+                        response.raise_for_status()
+                        if urlsplit(response.url).scheme != 'https':
+                            raise CommandError(
+                                'The source database download redirected away '
+                                'from HTTPS.'
+                            )
+                        for chunk in response.iter_content(chunk_size=1024 * 1024):
+                            if not chunk:
+                                continue
+                            total_bytes += len(chunk)
+                            if total_bytes > self.max_sqlite_source_bytes:
+                                raise CommandError(
+                                    'The source database exceeds the 800 MiB '
+                                    'import limit.'
+                                )
+                            digest.update(chunk)
+                            destination.write(chunk)
+                if digest.hexdigest().lower() != checksum.lower():
+                    raise CommandError(
+                        'The downloaded source database checksum does not match.'
+                    )
+            except CommandError:
+                temporary_path.unlink(missing_ok=True)
+                raise
+            except requests.RequestException:
+                temporary_path.unlink(missing_ok=True)
+                raise CommandError(
+                    'Could not download the source database from the configured '
+                    'HTTPS URL.'
+                ) from None
+            except OSError as exc:
+                temporary_path.unlink(missing_ok=True)
+                raise CommandError(
+                    'Could not write the downloaded source database.'
+                ) from exc
+            source_path = temporary_path
+            temporary_source_path = temporary_path
+        else:
+            temporary_source_path = None
+
+        source_path = Path(source_path).expanduser().resolve()
+        if not source_path.is_file():
+            raise CommandError('The configured SQLite source file was not found.')
+        legacy_database = connections.databases['default'].copy()
+        legacy_database.update({
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': str(source_path),
+            'OPTIONS': {'timeout': 20},
+        })
+        connections.databases['legacy'] = legacy_database
+        return temporary_source_path
+
+    @staticmethod
+    def _validate_source(target_path):
+        source_path = Path(connections.databases['legacy']['NAME']).resolve()
+        if source_path == target_path.resolve():
+            raise CommandError('The source and target database paths must differ.')
+        if connections['legacy'].vendor != 'sqlite':
+            return
+        source = None
+        try:
+            source = sqlite3.connect(
+                f'{source_path.as_uri()}?mode=ro',
+                uri=True,
+                timeout=20,
+            )
+            integrity = source.execute('PRAGMA integrity_check').fetchone()
+            tables = {
+                row[0]
+                for row in source.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+        except sqlite3.Error as exc:
+            raise CommandError(
+                'The source file is not a readable SQLite database.'
+            ) from exc
+        finally:
+            if source:
+                source.close()
+        if not integrity or integrity[0] != 'ok':
+            raise CommandError('The source SQLite database failed its integrity check.')
+        if 'users' not in tables:
+            raise CommandError(
+                'The source SQLite database does not contain application tables.'
+            )
 
     def _ensure_target_is_empty(self):
         connection = connections['default']

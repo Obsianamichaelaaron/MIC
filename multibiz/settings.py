@@ -92,9 +92,19 @@ DATABASES = {
     }
 }
 
-# Optional read-only source used only by the one-time PostgreSQL/Supabase
-# import command. The application itself always uses SQLite.
+# Optional source databases used only by the one-time data import command.
+# The application itself always uses SQLite.
 migration_source_url = os.environ.get('MIGRATION_SOURCE_DATABASE_URL')
+legacy_sqlite_path = os.environ.get('MIGRATION_SOURCE_SQLITE_PATH')
+legacy_sqlite_url = os.environ.get('MIGRATION_SOURCE_SQLITE_URL')
+if sum(bool(value) for value in (
+    migration_source_url,
+    legacy_sqlite_path,
+    legacy_sqlite_url,
+)) > 1:
+    raise RuntimeError(
+        'Configure only one legacy database source.'
+    )
 if migration_source_url:
     import dj_database_url
 
@@ -103,6 +113,12 @@ if migration_source_url:
         conn_max_age=0,
         ssl_require=True,
     )
+elif legacy_sqlite_path:
+    DATABASES['legacy'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': legacy_sqlite_path,
+        'OPTIONS': {'timeout': 20},
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
