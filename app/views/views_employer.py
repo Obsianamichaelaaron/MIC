@@ -3,7 +3,7 @@ import datetime
 from decimal import Decimal
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q, Count
 from django.conf import settings
@@ -244,6 +244,96 @@ def dashboard_view(request):
         'unread_count': unread_count,
     }
     return render(request, 'employer/dashboard.html', context)
+
+
+@require_role('employer')
+def notifications_view(request):
+    """Show the signed-in employer's notifications and support new-application polling."""
+    employer_user_id = getCurrentUserId(request)
+
+    if request.method == 'GET' and request.GET.get('poll') == 'applications':
+        cursor_key = f'employer_application_notification_cursor_{employer_user_id}'
+        notification_cursor = request.session.get(cursor_key)
+        if notification_cursor is None:
+            latest_notification_id = (
+                Notification.objects.filter(user_id=employer_user_id)
+                .order_by('-notification_id')
+                .values_list('notification_id', flat=True)
+                .first()
+            ) or 0
+            request.session[cursor_key] = latest_notification_id
+            latest_unread_application = Notification.objects.filter(
+                user_id=employer_user_id,
+                type='application',
+                is_read=False,
+                notification_id__lte=latest_notification_id,
+            ).order_by('-notification_id').first()
+            new_notifications = (
+                [latest_unread_application] if latest_unread_application else []
+            )
+        else:
+            new_notifications = list(
+                Notification.objects.filter(
+                    user_id=employer_user_id,
+                    type='application',
+                    notification_id__gt=notification_cursor,
+                ).order_by('notification_id')[:20]
+            )
+            if new_notifications:
+                request.session[cursor_key] = new_notifications[-1].notification_id
+
+        return JsonResponse({
+            'notifications': [
+                {
+                    'notification_id': notification.notification_id,
+                    'title': notification.title,
+                    'message': notification.message or '',
+                }
+                for notification in new_notifications
+            ],
+            'unread_notification_count': Notification.objects.filter(
+                user_id=employer_user_id,
+                is_read=False,
+            ).count(),
+        })
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'mark_all_read':
+            Notification.objects.filter(
+                user_id=employer_user_id,
+                is_read=False,
+            ).update(is_read=True)
+        elif action == 'mark_read':
+            notification_id = request.POST.get('notification_id', '')
+            if not notification_id.isdigit():
+                return HttpResponseBadRequest('A valid notification ID is required.')
+            notification = get_object_or_404(
+                Notification,
+                pk=int(notification_id),
+                user_id=employer_user_id,
+            )
+            if not notification.is_read:
+                notification.is_read = True
+                notification.save(update_fields=['is_read'])
+        else:
+            return HttpResponseBadRequest('Invalid notification action.')
+
+        return redirect('employer_notifications')
+
+    notifications = Notification.objects.filter(
+        user_id=employer_user_id,
+    ).order_by('-created_at', '-notification_id')[:100]
+    context = {
+        'page_title': 'Notifications - MultiBiz',
+        'current_page': 'notifications.php',
+        'notifications': notifications,
+        'unread_notification_count': Notification.objects.filter(
+            user_id=employer_user_id,
+            is_read=False,
+        ).count(),
+    }
+    return render(request, 'admin/notifications.html', context)
 
 
 @require_role('employer')

@@ -593,6 +593,25 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(response, 'Complete Your Profile to Unlock AI Job Matches')
         match_job.assert_not_called()
 
+    def test_dashboard_uses_profile_page_fields_without_requiring_resume_analysis(self):
+        self.applicant.resume_file = 'uploads/resumes/complete-profile.pdf'
+        self.applicant.save(update_fields=['resume_file'])
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        response = self.client.get('/applicant/dashboard.php')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['completion_pct'], 100)
+        self.assertTrue(response.context['profile_is_complete'])
+        self.assertEqual(len(response.context['recommended_jobs']), 1)
+        self.assertGreater(
+            response.context['recommended_jobs'][0]['match_score'],
+            0,
+        )
+
     @patch('app.views.views_applicant.compute_semantic_match')
     def test_job_match_api_withholds_score_until_profile_is_complete(self, semantic_match):
         session = self.client.session
@@ -1134,6 +1153,22 @@ class MultiBizConversionTests(TestCase):
             set(JobPosting.objects.filter(job_id__in=duplicate_ids).values_list('status', flat=True)),
             {'closed'},
         )
+
+    def test_admin_jobs_action_ignores_invalid_duplicate_ids_without_400(self):
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.post('/admin/jobs.php', {
+            'action': 'toggle_status',
+            'job_id': self.job.job_id,
+            'job_ids': f'{self.job.job_id},999999,not-a-number',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, 'closed')
 
     def test_homepage_featured_jobs_are_unique_and_use_employer_names(self):
         JobPosting.objects.create(
@@ -1911,6 +1946,14 @@ class MultiBizConversionTests(TestCase):
         )
         self.assertEqual(application_notification.title, 'Application submitted')
         self.assertIn(self.job.title, application_notification.message)
+        employer_application_notification = Notification.objects.get(
+            user=self.employer_user,
+            type='application',
+            title='New applicant applied',
+        )
+        self.assertIn(self.job.title, employer_application_notification.message)
+        self.assertIn('pending admin review', employer_application_notification.message)
+        self.assertNotIn(self.applicant_user.full_name, employer_application_notification.message)
         admin_application_notification = Notification.objects.get(
             user=self.admin_user,
             type='application',
@@ -1931,6 +1974,7 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(notifications_response.status_code, 200)
         self.assertContains(notifications_response, 'Application submitted')
         self.assertContains(notifications_response, self.job.title)
+
 
         jobs_response = self.client.get('/applicant/jobs.php')
         self.assertEqual(jobs_response.status_code, 200)
@@ -2766,8 +2810,85 @@ class AdminNotificationTests(TestCase):
         self.assertContains(notifications_page, new_notification.title)
 
         dashboard = self.client.get('/admin/analytics.php')
-        self.assertContains(dashboard, 'id="adminApplicationToast"')
-        self.assertContains(dashboard, '/admin/notifications/?poll=applications')
+        self.assertContains(dashboard, 'id="applicationNotificationToast"')
+        self.assertContains(dashboard, "notificationUrl + '?poll=applications'")
+        self.assertContains(dashboard, '/admin/notifications/')
+
+    def test_employer_bell_and_application_toast_are_scoped_to_employer(self):
+        employer_user = User.objects.create(
+            email='notification-employer@example.com',
+            password='test-password',
+            role='employer',
+            status='active',
+        )
+        notification = Notification.objects.create(
+            user=employer_user,
+            title='New applicant applied',
+            message='A new applicant applied for Senior Full Stack Developer.',
+            type='application',
+        )
+        other_employer = User.objects.create(
+            email='another-employer@example.com',
+            password='test-password',
+            role='employer',
+            status='active',
+        )
+        Notification.objects.create(
+            user=other_employer,
+            title='Private employer notification',
+            type='application',
+        )
+
+        employer_client = Client()
+        session = employer_client.session
+        session['user_id'] = employer_user.user_id
+        session['role'] = 'employer'
+        session.save()
+
+        dashboard = employer_client.get('/employer/dashboard/')
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertContains(
+            dashboard,
+            '<a href="/employer/recommended_candidates.php" class="ud-item" role="menuitem">',
+        )
+        self.assertContains(dashboard, 'Recommended Candidates')
+        self.assertContains(dashboard, '/employer/notifications/')
+        self.assertContains(dashboard, 'aria-label="Notifications, 1 unread"')
+        self.assertContains(dashboard, 'id="applicationNotificationToast"')
+        self.assertContains(dashboard, "notificationUrl + '?poll=applications'")
+
+        first_poll = employer_client.get(
+            '/employer/notifications/?poll=applications',
+        )
+        self.assertEqual(first_poll.status_code, 200)
+        self.assertEqual(first_poll.json()['unread_notification_count'], 1)
+        self.assertEqual(
+            first_poll.json()['notifications'],
+            [{
+                'notification_id': notification.notification_id,
+                'title': notification.title,
+                'message': notification.message,
+            }],
+        )
+        second_poll = employer_client.get(
+            '/employer/notifications/?poll=applications',
+        )
+        self.assertEqual(second_poll.json()['notifications'], [])
+
+        notifications_page = employer_client.get('/employer/notifications/')
+        self.assertEqual(notifications_page.status_code, 200)
+        self.assertContains(notifications_page, notification.message)
+        self.assertNotContains(notifications_page, 'Private employer notification')
+        mark_read_response = employer_client.post(
+            '/employer/notifications/',
+            {
+                'action': 'mark_read',
+                'notification_id': notification.notification_id,
+            },
+        )
+        self.assertRedirects(mark_read_response, '/employer/notifications/')
+        notification.refresh_from_db()
+        self.assertTrue(notification.is_read)
 
     def test_mark_all_read_only_updates_current_admin_notifications(self):
         own_notification = Notification.objects.create(
@@ -3013,3 +3134,36 @@ class ResumeProfileSyncTests(TestCase):
         self.assertEqual(ResumeAnalysis.objects.filter(applicant=self.applicant).count(), 0)
         self.assertEqual(self.user.first_name, 'Taylor')
         self.assertEqual(self.user.last_name, 'Candidate')
+
+
+class UserSessionValidationMiddlewareTests(TestCase):
+    def test_unchanged_user_details_do_not_mark_session_modified(self):
+        from django.contrib.sessions.backends.db import SessionStore
+        from django.test import RequestFactory
+        from app.middleware import UserSessionValidationMiddleware
+
+        user = User.objects.create(
+            email='session-check@example.com',
+            password='test-password',
+            role='applicant',
+            first_name='Session',
+            last_name='Check',
+            status='active',
+        )
+        session = SessionStore()
+        session.update({
+            'user_id': user.user_id,
+            'email': user.email,
+            'role': user.role,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
+        })
+        session.save()
+        session.modified = False
+
+        request = RequestFactory().get('/applicant/dashboard/')
+        request.session = session
+        middleware = UserSessionValidationMiddleware(lambda current_request: None)
+        middleware.process_view(request, lambda current_request: None, (), {})
+
+        self.assertFalse(session.modified)

@@ -70,14 +70,13 @@ def _has_semantic_profile_content(applicant: Applicant, resume_text: str = '') -
 
 
 def _applicant_profile_status(applicant: Applicant) -> tuple[int, bool]:
-    """Return completion percentage and whether required resume data is available."""
-    has_resume_analysis = ResumeAnalysis.objects.filter(applicant=applicant).exists()
+    """Return profile-page completion and whether matching has enough profile data."""
     fields = [
         bool(applicant.resume_file),
-        bool(applicant.user.phone),
         bool(applicant.skills),
+        bool(applicant.qualifications),
+        bool(applicant.experience_years),
         bool(applicant.education_level),
-        has_resume_analysis,
     ]
     completion_pct = round(sum(fields) / len(fields) * 100)
     has_name = bool(applicant.user.first_name and applicant.user.last_name)
@@ -754,7 +753,10 @@ def apply_job_view(request, job_id=None):
     chatbot_answers = list(ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number'))
 
     j_id = job_id or request.GET.get('id') or request.GET.get('job_id') or request.POST.get('job_id')
-    job = get_object_or_404(JobPosting.objects.select_related('employer'), pk=j_id)
+    job = get_object_or_404(
+        JobPosting.objects.select_related('employer', 'employer__user'),
+        pk=j_id,
+    )
 
     # Check if already applied
     existing_app = Application.objects.filter(applicant=applicant, job=job).first()
@@ -872,6 +874,16 @@ def apply_job_view(request, job_id=None):
                     role='admin',
                 ).only('user_id')
             ])
+            if job.employer and job.employer.user.role == 'employer':
+                Notification.objects.create(
+                    user_id=job.employer.user_id,
+                    title='New applicant applied',
+                    message=(
+                        f'A new applicant applied for {job.title}. '
+                        'The application is pending admin review.'
+                    ),
+                    type='application',
+                )
 
             # Send under review email to applicant
             try:
@@ -1131,14 +1143,7 @@ def profile_view(request):
     # Qualifications list for dropdown
     all_qualifications = Qualification.objects.filter(status='active').order_by('name')
     chatbot_answers = ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number')
-    profile_fields = [
-        applicant.skills,
-        applicant.qualifications,
-        applicant.experience_years,
-        applicant.resume_file,
-        applicant.education_level,
-    ]
-    completion_pct = round(sum(bool(value) for value in profile_fields) / len(profile_fields) * 100)
+    completion_pct, _ = _applicant_profile_status(applicant)
     skills_list = [skill.strip() for skill in (applicant.skills or '').split(',') if skill.strip()]
 
     context = {

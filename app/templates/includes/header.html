@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ page_title|default:"MULTIBIZ INTERNATIONAL CORPORATION" }}</title>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="/static/css/typography.css">
@@ -1016,7 +1018,7 @@
         
         <!-- Brand Logo -->
         <a href="/{{ current_role }}/dashboard.php" class="navbar-brand">
-            <img src="/images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION" style="height: 40px; margin-right: 10px;">
+            <img src="/images/mbLogo.webp" alt="MULTIBIZ INTERNATIONAL CORPORATION" style="height: 40px; margin-right: 10px;">
         </a>
         
         
@@ -1045,9 +1047,6 @@
                     </a>
                     <a href="/employer/candidates.php" class="{% if current_page == 'candidates.php' %}active{% endif %}">
                         <i class="fas fa-users-viewfinder"></i> <span>Candidates</span>
-                    </a>
-                    <a href="/employer/recommended_candidates.php" class="{% if current_page == 'recommended_candidates.php' %}active{% endif %}">
-                        <i class="fas fa-wand-magic-sparkles"></i> <span>Recommended</span>
                     </a>
                 {% elif current_role == 'admin' %}
                     <a href="/admin/dashboard.php" class="{% if current_page == 'dashboard.php' %}active{% endif %}">
@@ -1086,6 +1085,15 @@
                 </a>
             {% elif current_role == 'admin' %}
                 <a href="/admin/notifications/" class="applicant-notification-link{% if current_page == 'notifications.php' %} active{% endif %}" aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}" title="Notifications">
+                    <i class="fas fa-bell" aria-hidden="true"></i>
+                    {% if unread_notification_count > 0 %}
+                        <span class="applicant-notification-badge">
+                            {% if unread_notification_count > 99 %}99+{% else %}{{ unread_notification_count }}{% endif %}
+                        </span>
+                    {% endif %}
+                </a>
+            {% elif current_role == 'employer' %}
+                <a href="/employer/notifications/" class="applicant-notification-link{% if current_page == 'notifications.php' %} active{% endif %}" aria-label="Notifications{% if unread_notification_count %}, {{ unread_notification_count }} unread{% endif %}" title="Notifications">
                     <i class="fas fa-bell" aria-hidden="true"></i>
                     {% if unread_notification_count > 0 %}
                         <span class="applicant-notification-badge">
@@ -1135,6 +1143,11 @@
                     <span class="ud-item-icon"><i class="fas fa-file-alt"></i></span>
                     <span>My Applications</span>
                 </a>
+                {% elif current_role == 'employer' %}
+                <a href="/employer/recommended_candidates.php" class="ud-item" role="menuitem">
+                    <span class="ud-item-icon"><i class="fas fa-wand-magic-sparkles"></i></span>
+                    <span>Recommended Candidates</span>
+                </a>
                 {% elif current_role == 'admin' %}
                 <a href="/admin/jobs.php" class="ud-item" role="menuitem">
                     <span class="ud-item-icon"><i class="fas fa-briefcase"></i></span>
@@ -1174,17 +1187,17 @@
 
     </nav>
 
-    {% if current_role == 'admin' %}
-    <div id="adminApplicationToast" role="status" aria-live="polite" aria-atomic="true" hidden
+    {% if current_role == 'admin' or current_role == 'employer' %}
+    <div id="applicationNotificationToast" role="status" aria-live="polite" aria-atomic="true" hidden
          style="display:none;position:fixed;top:5.5rem;right:1rem;z-index:20000;width:min(390px,calc(100vw - 2rem));padding:1rem 1.1rem;background:#fff;border:1px solid #dbe4ef;border-left:4px solid #0284c7;border-radius:12px;box-shadow:0 12px 35px rgba(15,23,42,.2);">
         <div style="display:flex;align-items:flex-start;gap:.75rem;">
             <i class="fas fa-bell" aria-hidden="true" style="color:#0284c7;margin-top:.2rem;"></i>
             <div style="flex:1;min-width:0;">
-                <strong id="adminApplicationToastTitle" style="display:block;color:#0f172a;font-size:.92rem;">New applicant</strong>
-                <span id="adminApplicationToastMessage" style="display:block;color:#475569;font-size:.84rem;margin-top:.2rem;"></span>
-                <a href="/admin/notifications/" style="display:inline-block;color:#0369a1;font-size:.8rem;font-weight:700;margin-top:.5rem;">View notifications</a>
+                <strong id="applicationNotificationToastTitle" style="display:block;color:#0f172a;font-size:.92rem;">New applicant</strong>
+                <span id="applicationNotificationToastMessage" style="display:block;color:#475569;font-size:.84rem;margin-top:.2rem;"></span>
+                <a href="{% if current_role == 'admin' %}/admin/notifications/{% else %}/employer/notifications/{% endif %}" style="display:inline-block;color:#0369a1;font-size:.8rem;font-weight:700;margin-top:.5rem;">View notifications</a>
             </div>
-            <button type="button" id="adminApplicationToastClose" aria-label="Dismiss notification"
+            <button type="button" id="applicationNotificationToastClose" aria-label="Dismiss notification"
                     style="border:0;background:transparent;color:#64748b;font-size:1.1rem;line-height:1;cursor:pointer;padding:.1rem;">&times;</button>
         </div>
     </div>
@@ -1287,13 +1300,14 @@
         }
     })();
 
-    {% if current_role == 'admin' %}
+    {% if current_role == 'admin' or current_role == 'employer' %}
     (function() {
-        var toast = document.getElementById('adminApplicationToast');
-        var toastTitle = document.getElementById('adminApplicationToastTitle');
-        var toastMessage = document.getElementById('adminApplicationToastMessage');
-        var closeButton = document.getElementById('adminApplicationToastClose');
-        var notificationBell = document.querySelector('.navbar-account-actions a[href="/admin/notifications/"]');
+        var toast = document.getElementById('applicationNotificationToast');
+        var toastTitle = document.getElementById('applicationNotificationToastTitle');
+        var toastMessage = document.getElementById('applicationNotificationToastMessage');
+        var closeButton = document.getElementById('applicationNotificationToastClose');
+        var notificationUrl = '{% if current_role == 'admin' %}/admin/notifications/{% else %}/employer/notifications/{% endif %}';
+        var notificationBell = document.querySelector('.navbar-account-actions a[href="' + notificationUrl + '"]');
         if (!toast || !toastTitle || !toastMessage) return;
 
         var requestPending = false;
@@ -1322,18 +1336,18 @@
             if (requestPending || document.hidden) return;
             requestPending = true;
             try {
-                var response = await fetch('/admin/notifications/?poll=applications', {
+                var response = await fetch(notificationUrl + '?poll=applications', {
                     credentials: 'same-origin',
                     cache: 'no-store',
                     headers: { 'Accept': 'application/json' }
                 });
                 if (!response.ok) {
-                    throw new Error('Admin application notification check failed: ' + response.status);
+                    throw new Error('Application notification check failed: ' + response.status);
                 }
                 var data = await response.json();
                 if (!Array.isArray(data.notifications) ||
                     !Number.isInteger(data.unread_notification_count)) {
-                    throw new Error('Admin application notification response is invalid.');
+                    throw new Error('Application notification response is invalid.');
                 }
 
                 var badge = notificationBell

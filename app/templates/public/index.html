@@ -14,10 +14,12 @@
     <link rel="apple-touch-icon" href="2024/favicon.png">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&display=swap">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="js/script.js"></script>
-    <script src="js/landingPage.js"></script>
+    <script src="js/script.js" defer></script>
+    <script src="js/landingPage.js" defer></script>
 
     <style>
         /* ============================================================
@@ -1258,7 +1260,7 @@
         <div class="header-container">
             <div class="logo">
                 <a href="index.php">
-                    <img src="images/mbLogo.png" alt="MULTIBIZ INTERNATIONAL CORPORATION">
+                    <img src="images/mbLogo.webp" alt="MULTIBIZ INTERNATIONAL CORPORATION">
                 </a>
             </div>
             <button class="nav-toggle" id="navToggle"><i class="fas fa-bars"></i></button>
@@ -1300,7 +1302,7 @@
             {% for slide in hero_slides %}
                 <div class="hero-image {% if forloop.first %}active{% endif %}"
                      data-slide-index="{{ forloop.counter0 }}"
-                     style="background-image: url('{% if slide.image_path %}{{ slide.image_path }}{% else %}images/picture{{ forloop.counter }}.png{% endif %}');"></div>
+                     style="background-image: url('{% if slide.image_path %}{{ slide.image_path }}{% else %}images/picture{{ forloop.counter }}.webp{% endif %}');"></div>
             {% endfor %}
         </div>
         <div class="hero-overlay"></div>
@@ -1362,7 +1364,7 @@
                  data-category="{{ brand.brand_category }}">
                 <div class="brand-logo">
                     {% if brand.brand_logo %}
-                        <img src="{{ brand.brand_logo }}"
+                        <img src="{{ brand.brand_logo }}" loading="lazy" decoding="async"
                              alt="{{ brand.brand_name }}"
                              style="height:56px;">
                     {% else %}
@@ -1475,7 +1477,7 @@
                     {% for news in news_articles %}
                         <div class="news-card animate-on-scroll compact-news-card">
                             <div class="news-image">
-                                <img src="{{ news.image_path|default:"https://placehold.co/400x250/0a1628/d4af55?text=News" }}" alt="{{ news.title }}">
+                                <img src="{{ news.image_path|default:"https://placehold.co/400x250/0a1628/d4af55?text=News" }}" alt="{{ news.title }}" loading="lazy" decoding="async">
                                 <div class="news-date">
                                     <span class="date-day">{{ news.news_date|date:"d" }}</span>
                                     <span class="date-month">{{ news.news_date|date:"M"|upper }}</span>
@@ -1491,15 +1493,15 @@
                     {% endfor %}
                 {% else %}
                     <div class="news-card animate-on-scroll compact-news-card">
-                        <div class="news-image"><img src="https://placehold.co/400x250/0a1628/d4af55?text=Partnership" alt="New Partnership"><div class="news-date"><span class="date-day">15</span><span class="date-month">OCT</span></div></div>
+                        <div class="news-image"><img src="https://placehold.co/400x250/0a1628/d4af55?text=Partnership" alt="New Partnership" loading="lazy" decoding="async"><div class="news-date"><span class="date-day">15</span><span class="date-month">OCT</span></div></div>
                         <div class="news-content"><span class="news-category">Partnership</span><h3 class="news-title">MULTIBIZ Announces Strategic Partnership with Tech Giant</h3><p class="news-excerpt">We're excited to announce our new partnership that will revolutionize business solutions across the region.</p><a href="#" class="news-link">Read More <i class="fas fa-arrow-right"></i></a></div>
                     </div>
                     <div class="news-card animate-on-scroll compact-news-card">
-                        <div class="news-image"><img src="https://placehold.co/400x250/1a4fa0/ffffff?text=Product+Launch" alt="Product Launch"><div class="news-date"><span class="date-day">08</span><span class="date-month">OCT</span></div></div>
+                        <div class="news-image"><img src="https://placehold.co/400x250/1a4fa0/ffffff?text=Product+Launch" alt="Product Launch" loading="lazy" decoding="async"><div class="news-date"><span class="date-day">08</span><span class="date-month">OCT</span></div></div>
                         <div class="news-content"><span class="news-category">Product Launch</span><h3 class="news-title">Introducing Our New Managed Print Solutions</h3><p class="news-excerpt">Discover our latest managed print services designed to optimize your business operations and reduce costs.</p><a href="#" class="news-link">Read More <i class="fas fa-arrow-right"></i></a></div>
                     </div>
                     <div class="news-card animate-on-scroll compact-news-card">
-                        <div class="news-image"><img src="https://placehold.co/400x250/18151f/b8973a?text=Industry+Award" alt="Award"><div class="news-date"><span class="date-day">25</span><span class="date-month">SEP</span></div></div>
+                        <div class="news-image"><img src="https://placehold.co/400x250/18151f/b8973a?text=Industry+Award" alt="Award" loading="lazy" decoding="async"><div class="news-date"><span class="date-day">25</span><span class="date-month">SEP</span></div></div>
                         <div class="news-content"><span class="news-category">Award</span><h3 class="news-title">MULTIBIZ Wins Prestigious Industry Innovation Award</h3><p class="news-excerpt">Recognized for excellence in business solutions and customer service for the third consecutive year.</p><a href="#" class="news-link">Read More <i class="fas fa-arrow-right"></i></a></div>
                     </div>
                 {% endif %}

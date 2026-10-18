@@ -80,6 +80,8 @@ urlpatterns = [
     # ── Employer Portal ──
     path('employer/dashboard/', views_employer.dashboard_view, name='employer_dashboard'),
     re_path(r'^(?:frontend/)?employer/dashboard\.php$', views_employer.dashboard_view),
+    path('employer/notifications/', views_employer.notifications_view, name='employer_notifications'),
+    re_path(r'^(?:frontend/)?employer/notifications\.php$', views_employer.notifications_view),
     path('employer/request_talent/', views_employer.request_talent_view, name='employer_request_talent'),
     re_path(r'^(?:frontend/)?employer/request_talent\.php$', views_employer.request_talent_view),
     path('employer/post_job/', views_employer.post_job_view, name='employer_post_job'),

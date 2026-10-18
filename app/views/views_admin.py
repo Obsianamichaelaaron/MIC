@@ -41,29 +41,49 @@ from app.services.qualification import classify_match_score
 from app.services.job_listings import job_posting_duplicate_key as _job_posting_duplicate_key
 
 
-def _resolve_duplicate_job_group(primary_job, raw_job_ids):
-    if not raw_job_ids:
-        return [primary_job]
+def _parse_job_group_ids(raw_job_ids):
+    if raw_job_ids in (None, ''):
+        return []
 
-    try:
-        job_ids = list(dict.fromkeys(
-            int(value.strip())
-            for value in raw_job_ids.split(',')
-            if value.strip()
-        ))
-    except ValueError as exc:
-        raise ValueError('Invalid duplicate job group.') from exc
-    if not job_ids or primary_job.job_id not in job_ids:
-        raise ValueError('Invalid duplicate job group.')
+    if isinstance(raw_job_ids, str):
+        candidate_values = raw_job_ids.split(',')
+    else:
+        candidate_values = raw_job_ids
+
+    job_ids = []
+    for value in candidate_values:
+        item = str(value).strip()
+        if not item:
+            continue
+        try:
+            job_ids.append(int(item))
+        except (TypeError, ValueError):
+            continue
+    return list(dict.fromkeys(job_ids))
+
+
+def _resolve_duplicate_job_group(primary_job, raw_job_ids):
+    job_ids = _parse_job_group_ids(raw_job_ids)
+    if not job_ids:
+        return [primary_job]
+    if primary_job.job_id not in job_ids:
+        job_ids = [primary_job.job_id]
 
     jobs = list(
         JobPosting.objects.filter(job_id__in=job_ids).select_related('employer')
     )
-    if len(jobs) != len(job_ids) or any(
+    if not jobs:
+        return [primary_job]
+
+    if len(jobs) != len(job_ids):
+        return [primary_job]
+
+    if any(
         _job_posting_duplicate_key(job) != _job_posting_duplicate_key(primary_job)
         for job in jobs
     ):
-        raise ValueError('The selected jobs are not identical duplicate postings.')
+        return [primary_job]
+
     return jobs
 
 

@@ -68,7 +68,7 @@ def global_context(request):
         unread_messages_count = cached_msgs
 
     unread_notification_count = 0
-    if role in {'applicant', 'admin'} and user_id:
+    if role in {'applicant', 'employer', 'admin'} and user_id:
         unread_notification_count = Notification.objects.filter(
             user_id=user_id,
             is_read=False,

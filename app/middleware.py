@@ -40,8 +40,13 @@ class UserSessionValidationMiddleware:
             request.session.flush()
             return None
 
-        request.session['email'] = user.email
-        request.session['role'] = user.role
-        request.session['first_name'] = user.first_name or ''
-        request.session['last_name'] = user.last_name or ''
+        session_values = {
+            'email': user.email,
+            'role': user.role,
+            'first_name': user.first_name or '',
+            'last_name': user.last_name or '',
+        }
+        for key, value in session_values.items():
+            if request.session.get(key) != value:
+                request.session[key] = value
         return None
