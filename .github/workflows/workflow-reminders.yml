@@ -1,0 +1,22 @@
+name: Workflow reminders
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger application workflow reminders
+        env:
+          REMINDER_URL: ${{ vars.WORKFLOW_REMINDER_URL }}
+          REMINDER_TOKEN: ${{ secrets.WORKFLOW_REMINDER_TOKEN }}
+        run: |
+          test -n "$REMINDER_URL"
+          test -n "$REMINDER_TOKEN"
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer ${REMINDER_TOKEN}" \
+            "$REMINDER_URL"

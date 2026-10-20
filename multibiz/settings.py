@@ -209,6 +209,7 @@ ADMIN_NOTIFICATION_EMAIL = os.environ.get(
     'ADMIN_NOTIFICATION_EMAIL',
     EMAIL_HOST_USER,
 )
+WORKFLOW_REMINDER_TOKEN = os.environ.get('WORKFLOW_REMINDER_TOKEN', '')
 
 # Session Configuration
 # Use cached_db: reads from local cache, only writes to DB when session changes.

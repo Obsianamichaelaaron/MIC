@@ -26,3 +26,5 @@ services:
         value: /var/data/django_cache
       - key: SITE_URL
         value: https://multibiz.global
+      - key: WORKFLOW_REMINDER_TOKEN
+        sync: false

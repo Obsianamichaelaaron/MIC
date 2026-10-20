@@ -2075,6 +2075,7 @@ class MultiBizConversionTests(TestCase):
             job=self.job,
             applicant=self.applicant,
             status='pending',
+            forwarded_to_employer=True,
             match_score=Decimal('88.00')
         )
 
@@ -2102,6 +2103,7 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(app.status, 'shortlisted')
 
     def test_employer_can_send_interview_invitation(self):
+        interview_date = timezone.localdate() + timedelta(days=1)
         application = Application.objects.create(
             job=self.job,
             applicant=self.applicant,
@@ -2119,7 +2121,7 @@ class MultiBizConversionTests(TestCase):
                 f'/employer/view_candidate.php?id={application.application_id}',
                 {
                     'action': 'schedule_interview',
-                    'interview_date': '2026-10-15',
+                    'interview_date': interview_date.isoformat(),
                     'start_time': '10:30',
                     'interview_type': 'Online',
                 },
@@ -2133,7 +2135,7 @@ class MultiBizConversionTests(TestCase):
                 f'/employer/view_candidate.php?id={application.application_id}',
                 {
                     'action': 'schedule_interview',
-                    'interview_date': '2026-10-15',
+                    'interview_date': interview_date.isoformat(),
                     'start_time': '10:30',
                     'end_time': '11:30',
                     'interview_type': 'Online',
@@ -2152,7 +2154,7 @@ class MultiBizConversionTests(TestCase):
         self.assertNotContains(response, 'Instructions for Candidate:')
         self.assertNotContains(response, 'Send Interview Invitation')
         schedule = InterviewSchedule.objects.get(application=application)
-        self.assertEqual(schedule.interview_date.isoformat(), '2026-10-15')
+        self.assertEqual(schedule.interview_date, interview_date)
         self.assertEqual(schedule.start_time.strftime('%H:%M'), '10:30')
         self.assertEqual(schedule.end_time.strftime('%H:%M'), '11:30')
         self.assertEqual(schedule.meeting_link, 'https://meet.example.com/interview')
@@ -2170,6 +2172,386 @@ class MultiBizConversionTests(TestCase):
         )
         self.assertEqual(detail_response.status_code, 200)
         self.assertNotContains(detail_response, 'Schedule Interview')
+
+    def test_employer_verification_is_required_to_submit_job_requests(self):
+        self.employer.verification_status = 'pending'
+        self.employer.save(update_fields=['verification_status'])
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session.save()
+
+        blocked = self.client.post('/employer/post_job/', {
+            'title': 'New Job',
+            'description': 'A verified-company-only job request.',
+        })
+        self.assertEqual(blocked.status_code, 200)
+        self.assertContains(blocked, 'awaiting verification')
+        self.assertEqual(self.client.get('/employer/candidates/').status_code, 403)
+        self.assertFalse(JobPosting.objects.filter(title='New Job').exists())
+
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+        verified = self.client.post('/admin/users/', {
+            'action': 'verify_employer',
+            'employer_id': self.employer.employer_id,
+            'decision': 'verified',
+            'verification_notes': 'Company details confirmed.',
+        })
+        self.assertEqual(verified.status_code, 200)
+        self.employer.refresh_from_db()
+        self.assertEqual(self.employer.verification_status, 'verified')
+        self.assertEqual(self.employer.verified_by_id, self.admin_user.user_id)
+
+    @patch('app.views.views_auth.send_employer_welcome_email')
+    def test_self_registered_employer_enters_pending_verification_queue(self, send_welcome):
+        response = self.client.post('/register/', {
+            'role': 'employer',
+            'first_name': 'New',
+            'last_name': 'Partner',
+            'email': 'pending-company@example.com',
+            'phone': '09170000000',
+            'password': 'secure-pass-123',
+            'confirm_password': 'secure-pass-123',
+            'company_name': 'Pending Company Ltd.',
+            'industry': 'Technology',
+            'company_size': '11-50',
+            'company_website': 'https://pending.example.com',
+            'company_address': 'Manila',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        employer = Employer.objects.get(user__email='pending-company@example.com')
+        self.assertEqual(employer.verification_status, 'pending')
+        self.assertTrue(Notification.objects.filter(
+            user=self.admin_user,
+            title='Employer company verification required',
+        ).exists())
+        send_welcome.assert_called_once()
+
+    def test_closing_job_notifies_open_applications_but_preserves_decisions(self):
+        open_application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='forwarded',
+            forwarded_to_employer=True,
+        )
+        rejected_user = User.objects.create(
+            email='rejected-applicant@example.com',
+            password='test-password',
+            role='applicant',
+            status='active',
+        )
+        rejected_applicant = Applicant.objects.create(user=rejected_user)
+        rejected_application = Application.objects.create(
+            job=self.job,
+            applicant=rejected_applicant,
+            status='rejected',
+            employer_status='rejected',
+        )
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session.save()
+
+        response = self.client.post('/employer/jobs/', {
+            'action': 'close_job',
+            'job_id': self.job.job_id,
+            'closure_reason': 'Hiring paused by the company.',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.job.refresh_from_db()
+        open_application.refresh_from_db()
+        rejected_application.refresh_from_db()
+        self.assertEqual(self.job.status, 'closed')
+        self.assertEqual(self.job.closure_reason, 'Hiring paused by the company.')
+        self.assertEqual(open_application.status, 'job_closed')
+        self.assertEqual(rejected_application.status, 'rejected')
+        self.assertTrue(Notification.objects.filter(
+            user=self.applicant_user,
+            title__contains='Job closed',
+        ).exists())
+
+    def test_applicant_cannot_apply_to_closed_job(self):
+        self.job.status = 'closed'
+        self.job.save(update_fields=['status'])
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        response = self.client.get(f'/applicant/apply_job.php?id={self.job.job_id}')
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_applicant_withdrawal_is_not_recorded_as_rejection(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='forwarded',
+            forwarded_to_employer=True,
+        )
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        response = self.client.post('/applicant/update_application.php', {
+            'application_id': application.application_id,
+            'action': 'withdraw',
+        }, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'withdrawn')
+        self.assertEqual(application.employer_status, 'withdrawn')
+        self.assertEqual(application.status_history[-1]['status'], 'withdrawn')
+        self.assertTrue(Notification.objects.filter(
+            user=self.employer_user,
+            title='Applicant withdrew an application',
+        ).exists())
+
+    def test_applicant_can_request_interview_reschedule(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='interviewed',
+            employer_status='for_interview',
+        )
+        interview = InterviewSchedule.objects.create(
+            application=application,
+            employer=self.employer,
+            interview_date=timezone.localdate() + timedelta(days=2),
+            start_time='10:00',
+            end_time='11:00',
+            status='scheduled',
+        )
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        response = self.client.post('/applicant/update_application.php', {
+            'application_id': application.application_id,
+            'interview_id': interview.id,
+            'action': 'respond_interview',
+            'response': 'reschedule_requested',
+            'response_notes': 'I have a conflict at that time.',
+        }, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        interview.refresh_from_db()
+        self.assertEqual(interview.applicant_response, 'reschedule_requested')
+        self.assertEqual(interview.applicant_response_notes, 'I have a conflict at that time.')
+        self.assertTrue(Notification.objects.filter(
+            user=self.employer_user,
+            title='Interview Reschedule Requested',
+        ).exists())
+
+    def test_offer_acceptance_closes_filled_job_and_notifies_other_applicants(self):
+        self.job.positions_available = 1
+        self.job.save(update_fields=['positions_available'])
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='interview_completed',
+            employer_status='interview_completed',
+            forwarded_to_employer=True,
+        )
+        other_user = User.objects.create(
+            email='other-applicant@example.com',
+            password='test-password',
+            role='applicant',
+            status='active',
+        )
+        other_applicant = Applicant.objects.create(user=other_user)
+        other_application = Application.objects.create(
+            job=self.job,
+            applicant=other_applicant,
+            status='forwarded',
+            forwarded_to_employer=True,
+        )
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session.save()
+
+        with patch('app.views.views_employer.send_application_status_update_email'):
+            sent = self.client.post(
+                f'/employer/view_candidate.php?id={application.application_id}',
+                {
+                    'action': 'update_status',
+                    'employer_status': 'offer_sent',
+                    'remarks': 'PHP 80,000 monthly. Start date: November 1.',
+                },
+            )
+        self.assertEqual(sent.status_code, 200)
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'offer_sent')
+        self.assertEqual(application.offer_details, 'PHP 80,000 monthly. Start date: November 1.')
+
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+        offer_page = self.client.get('/applicant/applications/')
+        self.assertEqual(offer_page.status_code, 200)
+        self.assertContains(offer_page, 'PHP 80,000 monthly. Start date: November 1.')
+        self.assertContains(offer_page, 'Accept offer')
+        accepted = self.client.post('/applicant/update_application.php', {
+            'application_id': application.application_id,
+            'action': 'respond_offer',
+            'decision': 'accept',
+        }, follow=True)
+
+        self.assertEqual(accepted.status_code, 200)
+        application.refresh_from_db()
+        other_application.refresh_from_db()
+        self.job.refresh_from_db()
+        self.assertEqual(application.status, 'accepted')
+        self.assertEqual(application.employer_status, 'hired')
+        self.assertEqual(self.job.status, 'closed')
+        self.assertEqual(other_application.status, 'job_closed')
+        self.assertTrue(Notification.objects.filter(
+            user=other_user,
+            title__contains='Job closed',
+        ).exists())
+
+    def test_employer_can_reschedule_and_complete_interview(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='interviewed',
+            employer_status='for_interview',
+            forwarded_to_employer=True,
+        )
+        interview = InterviewSchedule.objects.create(
+            application=application,
+            employer=self.employer,
+            interview_date=timezone.localdate() + timedelta(days=2),
+            start_time='10:00',
+            end_time='11:00',
+            status='scheduled',
+            applicant_response='reschedule_requested',
+        )
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session.save()
+
+        rescheduled_date = timezone.localdate() + timedelta(days=3)
+        rescheduled = self.client.post(
+            f'/employer/view_candidate.php?id={application.application_id}',
+            {
+                'action': 'manage_interview',
+                'interview_id': interview.id,
+                'decision': 'reschedule',
+                'interview_date': rescheduled_date.isoformat(),
+                'start_time': '13:00',
+                'end_time': '14:00',
+            },
+        )
+        self.assertEqual(rescheduled.status_code, 200)
+        interview.refresh_from_db()
+        self.assertEqual(interview.interview_date, rescheduled_date)
+        self.assertEqual(interview.applicant_response, 'pending')
+
+        completed = self.client.post(
+            f'/employer/view_candidate.php?id={application.application_id}',
+            {
+                'action': 'manage_interview',
+                'interview_id': interview.id,
+                'decision': 'complete',
+            },
+        )
+        self.assertEqual(completed.status_code, 200)
+        interview.refresh_from_db()
+        application.refresh_from_db()
+        self.assertEqual(interview.status, 'completed')
+        self.assertEqual(application.employer_status, 'interview_completed')
+        self.assertTrue(Notification.objects.filter(
+            user=self.applicant_user,
+            title__contains='Interview completed',
+        ).exists())
+
+    def test_workflow_reminders_are_idempotent_within_a_day(self):
+        from app.services.workflow import process_workflow_reminders
+
+        now = timezone.now()
+        pending_admin = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='pending',
+            applied_at=now - timedelta(hours=49),
+        )
+        process_workflow_reminders(now)
+        admin_count = Notification.objects.filter(
+            user=self.admin_user,
+            title='Application awaiting admin review',
+        ).count()
+        process_workflow_reminders(now + timedelta(hours=1))
+        self.assertEqual(
+            Notification.objects.filter(
+                user=self.admin_user,
+                title='Application awaiting admin review',
+            ).count(),
+            admin_count,
+        )
+        pending_admin.refresh_from_db()
+        self.assertIsNotNone(pending_admin.admin_reminder_at)
+
+        pending_employer = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='forwarded',
+            forwarded_to_employer=True,
+            forwarded_at=now - timedelta(hours=73),
+            employer_status='for_review',
+        )
+        process_workflow_reminders(now)
+        pending_employer.refresh_from_db()
+        self.assertIsNotNone(pending_employer.employer_reminder_at)
+        self.assertTrue(Notification.objects.filter(
+            user=self.employer_user,
+            title='Candidate review is overdue',
+        ).exists())
+
+        future_start = timezone.localtime(now) + timedelta(hours=12)
+        interview_application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='interviewed',
+            employer_status='for_interview',
+        )
+        interview = InterviewSchedule.objects.create(
+            application=interview_application,
+            employer=self.employer,
+            interview_date=future_start.date(),
+            start_time=future_start.time().replace(tzinfo=None),
+            status='scheduled',
+        )
+        process_workflow_reminders(now)
+        interview.refresh_from_db()
+        self.assertIsNotNone(interview.reminder_sent_at)
+        self.assertEqual(
+            Notification.objects.filter(title='Interview reminder').count(),
+            2,
+        )
+
+    @override_settings(WORKFLOW_REMINDER_TOKEN='test-workflow-token')
+    def test_workflow_reminder_endpoint_requires_bearer_token(self):
+        unauthorized = self.client.post('/internal/workflow-reminders/')
+        self.assertEqual(unauthorized.status_code, 403)
+
+        authorized = self.client.post(
+            '/internal/workflow-reminders/',
+            HTTP_AUTHORIZATION='Bearer test-workflow-token',
+        )
+        self.assertEqual(authorized.status_code, 200)
+        self.assertTrue(authorized.json()['success'])
 
     def test_interview_form_is_hidden_at_interview_stage(self):
         application = Application.objects.create(
@@ -2209,8 +2591,9 @@ class MultiBizConversionTests(TestCase):
             '<select name="employer_status"', 1
         )[1].split('</select>', 1)[0]
         self.assertIn('value="hired"', status_select)
-        self.assertIn('>Hired</option>', status_select)
-        self.assertIn('value="hired" selected', status_select)
+        self.assertIn('>Hire directly</option>', status_select)
+        self.assertIn('value="offer_sent" selected', status_select)
+        self.assertNotIn('value="hired" selected', status_select)
         self.assertIn('value="rejected"', status_select)
         self.assertIn('>Reject</option>', status_select)
         for unavailable_status in (
@@ -2241,7 +2624,7 @@ class MultiBizConversionTests(TestCase):
             'Interview did not meet requirements.',
         )
 
-    def test_for_interview_status_dropdown_defaults_to_hired_or_reject(self):
+    def test_for_interview_status_dropdown_defaults_to_offer(self):
         application = Application.objects.create(
             job=self.job,
             applicant=self.applicant,
@@ -2263,7 +2646,7 @@ class MultiBizConversionTests(TestCase):
         status_select = response.content.decode().split(
             '<select name="employer_status"', 1
         )[1].split('</select>', 1)[0]
-        self.assertIn('value="hired" selected', status_select)
+        self.assertIn('value="offer_sent" selected', status_select)
         self.assertIn('value="rejected"', status_select)
         self.assertNotIn('>For Interview</option>', status_select)
         self.assertNotIn('value="for_interview"', status_select)

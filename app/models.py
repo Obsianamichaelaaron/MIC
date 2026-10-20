@@ -63,6 +63,12 @@ class Applicant(models.Model):
 
 
 class Employer(models.Model):
+    VERIFICATION_STATUS_CHOICES = [
+        ('pending', 'Pending Verification'),
+        ('verified', 'Verified'),
+        ('rejected', 'Verification Rejected'),
+    ]
+
     employer_id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='user_id', related_name='employer_profile')
     company_name = models.CharField(max_length=255, null=True, blank=True)
@@ -71,6 +77,20 @@ class Employer(models.Model):
     company_website = models.CharField(max_length=255, null=True, blank=True)
     industry = models.CharField(max_length=100, null=True, blank=True)
     company_size = models.CharField(max_length=50, null=True, blank=True)
+    verification_status = models.CharField(
+        max_length=20,
+        choices=VERIFICATION_STATUS_CHOICES,
+        default='verified',
+    )
+    verification_notes = models.TextField(null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verified_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verified_employers',
+    )
 
     class Meta:
         db_table = 'employers'
@@ -121,6 +141,7 @@ class JobPosting(models.Model):
     special_notes = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     rejection_reason = models.TextField(null=True, blank=True)
+    closure_reason = models.TextField(null=True, blank=True)
     admin_notes = models.TextField(null=True, blank=True)
     target_qualifications = models.TextField(null=True, blank=True, help_text="Comma-separated qualification IDs")
     posted_at = models.DateTimeField(default=timezone.now)
@@ -173,6 +194,10 @@ class Application(models.Model):
         ('rejected', 'Rejected'),
         ('reviewed', 'Reviewed'),
         ('shortlisted', 'Shortlisted'),
+        ('withdrawn', 'Withdrawn by Applicant'),
+        ('job_closed', 'Job Closed'),
+        ('offer_sent', 'Offer Sent'),
+        ('offer_declined', 'Offer Declined'),
     ]
 
     EMPLOYER_STATUS_CHOICES = [
@@ -181,8 +206,12 @@ class Application(models.Model):
         ('not_qualified', 'Not Qualified'),
         ('for_interview', 'For Interview'),
         ('interview_completed', 'Interview Completed'),
+        ('offer_sent', 'Offer Sent'),
+        ('offer_declined', 'Offer Declined'),
         ('hired', 'Hired'),
         ('rejected', 'Rejected'),
+        ('withdrawn', 'Withdrawn'),
+        ('job_closed', 'Job Closed'),
     ]
 
     application_id = models.AutoField(primary_key=True)
@@ -208,6 +237,11 @@ class Application(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     classification = models.CharField(max_length=50, null=True, blank=True)
     classified_at = models.DateTimeField(null=True, blank=True)
+    admin_reminder_at = models.DateTimeField(null=True, blank=True)
+    employer_reminder_at = models.DateTimeField(null=True, blank=True)
+    offer_details = models.TextField(null=True, blank=True)
+    offer_sent_at = models.DateTimeField(null=True, blank=True)
+    offer_responded_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = 'applications'
@@ -268,6 +302,13 @@ class Notification(models.Model):
 
 
 class InterviewSchedule(models.Model):
+    APPLICANT_RESPONSE_CHOICES = [
+        ('pending', 'Awaiting Response'),
+        ('confirmed', 'Confirmed'),
+        ('reschedule_requested', 'Reschedule Requested'),
+        ('declined', 'Declined'),
+    ]
+
     id = models.AutoField(primary_key=True)
     application = models.ForeignKey(Application, on_delete=models.CASCADE, db_column='application_id', related_name='interviews')
     employer = models.ForeignKey(Employer, on_delete=models.CASCADE, db_column='employer_id')
@@ -282,6 +323,14 @@ class InterviewSchedule(models.Model):
     instructions = models.TextField(null=True, blank=True)
     notes = models.TextField(null=True, blank=True)
     status = models.CharField(max_length=20, default='scheduled', help_text="scheduled, completed, cancelled, rescheduled")
+    applicant_response = models.CharField(
+        max_length=30,
+        choices=APPLICANT_RESPONSE_CHOICES,
+        default='pending',
+    )
+    applicant_response_notes = models.TextField(null=True, blank=True)
+    applicant_responded_at = models.DateTimeField(null=True, blank=True)
+    reminder_sent_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -465,6 +465,40 @@ def users_view(request):
             log_audit_trail(request, admin_id, 'update_user_status', f"Changed status of user {user_to_update.email} to {new_status}", 'user', user_to_update.user_id, user_to_update.email)
             success_msg = f"User status updated to {new_status}."
 
+        elif action == 'verify_employer':
+            employer = get_object_or_404(Employer, pk=request.POST.get('employer_id'))
+            decision = request.POST.get('decision')
+            if decision not in ('verified', 'rejected'):
+                error_msg = 'Choose a valid company verification decision.'
+            else:
+                employer.verification_status = decision
+                employer.verification_notes = request.POST.get('verification_notes', '').strip()
+                employer.verified_at = timezone.now()
+                employer.verified_by_id = admin_id
+                employer.save(update_fields=[
+                    'verification_status', 'verification_notes', 'verified_at', 'verified_by',
+                ])
+                log_audit_trail(
+                    request,
+                    admin_id,
+                    f'{decision}_employer',
+                    f"{decision.title()} company {employer.company_name or employer.user.email}",
+                    'employer',
+                    employer.employer_id,
+                    employer.company_name,
+                )
+                Notification.objects.create(
+                    user=employer.user,
+                    title=f'Company verification {decision}',
+                    message=(
+                        'Your company is verified. You may now submit job requests.'
+                        if decision == 'verified'
+                        else f'Your company verification was rejected. {employer.verification_notes}'.strip()
+                    ),
+                    type='system',
+                )
+                success_msg = f"{employer.company_name or 'Company'} marked {decision}."
+
         elif action == 'change_password':
             target_id = request.POST.get('user_id')
             new_pass = request.POST.get('new_password', '')
@@ -488,7 +522,7 @@ def users_view(request):
             else:
                 error_msg = "Cannot delete your own admin account."
 
-    users_qs = User.objects.all().order_by('-created_at')
+    users_qs = User.objects.prefetch_related('employer_profile').order_by('-created_at')
 
     if search:
         search_filter = (
@@ -524,6 +558,9 @@ def users_view(request):
         'current_page': 'users.php',
         'admin_user': get_object_or_404(User, pk=admin_id),
         'users': users_qs,
+        'pending_employer_verifications': Employer.objects.filter(
+            verification_status='pending',
+        ).count(),
         'search': search,
         'query': search,
         'q': search,

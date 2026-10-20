@@ -448,6 +448,38 @@
                             </div>
                         </div>
                     {% endif %}
+
+                    {% if interviews %}
+                        <section class="p-3.5 border rounded-3 bg-white shadow-sm mt-3">
+                            <h6 class="fw-bold text-dark mb-3 pb-2 border-bottom"><i class="fa-solid fa-calendar-check text-primary me-1"></i> Interview Schedule</h6>
+                            {% for interview in interviews %}
+                                <div class="py-3 {% if not forloop.first %}border-top{% endif %}">
+                                    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                                        <strong>{{ interview.interview_date|date:"M d, Y" }} · {{ interview.interview_time|default:"Time not set" }}</strong>
+                                        <span class="badge bg-light text-dark">{{ interview.status|title }} · Applicant {{ interview.get_applicant_response_display }}</span>
+                                    </div>
+                                    {% if interview.applicant_response_notes %}<p class="small text-muted mb-2">{{ interview.applicant_response_notes }}</p>{% endif %}
+                                    {% if interview.status == 'scheduled' %}
+                                        <form method="POST" class="d-flex flex-column gap-2">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="action" value="manage_interview">
+                                            <input type="hidden" name="interview_id" value="{{ interview.id }}">
+                                            <div class="row g-2">
+                                                <div class="col-sm-4"><input type="date" name="interview_date" class="form-control form-control-sm" value="{{ interview.interview_date|date:'Y-m-d' }}" aria-label="New interview date"></div>
+                                                <div class="col-sm-3"><input type="time" name="start_time" class="form-control form-control-sm" value="{{ interview.start_time|time:'H:i' }}" aria-label="New start time"></div>
+                                                <div class="col-sm-3"><input type="time" name="end_time" class="form-control form-control-sm" value="{{ interview.end_time|time:'H:i' }}" aria-label="New end time"></div>
+                                            </div>
+                                            <div class="d-flex flex-wrap gap-2">
+                                                <button class="btn btn-sm btn-outline-primary" name="decision" value="reschedule">Reschedule</button>
+                                                <button class="btn btn-sm btn-outline-success" name="decision" value="complete">Mark complete</button>
+                                                <button class="btn btn-sm btn-outline-danger" name="decision" value="cancel">Cancel interview</button>
+                                            </div>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </section>
+                    {% endif %}
                 </div>
 
                 <!-- Right Column: Evaluation & Action Panel -->
@@ -455,6 +487,12 @@
                     <div class="p-3.5 border rounded-3 bg-white shadow-sm mb-3">
                         <h6 class="fw-bold text-dark mb-3 pb-2 border-bottom"><i class="fa-solid fa-gavel text-primary me-1"></i> Hiring Stage & Actions</h6>
                         
+                        {% if application.employer_status == 'offer_sent' %}
+                            <div class="alert alert-info mb-0">
+                                <strong>Offer sent.</strong> Waiting for the applicant to accept or decline.
+                                {% if application.offer_details %}<div class="mt-2">{{ application.offer_details|linebreaksbr }}</div>{% endif %}
+                            </div>
+                        {% else %}
                         <form method="POST" action="" class="employer-action-form d-flex flex-column gap-3">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="update_status">
@@ -463,28 +501,27 @@
                                 <label class="employer-form-label form-label small fw-semibold text-dark">Update Employer Status:</label>
                                 <select name="employer_status" class="form-select-custom">
                                     {% if interview_stage %}
-                                        <option value="hired" {% if application.employer_status != 'rejected' %}selected{% endif %}>Hired</option>
+                                        <option value="offer_sent" {% if application.employer_status != 'hired' and application.employer_status != 'rejected' %}selected{% endif %}>Send Offer</option>
+                                        <option value="hired" {% if application.employer_status == 'hired' %}selected{% endif %}>Hire directly</option>
                                         <option value="rejected" {% if application.employer_status == 'rejected' %}selected{% endif %}>Reject</option>
                                     {% else %}
                                         <option value="for_review" {% if application.employer_status == 'for_review' %}selected{% endif %}>For Review</option>
                                         <option value="qualified" {% if application.employer_status == 'qualified' %}selected{% endif %}>Qualified</option>
-                                        <option value="for_interview" {% if application.employer_status == 'for_interview' %}selected{% endif %}>For Interview</option>
-                                        <option value="interview_completed" {% if application.employer_status == 'interview_completed' %}selected{% endif %}>Interview Completed</option>
-                                        <option value="hired" {% if application.employer_status == 'hired' %}selected{% endif %}>Hired / Offer Accepted</option>
                                         <option value="not_qualified" {% if application.employer_status == 'not_qualified' %}selected{% endif %}>Not Qualified</option>
                                     {% endif %}
                                 </select>
                             </div>
 
                             <div>
-                                <label class="employer-form-label form-label small fw-semibold text-dark">Employer Feedback / Remarks:</label>
-                                <textarea name="remarks" rows="3" class="form-control-custom" placeholder="Optional comments regarding candidate qualifications or next steps..."></textarea>
+                                <label class="employer-form-label form-label small fw-semibold text-dark">Employer Feedback / Offer Details:</label>
+                                <textarea name="remarks" rows="3" class="form-control-custom" placeholder="Add feedback, rejection reason, or offer terms..."></textarea>
                             </div>
 
                             <button type="submit" class="btn btn-primary w-100 fw-semibold" style="background:#0056b3; border:none; border-radius:8px;">
                                 <i class="fa-solid fa-check-double me-1"></i> Update Candidate Status
                             </button>
                         </form>
+                        {% endif %}
                     </div>
 
                     {% if can_schedule_interview and not interview_stage %}

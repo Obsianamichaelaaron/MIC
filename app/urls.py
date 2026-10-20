@@ -1,10 +1,15 @@
 from django.urls import path, re_path
 from app.views import (
     views_public, views_auth, views_applicant,
-    views_employer, views_admin, views_chat
+    views_employer, views_admin, views_chat, views_workflow
 )
 
 urlpatterns = [
+    path(
+        'internal/workflow-reminders/',
+        views_workflow.process_workflow_reminders_api,
+        name='process_workflow_reminders_api',
+    ),
     # ── Public Pages ──
     path('', views_public.index_view, name='index'),
     re_path(r'^(?:frontend/)?index\.php$', views_public.index_view),

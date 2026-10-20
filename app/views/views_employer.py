@@ -16,7 +16,7 @@ from app.models import (
     CandidateFeedback, CandidateRecommendation, ChatbotAnswer,
     Notification, ContactInquiry
 )
-from app.auth_utils import require_role, getCurrentUserId
+from app.auth_utils import require_role, require_verified_employer, getCurrentUserId
 from app.services.ml_ranking import (
     calculate_candidate_ml_score,
     compute_job_match_result,
@@ -28,6 +28,10 @@ from app.services.mailer import (
     send_talent_request_admin_notification,
     send_talent_request_employer_confirmation,
     send_interview_scheduled_email
+)
+from app.services.workflow import (
+    close_job_and_notify_applicants as _close_job_and_notify_applicants,
+    close_job_if_positions_filled as _close_job_if_positions_filled,
 )
 
 
@@ -49,6 +53,8 @@ def log_status_history_event(application, stage_title, status_key, actor_name, a
         'status': status_key,
         'actor': actor_name,
         'role': actor_role,
+        'actor_name': actor_name,
+        'actor_role': actor_role,
         'timestamp': timezone.now().strftime('%Y-%m-%d %H:%M'),
         'notes': notes or '',
     })
@@ -59,20 +65,27 @@ def _is_employer_interview_stage(application):
     return (
         application.employer_status in ('for_interview', 'interview_completed')
         or application.status in ('interviewed', 'interview_completed', 'for_interview')
-        or application.interviews.exists()
+        or application.interviews.filter(status__in=('scheduled', 'completed')).exists()
     )
 
 
 def _allowed_employer_statuses(application):
+    if application.employer_status in ('hired', 'rejected') or application.status in (
+        'accepted', 'hired', 'rejected', 'reviewed', 'not_qualified',
+        'withdrawn', 'job_closed', 'offer_declined',
+    ):
+        return ()
+    if application.employer_status in ('withdrawn', 'job_closed'):
+        return ()
+    if application.employer_status == 'offer_sent' or application.status == 'offer_sent':
+        return ('rejected',)
     if _is_employer_interview_stage(application):
-        return ('hired', 'rejected')
+        return ('offer_sent', 'hired', 'rejected')
+    if application.employer_status == 'qualified' or application.status == 'shortlisted':
+        return ('for_interview', 'not_qualified', 'rejected')
     return (
-        'for_review',
         'qualified',
         'not_qualified',
-        'for_interview',
-        'interview_completed',
-        'hired',
         'rejected',
     )
 
@@ -90,6 +103,8 @@ def _normalize_employer_status(value):
         'for_interview': 'for_interview',
         'interviewed': 'for_interview',
         'interview_completed': 'interview_completed',
+        'offer_sent': 'offer_sent',
+        'offer_declined': 'offer_declined',
         'accepted': 'hired',
         'hired': 'hired',
         'rejected': 'rejected',
@@ -350,6 +365,23 @@ def post_job_view(request):
     success = None
     form_data = {}
 
+    if employer.verification_status != 'verified':
+        context = {
+            'page_title': 'Submit Job Request - MultiBiz',
+            'current_page': 'post_job.php',
+            'employer': employer,
+            'user': user,
+            'qualifications': Qualification.objects.filter(status='active').order_by('name'),
+            'form_data': form_data,
+            'error_msg': (
+                'Your company verification was rejected. Contact the administrator to continue.'
+                if employer.verification_status == 'rejected'
+                else 'Your company is awaiting verification. You can post jobs after admin approval.'
+            ),
+            'success': None,
+        }
+        return render(request, 'employer/post_job.html', context)
+
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
         description = request.POST.get('description', '').strip()
@@ -511,13 +543,23 @@ def jobs_view(request):
         job = get_object_or_404(JobPosting, pk=job_id, employer=employer)
 
         if action == 'close_job' and job.status == 'active':
-            job.status = 'closed'
-            job.save()
+            reason = request.POST.get('closure_reason', '').strip()
+            if not reason:
+                reason = 'Closed by employer.'
+            _close_job_and_notify_applicants(job, reason)
             return redirect('/employer/jobs.php?closed=1')
         elif action == 'reopen_request' and job.status in ['closed', 'rejected']:
             job.status = 'pending'
             job.rejection_reason = None
-            job.save()
+            job.closure_reason = None
+            job.save(update_fields=['status', 'rejection_reason', 'closure_reason', 'updated_at'])
+            for admin_user in User.objects.filter(role='admin', status='active'):
+                Notification.objects.create(
+                    user=admin_user,
+                    title=f'Job reopening request: {job.title}',
+                    message=f'{employer.company_name or user_obj_name(admin_user)} requested to reopen {job.title}. Admin review is required.',
+                    type='job_update',
+                )
             return redirect('/employer/jobs.php?reopened=1')
 
     jobs_qs = JobPosting.objects.filter(employer=employer).annotate(
@@ -637,6 +679,7 @@ def edit_job_view(request, job_id=None):
 
 
 @require_role('employer')
+@require_verified_employer
 def candidates_view(request):
     """
     Dedicated Applicants Section in Employer Dashboard.
@@ -817,6 +860,7 @@ def candidates_view(request):
 
 
 @require_role('employer')
+@require_verified_employer
 def recommended_candidates_view(request):
     """AI Recommended Candidates matching employer/recommended_candidates.php."""
     user_id = getCurrentUserId(request)
@@ -873,6 +917,7 @@ def recommended_candidates_view(request):
 
 
 @require_role('employer')
+@require_verified_employer
 def view_candidate_view(request, application_id=None):
     """
     Complete Applicant Dossier Review, Qualification Decision, and Interview Scheduling.
@@ -885,6 +930,7 @@ def view_candidate_view(request, application_id=None):
         Application.objects.select_related('applicant', 'applicant__user', 'job'),
         pk=app_id,
         job__employer=employer,
+        forwarded_to_employer=True,
     )
 
     applicant = application.applicant
@@ -906,14 +952,25 @@ def view_candidate_view(request, application_id=None):
                 request.POST.get('remarks', ''),
             ).strip()
 
-            if new_status in _allowed_employer_statuses(application):
+            if new_status in ('rejected', 'not_qualified') and not employer_notes:
+                error_msg = 'Add a reason before rejecting or marking the candidate not qualified.'
+            elif new_status == 'offer_sent' and not employer_notes:
+                error_msg = 'Add the offer details before sending it to the applicant.'
+            elif new_status in _allowed_employer_statuses(application):
                 application.employer_status = new_status
                 if employer_notes:
                     application.employer_notes = employer_notes
+                if new_status == 'offer_sent':
+                    application.offer_details = employer_notes
+                    application.offer_sent_at = timezone.now()
                 
                 # Sync overall application status
                 if new_status == 'hired':
                     application.status = 'accepted'
+                elif new_status == 'offer_sent':
+                    application.status = 'offer_sent'
+                elif new_status == 'interview_completed':
+                    application.status = 'interview_completed'
                 elif new_status == 'rejected':
                     application.status = 'rejected'
                 elif new_status in ['for_interview', 'interview_completed']:
@@ -937,6 +994,8 @@ def view_candidate_view(request, application_id=None):
                     notes=employer_notes
                 )
                 application.save()
+                if new_status == 'hired':
+                    _close_job_if_positions_filled(job)
 
                 # In-App Notification
                 notification_title = f"Application Update: {job.title}"
@@ -951,6 +1010,9 @@ def view_candidate_view(request, application_id=None):
                         f"{applicant_name} has been hired for {job.title} "
                         f"at {employer.company_name}."
                     )
+                elif new_status == 'offer_sent':
+                    notification_title = f'Job offer: {job.title}'
+                    notification_message = f'{employer.company_name} sent you an offer. Review the details in your applications page.'
                 _notify_applicant_for_employer_application(
                     application,
                     notification_title,
@@ -985,6 +1047,8 @@ def view_candidate_view(request, application_id=None):
                     else "The applicant has an in-app notification, but email delivery failed."
                 )
                 success_msg = f"Candidate moved to '{status_label}' successfully! {email_status}"
+            else:
+                error_msg = 'That application stage transition is not allowed.'
 
         elif action == 'schedule_interview':
             interview_date = request.POST.get('interview_date', '').strip()
@@ -999,8 +1063,14 @@ def view_candidate_view(request, application_id=None):
             parsed_start_time = parse_time(start_time_val) if start_time_val else None
             parsed_end_time = parse_time(end_time_val) if end_time_val else None
 
-            if not parsed_date:
+            if 'for_interview' not in _allowed_employer_statuses(application):
+                error_msg = 'This application is not at a stage where an interview can be scheduled.'
+            elif application.interviews.filter(status='scheduled').exists():
+                error_msg = 'There is already an active interview scheduled for this application.'
+            elif not parsed_date:
                 error_msg = "Please provide a valid interview date."
+            elif parsed_date < timezone.localdate():
+                error_msg = 'Interview date must be today or later.'
             elif not parsed_start_time:
                 error_msg = "Please provide a valid interview start time."
             elif not parsed_end_time:
@@ -1033,7 +1103,6 @@ def view_candidate_view(request, application_id=None):
                 application.status = 'interviewed'
                 application.save()
 
-                # Log status history event
                 log_status_history_event(
                     application=application,
                     stage_title="Interview Scheduled by Employer",
@@ -1043,15 +1112,12 @@ def view_candidate_view(request, application_id=None):
                     notes=f"Interview set for {interview_date} at {formatted_time} ({interview_type}). Interviewer: {interviewer_name or 'Hiring Team'}."
                 )
                 application.save()
-
-                # Send In-App Notification to Applicant
                 _notify_applicant_for_employer_application(
                     application,
-                    f"📅 Interview Scheduled: {job.title}",
+                    f"Interview Scheduled: {job.title}",
                     f"{employer.company_name} scheduled an interview for {job.title} on {interview_date} at {formatted_time}.",
                 )
 
-                # Send Automated Email with Complete Details to Applicant
                 try:
                     email_result = send_interview_scheduled_email(
                         to_email=candidate_user.email,
@@ -1077,6 +1143,100 @@ def view_candidate_view(request, application_id=None):
                 )
                 success_msg = f"Interview successfully scheduled for {interview_date} at {formatted_time}! {email_status}"
 
+        elif action == 'manage_interview':
+            interview = get_object_or_404(
+                InterviewSchedule,
+                pk=request.POST.get('interview_id'),
+                application=application,
+                employer=employer,
+            )
+            decision = request.POST.get('decision', '').strip()
+            now = timezone.now()
+            if interview.status != 'scheduled':
+                error_msg = 'Only scheduled interviews can be changed.'
+            elif decision == 'complete':
+                interview.status = 'completed'
+                interview.save(update_fields=['status', 'updated_at'])
+                application.employer_status = 'interview_completed'
+                application.status = 'interview_completed'
+                log_status_history_event(
+                    application,
+                    'Interview Completed',
+                    'interview_completed',
+                    employer.company_name or 'Employer',
+                    'Employer',
+                )
+                application.save(update_fields=[
+                    'employer_status', 'status', 'status_history', 'updated_at',
+                ])
+                _notify_applicant_for_employer_application(
+                    application,
+                    f'Interview completed: {job.title}',
+                    f'Your interview for {job.title} has been marked complete.',
+                )
+                success_msg = 'Interview marked complete.'
+            elif decision == 'cancel':
+                interview.status = 'cancelled'
+                interview.save(update_fields=['status', 'updated_at'])
+                application.employer_status = 'qualified'
+                application.status = 'shortlisted'
+                log_status_history_event(
+                    application,
+                    'Interview Cancelled by Employer',
+                    'qualified',
+                    employer.company_name or 'Employer',
+                    'Employer',
+                    request.POST.get('notes', '').strip(),
+                )
+                application.save(update_fields=[
+                    'employer_status', 'status', 'status_history', 'updated_at',
+                ])
+                _notify_applicant_for_employer_application(
+                    application,
+                    f'Interview cancelled: {job.title}',
+                    'The employer cancelled the interview. They may schedule a new time.',
+                )
+                success_msg = 'Interview cancelled.'
+            elif decision == 'reschedule':
+                parsed_date = parse_date(request.POST.get('interview_date', '').strip())
+                parsed_start = parse_time(request.POST.get('start_time', '').strip())
+                parsed_end = parse_time(request.POST.get('end_time', '').strip())
+                if not parsed_date or parsed_date < timezone.localdate() or not parsed_start or not parsed_end or parsed_end <= parsed_start:
+                    error_msg = 'Provide a valid reschedule date and time range.'
+                else:
+                    interview.interview_date = parsed_date
+                    interview.start_time = parsed_start
+                    interview.end_time = parsed_end
+                    interview.interview_time = (
+                        f'{parsed_start.strftime("%I:%M %p")} - '
+                        f'{parsed_end.strftime("%I:%M %p")}'
+                    )
+                    interview.applicant_response = 'pending'
+                    interview.applicant_response_notes = ''
+                    interview.applicant_responded_at = None
+                    interview.reminder_sent_at = None
+                    interview.save(update_fields=[
+                        'interview_date', 'start_time', 'end_time', 'interview_time',
+                        'applicant_response', 'applicant_response_notes',
+                        'applicant_responded_at', 'reminder_sent_at', 'updated_at',
+                    ])
+                    log_status_history_event(
+                        application,
+                        'Interview Rescheduled',
+                        'for_interview',
+                        employer.company_name or 'Employer',
+                        'Employer',
+                    )
+                    application.save(update_fields=['status_history', 'updated_at'])
+                    _notify_applicant_for_employer_application(
+                        application,
+                        f'Interview rescheduled: {job.title}',
+                        f'Your interview is now scheduled for {parsed_date} at {interview.interview_time}.',
+                    )
+                    success_msg = 'Interview rescheduled and applicant notified.'
+            else:
+                error_msg = 'Choose a valid interview action.'
+
         elif action == 'submit_feedback':
             feedback_text = request.POST.get('feedback_text', '').strip()
             CandidateFeedback.objects.create(
@@ -1090,16 +1250,13 @@ def view_candidate_view(request, application_id=None):
             success_msg = "Candidate feedback submitted!"
 
     # Scheduled interviews
-    interviews = InterviewSchedule.objects.filter(application=application).order_by('-interview_date')
+    interviews = InterviewSchedule.objects.filter(application=application).order_by('-interview_date', '-created_at')
     interview_stage = (
         application.employer_status in ('for_interview', 'interview_completed')
         or application.status in ('interviewed', 'interview_completed', 'for_interview')
         or interviews.exists()
     )
-    can_schedule_interview = (
-        not interview_stage
-        and application.employer_status != 'hired'
-    )
+    can_schedule_interview = 'for_interview' in _allowed_employer_statuses(application)
     
     # Chatbot assessment answers
     chatbot_answers = ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number')
@@ -1136,6 +1293,7 @@ def view_candidate_view(request, application_id=None):
 
 @csrf_exempt
 @require_role('employer')
+@require_verified_employer
 def update_status_api(request):
     """
     AJAX endpoint for candidate status update from the Employer portal.
@@ -1151,16 +1309,32 @@ def update_status_api(request):
     status = _normalize_employer_status(requested_status)
     notes = request.POST.get('notes', '').strip() or request.POST.get('remarks', '').strip()
 
-    application = get_object_or_404(Application, pk=app_id, job__employer=employer)
+    application = get_object_or_404(
+        Application,
+        pk=app_id,
+        job__employer=employer,
+        forwarded_to_employer=True,
+    )
     valid_statuses = _allowed_employer_statuses(application)
 
     if status in valid_statuses:
+        if status in ('rejected', 'not_qualified') and not notes:
+            return JsonResponse({'success': False, 'message': 'Add a reason before rejecting or marking the candidate not qualified.'}, status=400)
+        if status == 'offer_sent' and not notes:
+            return JsonResponse({'success': False, 'message': 'Add the offer details before sending it to the applicant.'}, status=400)
         application.employer_status = status
         if notes:
             application.employer_notes = notes
+        if status == 'offer_sent':
+            application.offer_details = notes
+            application.offer_sent_at = timezone.now()
 
         if status == 'hired':
             application.status = 'accepted'
+        elif status == 'offer_sent':
+            application.status = 'offer_sent'
+        elif status == 'interview_completed':
+            application.status = 'interview_completed'
         elif status == 'rejected':
             application.status = 'rejected'
         elif status in ['for_interview', 'interview_completed']:
@@ -1183,15 +1357,22 @@ def update_status_api(request):
             notes=notes
         )
         application.save()
+        if status == 'hired':
+            _close_job_if_positions_filled(application.job)
 
         # In-App Notification and Email
         cand_user = application.applicant.user if (application.applicant and application.applicant.user) else None
         email_result = {'success': False}
         if cand_user:
+            notification_title = f"Application Update: {application.job.title}"
+            notification_message = f"Your application status at {employer.company_name} was updated to '{status_label}'."
+            if status == 'offer_sent':
+                notification_title = f'Job offer: {application.job.title}'
+                notification_message = f'{employer.company_name} sent you an offer. Review the details in your applications page.'
             _notify_applicant_for_employer_application(
                 application,
-                f"Application Update: {application.job.title}",
-                f"Your application status at {employer.company_name} was updated to '{status_label}'.",
+                notification_title,
+                notification_message,
             )
             try:
                 email_result = send_application_status_update_email(
@@ -1222,6 +1403,7 @@ def update_status_api(request):
 
 @csrf_exempt
 @require_role('employer')
+@require_verified_employer
 def schedule_interview_api(request):
     """
     AJAX endpoint for scheduling an interview directly from the candidate list modal.
@@ -1244,15 +1426,39 @@ def schedule_interview_api(request):
     if not app_id or not interview_date or not interview_time:
         return JsonResponse({'success': False, 'message': 'Missing required interview date or time'})
 
-    application = get_object_or_404(Application, pk=app_id, job__employer=employer)
+    application = get_object_or_404(
+        Application,
+        pk=app_id,
+        job__employer=employer,
+        forwarded_to_employer=True,
+    )
+    if 'for_interview' not in _allowed_employer_statuses(application):
+        return JsonResponse({'success': False, 'message': 'This application is not at a stage where an interview can be scheduled.'}, status=400)
+    if application.interviews.filter(status='scheduled').exists():
+        return JsonResponse({'success': False, 'message': 'There is already an active interview scheduled for this application.'}, status=400)
+    parsed_interview_date = parse_date(interview_date)
+    if not parsed_interview_date or parsed_interview_date < timezone.localdate():
+        return JsonResponse({'success': False, 'message': 'Interview date must be today or later.'}, status=400)
+    parsed_start_time = parse_time(interview_time)
+    if not parsed_start_time:
+        time_candidates = interview_time.split(' - ', 1)
+        for time_candidate in time_candidates:
+            try:
+                parsed_start_time = datetime.datetime.strptime(
+                    time_candidate.strip(), '%I:%M %p'
+                ).time()
+                break
+            except ValueError:
+                continue
     candidate_user = application.applicant.user
 
     # Create interview schedule
     InterviewSchedule.objects.create(
         application=application,
         employer=employer,
-        interview_date=interview_date,
+        interview_date=parsed_interview_date,
         interview_time=interview_time,
+        start_time=parsed_start_time,
         interview_type=interview_type,
         location=location_or_link if interview_type != 'Online' else None,
         meeting_link=location_or_link if interview_type == 'Online' else None,
@@ -1316,6 +1522,7 @@ def schedule_interview_api(request):
 
 
 @require_role('employer')
+@require_verified_employer
 def chatbot_review_view(request):
     """
     Employer view of applicant chatbot assessment answers.

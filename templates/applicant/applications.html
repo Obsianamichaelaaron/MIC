@@ -554,6 +554,15 @@
             </div>
         </section>
 
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}success{% endif %} alert-dismissible fade show" role="status">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
         <section class="applications-card">
             <div class="applications-table-wrap">
                 <table class="applications-table">
@@ -573,7 +582,7 @@
                             <td>{{ app.applied_at|date:"M d, Y" }}<small style="display:block;color:#687386;font-size:.68rem">{{ app.applied_at|timesince }} ago</small></td>
                             <td><span class="application-status">{{ app.status|title }}</span></td>
                             <td>{% with remarks=app.get_remarks_list %}{% if remarks %}<button class="application-action" type="button" data-bs-toggle="modal" data-bs-target="#remarksModal{{ app.application_id }}"><i class="fas fa-clock-rotate-left"></i> Feedback ({{ remarks|length }})</button>{% else %}<span style="color:#9aa5b4;font-size:.7rem">No feedback yet</span>{% endif %}{% endwith %}</td>
-                            <td><div class="application-actions"><a class="application-action" href="job_details.php?id={{ app.job.job_id }}" title="View Job Details"><i class="fas fa-eye"></i></a>{% if interview %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#interviewModal{{ app.application_id }}"><i class="fas fa-video"></i> Interview</button>{% endif %}</div></td>
+                            <td><div class="application-actions"><a class="application-action" href="job_details.php?id={{ app.job.job_id }}" title="View Job Details"><i class="fas fa-eye"></i></a>{% if app.status == 'offer_sent' %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#offerModal{{ app.application_id }}"><i class="fas fa-file-signature"></i> Review Offer</button>{% endif %}{% if interview %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#interviewModal{{ app.application_id }}"><i class="fas fa-video"></i> Interview</button>{% endif %}{% if app.status != 'accepted' and app.status != 'hired' and app.status != 'rejected' and app.status != 'withdrawn' and app.status != 'job_closed' and app.status != 'offer_declined' and app.status != 'offer_sent' %}<form method="POST" action="update_application.php" onsubmit="return confirm('Withdraw this application?');">{% csrf_token %}<input type="hidden" name="application_id" value="{{ app.application_id }}"><input type="hidden" name="action" value="withdraw"><button class="application-action" type="submit" title="Withdraw application"><i class="fas fa-xmark"></i> Withdraw</button></form>{% endif %}</div></td>
                         </tr>
                         {% endwith %}
                     {% empty %}<tr><td colspan="6"><div class="application-empty"><i class="fas fa-folder-open" style="font-size:2rem;opacity:.45"></i><h3>No applications submitted yet</h3><a href="jobs.php" class="applications-explore">Explore Openings</a></div></td></tr>{% endfor %}
@@ -630,9 +639,45 @@
                                     </a>
                                 </div>
                             {% endif %}
+                            <div class="mt-3 p-3 rounded-3 border bg-light">
+                                <div class="small mb-2"><strong>Response:</strong> {{ interview.get_applicant_response_display }}</div>
+                                {% if interview.applicant_response_notes %}<p class="small text-muted mb-2">{{ interview.applicant_response_notes }}</p>{% endif %}
+                                {% if interview.status == 'scheduled' and interview.applicant_response != 'declined' %}
+                                    <form method="POST" action="update_application.php" class="d-flex flex-column gap-2">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="application_id" value="{{ app.application_id }}">
+                                        <input type="hidden" name="interview_id" value="{{ interview.id }}">
+                                        <input type="hidden" name="action" value="respond_interview">
+                                        <textarea name="response_notes" rows="2" class="form-control" placeholder="Optional note; required for a reschedule request"></textarea>
+                                        <div class="d-flex flex-wrap gap-2">
+                                            <button class="btn btn-sm btn-success" name="response" value="confirmed" type="submit">Confirm</button>
+                                            <button class="btn btn-sm btn-outline-primary" name="response" value="reschedule_requested" type="submit">Request reschedule</button>
+                                            <button class="btn btn-sm btn-outline-danger" name="response" value="declined" type="submit">Decline</button>
+                                        </div>
+                                    </form>
+                                {% endif %}
+                            </div>
                         </div>
                     </div></div>
                 </div>
+                {% endif %}
+                {% if app.status == 'offer_sent' %}
+                    <div class="modal fade" id="offerModal{{ app.application_id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+                            <div class="modal-header"><h5 class="modal-title">Job Offer</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                            <div class="modal-body">
+                                <h6>{{ app.job.title }} · {{ app.job.employer.company_name|default:"Employer" }}</h6>
+                                <p class="mb-3">{{ app.offer_details|linebreaksbr }}</p>
+                                <form method="POST" action="update_application.php" class="d-flex flex-wrap gap-2">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="application_id" value="{{ app.application_id }}">
+                                    <input type="hidden" name="action" value="respond_offer">
+                                    <button class="btn btn-success" name="decision" value="accept" type="submit">Accept offer</button>
+                                    <button class="btn btn-outline-danger" name="decision" value="decline" type="submit">Decline offer</button>
+                                </form>
+                            </div>
+                        </div></div>
+                    </div>
                 {% endif %}
             {% endwith %}
         {% endfor %}

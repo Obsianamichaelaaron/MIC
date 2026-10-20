@@ -1,3 +1,4 @@
+from app.models import User, Applicant, Qualification, Employer, Notification
 import os
 import time
 import random
@@ -120,8 +121,16 @@ def login_register_view(request):
                         industry=industry,
                         company_size=company_size,
                         company_website=company_website,
-                        company_address=company_address
+                        company_address=company_address,
+                        verification_status='pending',
                     )
+                    for admin_user in User.objects.filter(role='admin', status='active'):
+                        Notification.objects.create(
+                            user=admin_user,
+                            title='Employer company verification required',
+                            message=f'{company_name} registered and is awaiting company verification.',
+                            type='system',
+                        )
 
                     # Auto-login newly registered employer
                     request.session.flush()

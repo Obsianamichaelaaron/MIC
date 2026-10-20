@@ -3,6 +3,7 @@ import os
 import time
 import random
 from decimal import Decimal
+from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.core.cache import cache
@@ -31,6 +32,7 @@ from app.services.resume_storage import (
 )
 from app.services.ml_ranking import compute_rule_based_match_score
 from app.services.mailer import send_application_submitted_email
+from app.services.workflow import close_job_if_positions_filled
 
 MAX_JOB_MATCHES_FOR_DASHBOARD = 12
 SEMANTIC_MATCH_CACHE_TTL_SECONDS = 86400
@@ -40,6 +42,22 @@ def compute_semantic_match(*args, **kwargs):
     from app.services.semantic_job_matching import compute_semantic_match as semantic_match
 
     return semantic_match(*args, **kwargs)
+
+
+def _application_action_response(request, message, success):
+    if (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        or 'application/json' in request.headers.get('Accept', '')
+    ):
+        return JsonResponse(
+            {'success': success, 'message': message},
+            status=200 if success else 400,
+        )
+    if success:
+        messages.success(request, message)
+    else:
+        messages.error(request, message)
+    return redirect('applicant_applications')
 
 
 def _semantic_match_cache_key(applicant: Applicant, job: JobPosting, resume_text: str = '') -> str:
@@ -756,6 +774,7 @@ def apply_job_view(request, job_id=None):
     job = get_object_or_404(
         JobPosting.objects.select_related('employer', 'employer__user'),
         pk=j_id,
+        status='active',
     )
 
     # Check if already applied
@@ -958,10 +977,11 @@ def applications_view(request):
     # Get interviews for these applications
     interviews_map = {}
     interviews = InterviewSchedule.objects.filter(
-        application__applicant=applicant
-    ).select_related('employer')
+        application__applicant=applicant,
+        status__in=('scheduled', 'completed'),
+    ).select_related('employer').order_by('-interview_date', '-created_at')
     for inv in interviews:
-        interviews_map[inv.application_id] = inv
+        interviews_map.setdefault(inv.application_id, inv)
 
     resume_text = ResumeAnalysis.objects.filter(
         applicant=applicant
@@ -1298,12 +1318,136 @@ def update_application_view(request):
 
         application = get_object_or_404(Application, pk=app_id, applicant=applicant)
         if action == 'cancel' or action == 'withdraw':
-            application.status = 'rejected'
-            application.applicant_remarks_history = f"[{timezone.now().strftime('%Y-%m-%d %H:%M')}] Application withdrawn by applicant."
-            application.save()
-            return JsonResponse({'success': True, 'message': 'Application withdrawn successfully'})
+            if application.status in ('accepted', 'hired', 'rejected', 'withdrawn', 'job_closed', 'offer_sent', 'offer_declined'):
+                return _application_action_response(request, 'This application can no longer be withdrawn.', False)
+            now = timezone.now()
+            application.status = 'withdrawn'
+            application.employer_status = 'withdrawn'
+            application.applicant_remarks_history = f"[{now.strftime('%Y-%m-%d %H:%M')}] Application withdrawn by applicant."
+            history = list(application.status_history or [])
+            history.append({
+                'stage': 'Application Withdrawn',
+                'status': 'withdrawn',
+                'actor_name': applicant.user.full_name or applicant.user.email,
+                'actor_role': 'Applicant',
+                'timestamp': now.strftime('%Y-%m-%d %H:%M'),
+                'notes': '',
+            })
+            application.status_history = history
+            application.save(update_fields=[
+                'status', 'employer_status', 'applicant_remarks_history', 'status_history', 'updated_at',
+            ])
+            Notification.objects.create(
+                user=application.job.employer.user,
+                title='Applicant withdrew an application',
+                message=f'{applicant.user.full_name or applicant.user.email} withdrew their application for {application.job.title}.',
+                type='application',
+            )
+            return _application_action_response(request, 'Application withdrawn successfully.', True)
 
-    return JsonResponse({'success': False, 'message': 'Invalid request'})
+        if action == 'respond_offer':
+            decision = request.POST.get('decision', '').strip()
+            if application.status != 'offer_sent' or decision not in ('accept', 'decline'):
+                return _application_action_response(request, 'This offer is no longer available.', False)
+            now = timezone.now()
+            if decision == 'accept':
+                application.status = 'accepted'
+                application.employer_status = 'hired'
+                stage = 'Offer Accepted'
+                employer_message = f'{applicant.user.full_name or applicant.user.email} accepted the offer for {application.job.title}.'
+            else:
+                application.status = 'offer_declined'
+                application.employer_status = 'offer_declined'
+                stage = 'Offer Declined'
+                employer_message = f'{applicant.user.full_name or applicant.user.email} declined the offer for {application.job.title}.'
+            application.offer_responded_at = now
+            history = list(application.status_history or [])
+            history.append({
+                'stage': stage,
+                'status': application.status,
+                'actor_name': applicant.user.full_name or applicant.user.email,
+                'actor_role': 'Applicant',
+                'timestamp': now.strftime('%Y-%m-%d %H:%M'),
+                'notes': '',
+            })
+            application.status_history = history
+            application.save(update_fields=[
+                'status', 'employer_status', 'offer_responded_at',
+                'status_history', 'updated_at',
+            ])
+            Notification.objects.create(
+                user=application.job.employer.user,
+                title=stage,
+                message=employer_message,
+                type='application',
+            )
+            Notification.objects.create(
+                user=applicant.user,
+                title=stage,
+                message=f'You {"accepted" if decision == "accept" else "declined"} the offer for {application.job.title}.',
+                type='application',
+            )
+            if decision == 'accept':
+                close_job_if_positions_filled(application.job)
+            return _application_action_response(request, stage + '.', True)
+
+        if action == 'respond_interview':
+            interview_id = request.POST.get('interview_id')
+            response = request.POST.get('response', '').strip()
+            response_notes = request.POST.get('response_notes', '').strip()
+            if response not in ('confirmed', 'reschedule_requested', 'declined'):
+                return _application_action_response(request, 'Invalid interview response.', False)
+            if response == 'reschedule_requested' and not response_notes:
+                return _application_action_response(request, 'Add a short note for your reschedule request.', False)
+
+            interview = get_object_or_404(
+                InterviewSchedule,
+                pk=interview_id,
+                application=application,
+                status='scheduled',
+            )
+            now = timezone.now()
+            interview.applicant_response = response
+            interview.applicant_response_notes = response_notes
+            interview.applicant_responded_at = now
+            if response == 'declined':
+                interview.status = 'cancelled'
+                application.employer_status = 'qualified'
+                application.status = 'shortlisted'
+            interview.save(update_fields=[
+                'applicant_response', 'applicant_response_notes',
+                'applicant_responded_at', 'status', 'updated_at',
+            ])
+
+            response_labels = {
+                'confirmed': 'Interview Confirmed',
+                'reschedule_requested': 'Interview Reschedule Requested',
+                'declined': 'Interview Declined',
+            }
+            history = list(application.status_history or [])
+            history.append({
+                'stage': response_labels[response],
+                'status': response,
+                'actor_name': applicant.user.full_name or applicant.user.email,
+                'actor_role': 'Applicant',
+                'timestamp': now.strftime('%Y-%m-%d %H:%M'),
+                'notes': response_notes,
+            })
+            application.status_history = history
+            application.save(update_fields=[
+                'status', 'employer_status', 'status_history', 'updated_at',
+            ])
+            Notification.objects.create(
+                user=interview.employer.user,
+                title=response_labels[response],
+                message=f'{applicant.user.full_name or applicant.user.email} responded to the interview for {application.job.title}: {response_labels[response].lower()}. {response_notes}'.strip(),
+                type='application',
+            )
+            return _application_action_response(request, response_labels[response] + '.', True)
+
+        return _application_action_response(request, 'Invalid request.', False)
+
+    return _application_action_response(request, 'Invalid request.', False)
 
 
 @require_role('applicant')

@@ -1,6 +1,6 @@
 from functools import wraps
 from django.shortcuts import redirect
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseForbidden, HttpResponseRedirect
 from django.contrib.auth.hashers import make_password, check_password
 import bcrypt
 
@@ -123,3 +123,19 @@ def require_role(role: str):
             return response
         return _wrapped
     return decorator
+
+
+def require_verified_employer(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        from app.models import Employer
+
+        if not Employer.objects.filter(
+            user_id=request.session.get('user_id'),
+            verification_status='verified',
+        ).exists():
+            return HttpResponseForbidden(
+                'Company verification is required to access candidate workflows.'
+            )
+        return view_func(request, *args, **kwargs)
+    return _wrapped

@@ -302,9 +302,13 @@
                             <span><i class="fa-solid fa-industry text-white"></i> {{ employer.industry|default:"Corporate Partner" }}</span>
                         </div>
                         <div class="portal-badges">
-                            <span class="portal-badge">
-                                <i class="fa-solid fa-shield-check text-success"></i> Verified Corporate Partner
-                            </span>
+                            {% if employer.verification_status == 'verified' %}
+                                <span class="portal-badge"><i class="fa-solid fa-shield-check text-success"></i> Verified Corporate Partner</span>
+                            {% elif employer.verification_status == 'rejected' %}
+                                <span class="portal-badge"><i class="fa-solid fa-shield-xmark text-danger"></i> Company Verification Rejected</span>
+                            {% else %}
+                                <span class="portal-badge"><i class="fa-solid fa-hourglass-half text-warning"></i> Company Verification Pending</span>
+                            {% endif %}
                             <span class="portal-badge">
                                 <i class="fa-solid fa-bolt text-warning"></i> AI Candidate Matching Active
                             </span>

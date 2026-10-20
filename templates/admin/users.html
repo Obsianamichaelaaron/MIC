@@ -26,6 +26,11 @@
     {% if error_msg %}
         <div class="alert alert-danger" role="alert">{{ error_msg }}</div>
     {% endif %}
+    {% if pending_employer_verifications %}
+        <div class="alert alert-warning" role="status">
+            {{ pending_employer_verifications }} employer company verification{{ pending_employer_verifications|pluralize }} pending review.
+        </div>
+    {% endif %}
 
     <!-- Filters -->
     <div class="custom-card p-3 bg-white border-0 shadow-sm rounded-4 mb-4">
@@ -87,6 +92,14 @@
                                 <span class="badge {% if u.role == 'admin' %}bg-danger{% else %}bg-success{% endif %} text-capitalize">
                                     {{ u.role }}
                                 </span>
+                                {% if u.role == 'employer' %}
+                                    {% with employer=u.employer_profile.all|first %}
+                                        {% if employer %}
+                                            <div class="small mt-1">{{ employer.company_name }}</div>
+                                            <span class="badge {% if employer.verification_status == 'verified' %}bg-success{% elif employer.verification_status == 'rejected' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ employer.verification_status|title }}</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
                             </td>
                             <td class="small text-secondary">{{ u.phone|default:"-" }}</td>
                             <td>
@@ -97,6 +110,27 @@
                             <td class="text-muted small">{{ u.created_at|date:"M d, Y" }}</td>
                             <td>
                                 <div class="d-flex gap-2">
+                                    {% if u.role == 'employer' %}
+                                        {% with employer=u.employer_profile.all|first %}
+                                            {% if employer and employer.verification_status != 'verified' %}
+                                                <form method="POST" action="{% url 'admin_users' %}" class="d-flex gap-1">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="action" value="verify_employer">
+                                                    <input type="hidden" name="employer_id" value="{{ employer.employer_id }}">
+                                                    <input type="hidden" name="decision" value="verified">
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Verify company"><i class="fa-solid fa-shield-check"></i> Verify</button>
+                                                </form>
+                                                <form method="POST" action="{% url 'admin_users' %}" class="d-flex gap-1">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="action" value="verify_employer">
+                                                    <input type="hidden" name="employer_id" value="{{ employer.employer_id }}">
+                                                    <input type="hidden" name="decision" value="rejected">
+                                                    <input type="text" name="verification_notes" class="form-control form-control-sm" placeholder="Rejection reason" aria-label="Company rejection reason" required>
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Reject company"><i class="fa-solid fa-ban"></i> Reject</button>
+                                                </form>
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endif %}
                                     <!-- Change Status Dropdown -->
                                     <form method="POST" action="{% url 'admin_users' %}" class="d-inline">
                                         {% csrf_token %}
