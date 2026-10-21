@@ -43,6 +43,23 @@ class User(models.Model):
         return f"{self.first_name or ''} {self.last_name or ''}".strip()
 
 
+class PasswordResetToken(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='password_reset_tokens',
+    )
+    token_digest = models.CharField(max_length=64, unique=True)
+    expires_at = models.DateTimeField()
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        db_table = 'password_reset_tokens'
+        indexes = [
+            models.Index(fields=['user', 'expires_at'], name='pwreset_user_exp_idx'),
+        ]
+
+
 class Applicant(models.Model):
     applicant_id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, db_column='user_id', related_name='applicant_profile')
@@ -331,8 +348,30 @@ class InterviewSchedule(models.Model):
     applicant_response_notes = models.TextField(null=True, blank=True)
     applicant_responded_at = models.DateTimeField(null=True, blank=True)
     reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    overdue_notified_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def is_overdue(self):
+        return self.is_overdue_at()
+
+    def is_overdue_at(self, now=None):
+        if self.status != 'scheduled' or self.applicant_response == 'declined':
+            return False
+
+        local_now = timezone.localtime(now or timezone.now())
+        local_date = local_now.date()
+        if self.interview_date < local_date:
+            return True
+        if self.interview_date > local_date:
+            return False
+
+        interview_end = self.end_time or self.start_time
+        return bool(
+            interview_end
+            and interview_end < local_now.time().replace(tzinfo=None)
+        )
 
     class Meta:
         db_table = 'interview_schedules'

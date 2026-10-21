@@ -1,12 +1,21 @@
 from app.models import User, Applicant, Qualification, Employer, Notification
+import hashlib
 import os
+import secrets
 import time
 import random
+import logging
+from datetime import timedelta
+from urllib.parse import urlencode
+from django.core.cache import cache
+from django.db import transaction
 from django.shortcuts import render, redirect
-from django.http import JsonResponse, HttpResponseRedirect
-from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.conf import settings
-from app.models import User, Applicant, Qualification, Employer
+from app.models import User, Applicant, Qualification, Employer, PasswordResetToken
 from app.auth_utils import (
     hash_password,
     isLoggedIn,
@@ -14,7 +23,12 @@ from app.auth_utils import (
     password_needs_rehash,
     verify_password,
 )
-from app.services.mailer import send_otp_email, send_welcome_email, send_employer_welcome_email
+from app.services.mailer import (
+    send_otp_email,
+    send_password_reset_email,
+    send_welcome_email,
+    send_employer_welcome_email,
+)
 from app.services.resume_parser import (
     parse_and_save_applicant_resume,
     parse_resume_text,
@@ -26,6 +40,18 @@ from app.services.resume_storage import (
     stage_uploaded_file,
     store_verified_resume,
 )
+
+logger = logging.getLogger(__name__)
+
+
+PASSWORD_RESET_LIFETIME = timedelta(minutes=30)
+PASSWORD_RESET_RATE_LIMIT = 5
+PASSWORD_RESET_RATE_WINDOW = 60 * 60
+
+
+def _password_reset_digest(token):
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
 
 @csrf_exempt
 def login_register_view(request):
@@ -290,11 +316,120 @@ def login_register_view(request):
         'default_role': default_role,
         'form_values': form_values,
         'session_expired': session_expired,
+        'password_reset_success': request.GET.get('password_reset') == 'success',
         'redirect': redirect_target,
         'job_id': job_id,
         'qualifications': qualifications,
     }
     return render(request, 'public/loginregister.html', context)
+
+
+@csrf_protect
+def password_reset_request_view(request):
+    message = None
+    error = None
+    if request.method == 'POST':
+        email = request.POST.get('email', '').strip().lower()
+        remote_address = request.META.get('REMOTE_ADDR', '')
+        rate_key = 'password-reset:' + hashlib.sha256(
+            f'{email}:{remote_address}'.encode('utf-8')
+        ).hexdigest()
+        if cache.add(rate_key, 1, PASSWORD_RESET_RATE_WINDOW):
+            request_count = 1
+        else:
+            request_count = cache.incr(rate_key)
+
+        if request_count > PASSWORD_RESET_RATE_LIMIT:
+            error = 'Too many reset requests. Please wait and try again later.'
+        else:
+            user = User.objects.filter(email__iexact=email, status='active').first()
+            if user:
+                token = secrets.token_urlsafe(32)
+                with transaction.atomic():
+                    PasswordResetToken.objects.filter(user=user).delete()
+                    reset_record = PasswordResetToken.objects.create(
+                        user=user,
+                        token_digest=_password_reset_digest(token),
+                        expires_at=timezone.now() + PASSWORD_RESET_LIFETIME,
+                    )
+
+                reset_url = (
+                    f'{settings.SITE_URL}{reverse("password_reset_confirm")}?'
+                    f'{urlencode({"token": token})}'
+                )
+                email_result = send_password_reset_email(
+                    to_email=user.email,
+                    first_name=user.first_name,
+                    reset_url=reset_url,
+                )
+                if not email_result['success']:
+                    reset_record.delete()
+                    logger.error(
+                        'Password reset email delivery failed for user id %s.',
+                        user.user_id,
+                    )
+
+            message = (
+                'If an active account matches that email, a password reset '
+                'link will be sent shortly. Check your inbox and spam folder.'
+            )
+
+    response = render(request, 'public/password_reset.html', {
+        'page_title': 'Forgot Password - MULTIBIZ INTERNATIONAL CORPORATION',
+        'message': message,
+        'error': error,
+    })
+    response['Cache-Control'] = 'no-store'
+    response['Referrer-Policy'] = 'no-referrer'
+    return response
+
+
+@csrf_protect
+def password_reset_confirm_view(request):
+    token = request.POST.get('token', '') if request.method == 'POST' else request.GET.get('token', '')
+    reset_record = None
+    if token:
+        reset_record = PasswordResetToken.objects.filter(
+            token_digest=_password_reset_digest(token),
+            expires_at__gt=timezone.now(),
+            user__status='active',
+        ).select_related('user').first()
+
+    error = None
+    if request.method == 'POST':
+        password = request.POST.get('password', '')
+        confirm_password = request.POST.get('confirm_password', '')
+        if not reset_record:
+            error = 'This reset link is invalid or has expired. Please request a new one.'
+        elif len(password) < 8:
+            error = 'Your password must be at least 8 characters long.'
+        elif password != confirm_password:
+            error = 'The passwords do not match.'
+        else:
+            with transaction.atomic():
+                reset_record = PasswordResetToken.objects.select_for_update().filter(
+                    pk=reset_record.pk,
+                    expires_at__gt=timezone.now(),
+                    user__status='active',
+                ).select_related('user').first()
+                if not reset_record:
+                    error = 'This reset link is invalid or has expired. Please request a new one.'
+                else:
+                    reset_record.user.password = hash_password(password)
+                    reset_record.user.save(update_fields=['password', 'updated_at'])
+                    PasswordResetToken.objects.filter(user=reset_record.user).delete()
+            if not error:
+                return redirect('/loginregister.php?password_reset=success')
+
+    response = render(request, 'public/password_reset_confirm.html', {
+        'page_title': 'Reset Password - MULTIBIZ INTERNATIONAL CORPORATION',
+        'token': token,
+        'valid_token': bool(reset_record),
+        'error': error,
+    })
+    response['Cache-Control'] = 'no-store'
+    response['Referrer-Policy'] = 'no-referrer'
+    return response
 
 
 def logout_view(request):

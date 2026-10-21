@@ -319,26 +319,26 @@
     <!-- Status Tabs -->
     <div class="status-tabs-nav">
         <a href="{% if search %}?search={{ search|urlencode }}{% else %}?{% endif %}" class="status-tab-btn {% if not status_filter %}active{% endif %}">
-            All Listings <span class="tab-badge">{{ counts.all|default:0 }}</span>
+            All Listings <span class="tab-badge" data-status-count="all">{{ counts.all|default:0 }}</span>
         </a>
         <a href="?status=pending{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'pending' %}active{% endif %}">
             <i class="fas fa-hourglass-half" style="color: #f59e0b;"></i> Pending Review
-            <span class="tab-badge" style="background: #fef3c7; color: #b45309;">{{ counts.pending|default:0 }}</span>
+            <span class="tab-badge" data-status-count="pending" style="background: #fef3c7; color: #b45309;">{{ counts.pending|default:0 }}</span>
         </a>
         <a href="?status=approved{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'approved' %}active{% endif %}">
             <i class="fas fa-thumbs-up" style="color: #0284c7;"></i> Approved (Ready)
-            <span class="tab-badge">{{ counts.approved|default:0 }}</span>
+            <span class="tab-badge" data-status-count="approved">{{ counts.approved|default:0 }}</span>
         </a>
         <a href="?status=active{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'active' %}active{% endif %}">
             <i class="fas fa-broadcast-tower" style="color: #10b981;"></i> Active / Live
-            <span class="tab-badge">{{ counts.active|default:0 }}</span>
+            <span class="tab-badge" data-status-count="active">{{ counts.active|default:0 }}</span>
         </a>
         <a href="?status=rejected{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'rejected' %}active{% endif %}">
             <i class="fas fa-ban" style="color: #ef4444;"></i> Rejected
-            <span class="tab-badge">{{ counts.rejected|default:0 }}</span>
+            <span class="tab-badge" data-status-count="rejected">{{ counts.rejected|default:0 }}</span>
         </a>
         <a href="?status=closed{% if search %}&search={{ search|urlencode }}{% endif %}" class="status-tab-btn {% if status_filter == 'closed' %}active{% endif %}">
-            Closed <span class="tab-badge">{{ counts.closed|default:0 }}</span>
+            Closed <span class="tab-badge" data-status-count="closed">{{ counts.closed|default:0 }}</span>
         </a>
     </div>
 
@@ -366,7 +366,7 @@
         <div style="overflow-x:auto;">
             <table class="jobs-modern-table">
                 <thead>
-                    <tr>
+                    <tr data-job-id="{{ job.job_id }}" data-job-status="{{ job.status }}">
                         <th style="padding-left:1.5rem;">Job Request / Vacancy</th>
                         <th>Hiring Employer</th>
                         <th>Type & Headcount</th>
@@ -399,7 +399,7 @@
                                     {% endif %}
                                 </div>
                             </td>
-                            <td>
+                            <td class="job-status-cell">
                                 <div style="font-weight:600;color:#1e293b;display:flex;align-items:center;gap:0.4rem;">
                                     <i class="fas fa-building" style="color:#64748b;font-size:0.85rem;"></i>
                                     <span>{{ job.employer.company_name|default:"MultiBiz Partner" }}</span>
@@ -440,7 +440,7 @@
                                 {{ job.created_at|default:job.posted_at|date:"M d, Y" }}
                             </td>
                             <td style="padding-right:1.5rem;text-align:right;white-space:nowrap;">
-                                <div style="display:inline-flex;gap:0.35rem;align-items:center;">
+                                <div class="job-row-actions" style="display:inline-flex;gap:0.35rem;align-items:center;">
 
                                     <!-- Pending Moderation Controls -->
                                     {% if job.status == 'pending' %}
@@ -529,7 +529,7 @@
         </div>
         <div style="padding:.7rem 1rem;text-align:right;border-top:1px solid #e2e8f0;">
             <span class="small" id="jobsApplicationRefreshStatus" data-latest-application-id="{{ latest_application_id|default_if_none:'' }}">
-                {{ total_application_count }} total applications · checking every 15 seconds
+                {{ total_application_count }} total applications · checking every 60 seconds
             </span>
         </div>
     </div>
@@ -679,11 +679,13 @@
                 throw new Error('Application refresh returned an invalid count.');
             }
             statusElement.textContent =
-                `${data.total_application_count} total applications · checking every 15 seconds`;
+                `${data.total_application_count} total applications · checking every 60 seconds`;
 
             if (data.latest_application_id !== null &&
                 String(data.latest_application_id) !== statusElement.dataset.latestApplicationId) {
-                window.location.reload();
+                statusElement.dataset.latestApplicationId = String(data.latest_application_id);
+                statusElement.textContent =
+                    `${data.total_application_count} total applications · new applications available — refresh to update job details`;
             }
         } catch (error) {
             console.error(error);
@@ -692,11 +694,119 @@
         }
     };
 
-    window.setInterval(refreshJobs, 15000);
+    window.setInterval(refreshJobs, 60000);
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) refreshJobs();
     });
 })();
+
+const jobStatusLabels = {
+    pending: '<i class="fas fa-hourglass-half"></i> Pending Review',
+    approved: '<i class="fas fa-thumbs-up"></i> Approved',
+    active: '<i class="fas fa-broadcast-tower"></i> Live / Posted',
+    rejected: '<i class="fas fa-ban"></i> Rejected',
+    closed: 'Closed',
+};
+
+function updateJobStatusCount(status, delta) {
+    const count = document.querySelector(`[data-status-count="${status}"]`);
+    if (count) count.textContent = String(Math.max(0, Number(count.textContent) + delta));
+}
+
+function updateJobRow(row, newStatus, form) {
+    const oldStatus = row.dataset.jobStatus;
+    if (oldStatus !== newStatus) {
+        updateJobStatusCount(oldStatus, -1);
+        updateJobStatusCount(newStatus, 1);
+        row.dataset.jobStatus = newStatus;
+        const badge = row.querySelector('.job-status-cell .job-status-badge');
+        badge.className = `job-status-badge status-${newStatus}`;
+        badge.innerHTML = jobStatusLabels[newStatus] || newStatus;
+    }
+
+    if (new URLSearchParams(window.location.search).get('status') &&
+        new URLSearchParams(window.location.search).get('status') !== newStatus) {
+        row.remove();
+        return;
+    }
+
+    const actionContainer = row.querySelector('.job-row-actions');
+    actionContainer.querySelectorAll('form').forEach((actionForm) => {
+        if (['approve', 'post_live', 'reject'].includes(actionForm.querySelector('[name="action"]')?.value)) {
+            actionForm.remove();
+        }
+    });
+
+    if (newStatus === 'approved') {
+        const publishForm = form.cloneNode(true);
+        publishForm.querySelector('[name="action"]').value = 'post_live';
+        const publishButton = publishForm.querySelector('button[type="submit"]');
+        publishButton.disabled = false;
+        publishButton.innerHTML = '<i class="fas fa-paper-plane"></i> Publish Live';
+        publishButton.title = 'Publish Live to Applicants';
+        actionContainer.insertBefore(publishForm, actionContainer.firstChild);
+    }
+}
+
+document.addEventListener('submit', async (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.method.toLowerCase() !== 'post') return;
+    if (!form.closest('.job-row-actions, #jobRejectModal')) return;
+    if (!form.querySelector('[name="action"]')) return;
+    event.preventDefault();
+
+    const submitButton = event.submitter || form.querySelector('button[type="submit"]');
+    if (submitButton?.disabled) return;
+    const originalButtonText = submitButton?.innerHTML;
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    }
+
+    try {
+        const response = await fetch(form.action || window.location.href, {
+            method: 'POST',
+            body: new FormData(form),
+            credentials: 'same-origin',
+            headers: { 'Accept': 'application/json' },
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || `Action failed (${response.status}).`);
+        }
+
+        const alert = document.createElement('div');
+        alert.setAttribute('role', 'status');
+        alert.style.cssText = 'background:#e0f2fe;border:1px solid #bae6fd;color:#0369a1;padding:.75rem 1rem;border-radius:10px;margin-bottom:1rem;font-weight:600;';
+        alert.textContent = result.message;
+        document.querySelector('.jobs-filter-card').before(alert);
+        window.setTimeout(() => alert.remove(), 6000);
+
+        if (result.deleted) {
+            const row = form.closest('tr');
+            updateJobStatusCount(row.dataset.jobStatus, -1);
+            updateJobStatusCount('all', -1);
+            row.remove();
+        } else {
+            const jobId = form.querySelector('[name="job_id"]')?.value;
+            const row = form.closest('tr') ||
+                document.querySelector(`tr[data-job-id="${jobId}"]`);
+            if (row && result.status) updateJobRow(row, result.status, form);
+            if (form.closest('#jobRejectModal')) closeRejectModal();
+        }
+        if (submitButton?.isConnected) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonText;
+        }
+    } catch (error) {
+        console.error(error);
+        window.alert(error.message || 'Unable to complete the job action. Please try again.');
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonText;
+        }
+    }
+});
 
 function openRejectModal(jobId, jobIds, jobTitle, employerName) {
     document.getElementById('reject_modal_job_id').value = jobId;

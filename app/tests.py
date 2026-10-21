@@ -15,7 +15,8 @@ from django.utils import timezone
 from app.models import (
     User, Applicant, Employer, JobPosting, Application,
     Qualification, JobQualificationMapping, Skill, ContactInquiry, Message, AuditTrail,
-    Notification, InterviewSchedule, CmsHeroSlide, CmsBrand, CmsTestimonial
+    Notification, InterviewSchedule, CmsHeroSlide, CmsBrand, CmsTestimonial,
+    PasswordResetToken,
 )
 from app.auth_utils import verify_password, hash_password
 from app.services.mailer import send_application_status_update_email
@@ -1170,6 +1171,39 @@ class MultiBizConversionTests(TestCase):
         self.job.refresh_from_db()
         self.assertEqual(self.job.status, 'closed')
 
+    def test_admin_jobs_action_returns_json_for_in_place_updates(self):
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        response = self.client.post(
+            '/admin/jobs.php',
+            {
+                'action': 'approve',
+                'job_id': self.job.job_id,
+                'job_ids': str(self.job.job_id),
+            },
+            HTTP_ACCEPT='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], 'approved')
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, 'approved')
+
+    def test_instant_navigation_is_included_in_portal_and_public_pages(self):
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        admin_response = self.client.get('/admin/jobs.php')
+        public_response = self.client.get('/careers.php')
+
+        self.assertContains(admin_response, '/static/js/instant-navigation.js')
+        self.assertContains(public_response, '/static/js/instant-navigation.js')
+
     def test_homepage_featured_jobs_are_unique_and_use_employer_names(self):
         JobPosting.objects.create(
             employer=self.employer,
@@ -1532,7 +1566,7 @@ class MultiBizConversionTests(TestCase):
             newer_applied_at,
         )
         self.assertContains(response, 'Latest:')
-        self.assertContains(response, 'checking every 15 seconds')
+        self.assertContains(response, 'checking every 60 seconds')
 
         refresh_response = self.client.get('/admin/jobs.php?check_updates=1')
         self.assertEqual(refresh_response.status_code, 200)
@@ -2538,6 +2572,69 @@ class MultiBizConversionTests(TestCase):
         self.assertIsNotNone(interview.reminder_sent_at)
         self.assertEqual(
             Notification.objects.filter(title='Interview reminder').count(),
+            2,
+        )
+
+    def test_past_scheduled_interviews_notify_both_parties_once(self):
+        from app.services.workflow import process_workflow_reminders
+
+        now = timezone.now()
+        past_date = timezone.localdate(now) - timedelta(days=1)
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='interviewed',
+            employer_status='for_interview',
+        )
+        overdue_interview = InterviewSchedule.objects.create(
+            application=application,
+            employer=self.employer,
+            interview_date=past_date,
+            start_time='10:00',
+            end_time='11:00',
+            status='scheduled',
+        )
+        InterviewSchedule.objects.create(
+            application=application,
+            employer=self.employer,
+            interview_date=past_date,
+            start_time='10:00',
+            end_time='11:00',
+            status='completed',
+        )
+        InterviewSchedule.objects.create(
+            application=application,
+            employer=self.employer,
+            interview_date=past_date,
+            start_time='10:00',
+            end_time='11:00',
+            status='scheduled',
+            applicant_response='declined',
+        )
+
+        counts = process_workflow_reminders(now)
+
+        self.assertEqual(counts['overdue_interview'], 1)
+        self.assertEqual(
+            Notification.objects.filter(title='Interview follow-up needed').count(),
+            2,
+        )
+        self.assertTrue(Notification.objects.filter(
+            user=self.employer_user,
+            title='Interview follow-up needed',
+        ).exists())
+        self.assertTrue(Notification.objects.filter(
+            user=self.applicant_user,
+            title='Interview follow-up needed',
+        ).exists())
+        overdue_interview.refresh_from_db()
+        self.assertIsNotNone(overdue_interview.overdue_notified_at)
+
+        counts = process_workflow_reminders(now + timedelta(hours=1))
+
+        self.assertEqual(counts['overdue_interview'], 0)
+        self.assertEqual(
+            Notification.objects.filter(title='Interview follow-up needed').count(),
             2,
         )
 
@@ -3550,3 +3647,93 @@ class UserSessionValidationMiddlewareTests(TestCase):
         middleware.process_view(request, lambda current_request: None, (), {})
 
         self.assertFalse(session.modified)
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class PasswordResetTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create(
+            email='reset-user@example.com',
+            password=hash_password('old-password'),
+            role='applicant',
+            first_name='Reset',
+            status='active',
+        )
+
+    def test_password_reset_request_is_generic_and_sends_single_use_token(self):
+        existing_response = self.client.post('/password-reset/', {
+            'email': self.user.email,
+        })
+        unknown_response = self.client.post('/password-reset/', {
+            'email': 'unknown@example.com',
+        })
+
+        self.assertEqual(existing_response.status_code, 200)
+        self.assertEqual(unknown_response.status_code, 200)
+        self.assertEqual(existing_response.context['message'], unknown_response.context['message'])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
+        self.assertIn('/password-reset/confirm/?token=', mail.outbox[0].body)
+        self.assertEqual(PasswordResetToken.objects.filter(user=self.user).count(), 1)
+
+    def test_password_reset_replaces_password_and_consumes_token(self):
+        self.client.post('/password-reset/', {'email': self.user.email})
+        token = mail.outbox[0].body.split('/password-reset/confirm/?token=', 1)[1].split()[0]
+
+        response = self.client.post('/password-reset/confirm/', {
+            'token': token,
+            'password': 'new-secure-password',
+            'confirm_password': 'new-secure-password',
+        })
+
+        self.assertRedirects(response, '/loginregister.php?password_reset=success')
+        self.user.refresh_from_db()
+        self.assertTrue(verify_password('new-secure-password', self.user.password))
+        self.assertFalse(PasswordResetToken.objects.filter(user=self.user).exists())
+        self.assertFalse(
+            self.client.get(f'/password-reset/confirm/?token={token}').context['valid_token']
+        )
+
+    def test_password_reset_rejects_short_or_mismatched_passwords_without_consuming_token(self):
+        self.client.post('/password-reset/', {'email': self.user.email})
+        token = mail.outbox[0].body.split('/password-reset/confirm/?token=', 1)[1].split()[0]
+
+        short_password = self.client.post('/password-reset/confirm/', {
+            'token': token,
+            'password': 'short',
+            'confirm_password': 'short',
+        })
+        mismatch = self.client.post('/password-reset/confirm/', {
+            'token': token,
+            'password': 'new-secure-password',
+            'confirm_password': 'different-password',
+        })
+
+        self.assertContains(short_password, 'at least 8 characters')
+        self.assertContains(mismatch, 'do not match')
+        self.assertTrue(PasswordResetToken.objects.filter(user=self.user).exists())
+        self.user.refresh_from_db()
+        self.assertTrue(verify_password('old-password', self.user.password))
+
+    def test_password_reset_token_expires_and_requests_are_rate_limited(self):
+        self.client.post('/password-reset/', {'email': self.user.email})
+        reset_record = PasswordResetToken.objects.get(user=self.user)
+        reset_record.expires_at = timezone.now() - timedelta(seconds=1)
+        reset_record.save(update_fields=['expires_at'])
+        token = mail.outbox[0].body.split('/password-reset/confirm/?token=', 1)[1].split()[0]
+        expired_response = self.client.get(f'/password-reset/confirm/?token={token}')
+        self.assertFalse(expired_response.context['valid_token'])
+
+        cache.clear()
+        for _ in range(5):
+            response = self.client.post('/password-reset/', {'email': self.user.email})
+            self.assertEqual(response.status_code, 200)
+        throttled = self.client.post('/password-reset/', {'email': self.user.email})
+        self.assertContains(throttled, 'Too many reset requests', status_code=200)
+
+    def test_password_reset_forms_require_csrf(self):
+        csrf_client = Client(enforce_csrf_checks=True)
+        csrf_client.get('/password-reset/')
+        response = csrf_client.post('/password-reset/', {'email': self.user.email})
+        self.assertEqual(response.status_code, 403)

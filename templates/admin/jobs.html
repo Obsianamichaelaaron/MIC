@@ -534,7 +534,7 @@
         </div>
         <div style="padding:.7rem 1rem;text-align:right;border-top:1px solid #e2e8f0;">
             <span class="small" id="jobsApplicationRefreshStatus" data-latest-application-id="{{ latest_application_id|default_if_none:'' }}">
-                {{ total_application_count }} total applications · checking every 15 seconds
+                {{ total_application_count }} total applications · checking every 60 seconds
             </span>
         </div>
     </div>
@@ -684,11 +684,13 @@
                 throw new Error('Application refresh returned an invalid count.');
             }
             statusElement.textContent =
-                `${data.total_application_count} total applications · checking every 15 seconds`;
+                `${data.total_application_count} total applications · checking every 60 seconds`;
 
             if (data.latest_application_id !== null &&
                 String(data.latest_application_id) !== statusElement.dataset.latestApplicationId) {
-                window.location.reload();
+                statusElement.dataset.latestApplicationId = String(data.latest_application_id);
+                statusElement.textContent =
+                    `${data.total_application_count} total applications · new applications available — refresh to update job details`;
             }
         } catch (error) {
             console.error(error);
@@ -697,7 +699,7 @@
         }
     };
 
-    window.setInterval(refreshJobs, 15000);
+    window.setInterval(refreshJobs, 60000);
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) refreshJobs();
     });

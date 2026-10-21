@@ -904,7 +904,29 @@ def jobs_view(request):
     search = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '').strip()
 
+    if request.method == 'GET' and request.GET.get('check_updates') == '1':
+        application_qs = Application.objects.all()
+        if status_filter:
+            application_qs = application_qs.filter(job__status=status_filter)
+        if search:
+            application_qs = application_qs.filter(
+                Q(job__title__icontains=search) |
+                Q(job__employer__company_name__icontains=search) |
+                Q(job__location__icontains=search) |
+                Q(job__skills_required__icontains=search)
+            )
+        latest_application_id = (
+            application_qs.order_by('-applied_at', '-application_id')
+            .values_list('application_id', flat=True)
+            .first()
+        )
+        return JsonResponse({
+            'total_application_count': application_qs.count(),
+            'latest_application_id': latest_application_id,
+        })
+
     if request.method == 'POST':
+        wants_json = 'application/json' in request.headers.get('Accept', '')
         action = request.POST.get('action')
         job_id = request.POST.get('job_id')
         job = get_object_or_404(JobPosting.objects.select_related('employer', 'employer__user'), pk=job_id)
@@ -914,6 +936,8 @@ def jobs_view(request):
                 request.POST.get('job_ids', ''),
             )
         except ValueError as exc:
+            if wants_json:
+                return JsonResponse({'success': False, 'message': str(exc)}, status=400)
             return HttpResponseBadRequest(str(exc))
         employer = job.employer
         emp_user = employer.user if employer else None
@@ -935,6 +959,12 @@ def jobs_view(request):
                     type='job'
                 )
             log_audit_trail(request, admin_id, 'approve_job_request', f"Approved job request #{job.job_id} ({job.title}) for {company_name}", 'job', job.job_id, job.title)
+            if wants_json:
+                return JsonResponse({
+                    'success': True,
+                    'message': f"Job '{job.title}' approved successfully.",
+                    'status': 'approved',
+                })
             return redirect('/admin/jobs.php?approved=success')
 
         elif action in ['post_live', 'publish']:
@@ -970,6 +1000,16 @@ def jobs_view(request):
 
             log_audit_trail(request, admin_id, 'post_job_live', f"Published job #{job.job_id} ({job.title}) live for {company_name}", 'job', job.job_id, job.title)
             email_status = '' if email_result.get('success') else '&email_failed=1'
+            if wants_json:
+                message = f"Job '{job.title}' is now live."
+                if not email_result.get('success'):
+                    message += ' The employer email notification could not be delivered.'
+                return JsonResponse({
+                    'success': True,
+                    'message': message,
+                    'email_sent': bool(email_result.get('success')),
+                    'status': 'active',
+                })
             return redirect(f'/admin/jobs.php?posted=success{email_status}')
 
         elif action == 'reject':
@@ -1003,6 +1043,16 @@ def jobs_view(request):
 
             log_audit_trail(request, admin_id, 'reject_job_request', f"Rejected job request #{job.job_id} ({job.title}) for {company_name}. Reason: {reason}", 'job', job.job_id, job.title)
             email_status = '' if email_result.get('success') else '&email_failed=1'
+            if wants_json:
+                message = 'Job request rejected.'
+                if not email_result.get('success'):
+                    message += ' The employer email notification could not be delivered.'
+                return JsonResponse({
+                    'success': True,
+                    'message': message,
+                    'email_sent': bool(email_result.get('success')),
+                    'status': 'rejected',
+                })
             return redirect(f'/admin/jobs.php?rejected=success{email_status}')
 
         elif action == 'toggle_status':
@@ -1011,6 +1061,12 @@ def jobs_view(request):
                 duplicate_job.status = new_status
                 duplicate_job.save()
             log_audit_trail(request, admin_id, 'toggle_job_status', f"Changed status of job {job.title} to {job.status}", 'job', job.job_id, job.title)
+            if wants_json:
+                return JsonResponse({
+                    'success': True,
+                    'message': f"Job status changed to {new_status}.",
+                    'status': new_status,
+                })
             return redirect('/admin/jobs.php')
 
         elif action == 'delete_job':
@@ -1018,7 +1074,16 @@ def jobs_view(request):
             for duplicate_job in duplicate_jobs:
                 duplicate_job.delete()
             log_audit_trail(request, admin_id, 'delete_job', f"Deleted job {title}", 'job', int(job_id), title)
+            if wants_json:
+                return JsonResponse({
+                    'success': True,
+                    'message': f"Job '{title}' was deleted.",
+                    'deleted': True,
+                })
             return redirect('/admin/jobs.php')
+
+        if wants_json:
+            return JsonResponse({'success': False, 'message': 'Unsupported job action.'}, status=400)
 
     jobs_base_qs = JobPosting.objects.select_related('employer')
     all_job_groups = _group_duplicate_job_postings(
@@ -1130,15 +1195,6 @@ def jobs_view(request):
     latest_application_id = (
         latest_application['application_id'] if latest_application else None
     )
-
-    if request.GET.get('check_updates') == '1':
-        return JsonResponse({
-            'total_application_count': sum(
-                row['total_application_count']
-                for row in application_stats.values()
-            ),
-            'latest_application_id': latest_application_id,
-        })
 
     context = {
         'page_title': 'All Jobs & Requests - MultiBiz Admin',

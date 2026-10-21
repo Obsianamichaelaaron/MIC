@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -109,6 +110,53 @@ def process_workflow_reminders(now=None):
 
     local_now = timezone.localtime(now)
     interview_window_end = local_now + timedelta(hours=24)
+    overdue_interview_reminders = 0
+    with transaction.atomic():
+        overdue_interviews = InterviewSchedule.objects.select_for_update().filter(
+            status='scheduled',
+            overdue_notified_at__isnull=True,
+            interview_date__lte=local_now.date(),
+        ).exclude(
+            applicant_response='declined',
+        ).select_related(
+            'application__applicant__user',
+            'application__job',
+            'employer__user',
+        )
+        for interview in overdue_interviews:
+            if not interview.is_overdue_at(now):
+                continue
+
+            job_title = interview.application.job.title
+            interview_date = interview.interview_date.strftime('%b %d, %Y')
+            applicant_name = (
+                interview.application.applicant.user.full_name
+                or interview.application.applicant.user.email
+            )
+            Notification.objects.create(
+                user=interview.employer.user,
+                title='Interview follow-up needed',
+                message=(
+                    f'The interview with {applicant_name} for {job_title} scheduled '
+                    f'on {interview_date} has passed and is still marked scheduled. '
+                    'Please mark it complete, reschedule it, or cancel it.'
+                ),
+                type='application',
+            )
+            Notification.objects.create(
+                user=interview.application.applicant.user,
+                title='Interview follow-up needed',
+                message=(
+                    f'Your interview for {job_title} scheduled on {interview_date} '
+                    'has passed and is still marked scheduled. The employer may update '
+                    'the interview status; contact them if you need assistance.'
+                ),
+                type='application',
+            )
+            interview.overdue_notified_at = now
+            interview.save(update_fields=['overdue_notified_at', 'updated_at'])
+            overdue_interview_reminders += 1
+
     upcoming_interviews = InterviewSchedule.objects.filter(
         status='scheduled',
         reminder_sent_at__isnull=True,
@@ -143,4 +191,5 @@ def process_workflow_reminders(now=None):
         'admin': admin_reminders,
         'employer': employer_reminders,
         'interview': interview_reminders,
+        'overdue_interview': overdue_interview_reminders,
     }

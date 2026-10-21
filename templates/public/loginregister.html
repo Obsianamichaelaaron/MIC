@@ -778,6 +778,7 @@
     </style>
 </head>
 <body>
+<script src="/static/js/instant-navigation.js?v=2"></script>
 <div id="toast-container"{% if toast_error %} data-toast-error="{{ toast_error }}"{% endif %}{% if toast_success %} data-toast-success="{{ toast_success }}"{% endif %}></div>
 
 <script>
@@ -876,6 +877,11 @@
                         {{ error }}
                     </div>
                 {% endif %}
+                {% if password_reset_success %}
+                    <div class="alert alert-success" role="status">
+                        Your password has been reset. You can now log in with your new password.
+                    </div>
+                {% endif %}
                 
                 <form method="POST" action="">
                     {% csrf_token %}
@@ -908,6 +914,9 @@
                         Login to Your Account
                     </button>
                 </form>
+                <p style="margin:1rem 0 0;text-align:center;">
+                    <a href="/password-reset/" style="color:#0369a1;font-weight:600;text-decoration:none;">Forgot your password?</a>
+                </p>
             </div>
             
             <!-- Register Form -->

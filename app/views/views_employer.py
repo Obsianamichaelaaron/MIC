@@ -1215,10 +1215,12 @@ def view_candidate_view(request, application_id=None):
                     interview.applicant_response_notes = ''
                     interview.applicant_responded_at = None
                     interview.reminder_sent_at = None
+                    interview.overdue_notified_at = None
                     interview.save(update_fields=[
                         'interview_date', 'start_time', 'end_time', 'interview_time',
                         'applicant_response', 'applicant_response_notes',
-                        'applicant_responded_at', 'reminder_sent_at', 'updated_at',
+                        'applicant_responded_at', 'reminder_sent_at',
+                        'overdue_notified_at', 'updated_at',
                     ])
                     log_status_history_event(
                         application,

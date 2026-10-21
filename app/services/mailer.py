@@ -187,6 +187,47 @@ def send_otp_email(to_email: str, first_name: str, otp_code: str) -> dict:
         return {'success': False, 'error': str(e)}
 
 
+def send_password_reset_email(to_email: str, first_name: str, reset_url: str) -> dict:
+    """Send a short-lived password reset link."""
+    safe_name = html.escape(first_name or 'User')
+    safe_url = html.escape(reset_url, quote=True)
+    year = datetime.date.today().year
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:24px;background:#f0f2f5;font-family:Arial,sans-serif;color:#1e293b;">
+  <main style="max-width:560px;margin:24px auto;padding:32px;background:#fff;border-radius:12px;">
+    <h1 style="margin:0 0 20px;color:#0a1628;font-size:22px;">Reset your MultiBiz password</h1>
+    <p>Hello {safe_name},</p>
+    <p>We received a request to reset the password for your account. This link expires in 30 minutes and can only be used once.</p>
+    <p style="margin:28px 0;"><a href="{safe_url}" style="padding:13px 22px;background:#0369a1;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;">Reset password</a></p>
+    <p>If you did not request this, you can ignore this email. Your password will not change.</p>
+    <p style="margin-top:28px;color:#64748b;font-size:12px;">&copy; {year} MULTIBIZ INTERNATIONAL CORPORATION</p>
+  </main>
+</body>
+</html>"""
+    plain_message = (
+        f"Hello {first_name or 'User'},\n\n"
+        "We received a request to reset your MultiBiz password. "
+        "Use this one-time link within 30 minutes:\n\n"
+        f"{reset_url}\n\n"
+        "If you did not request this, ignore this email."
+    )
+
+    try:
+        send_mail(
+            subject='Reset your MultiBiz password',
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[to_email],
+            html_message=html_content,
+        )
+        return {'success': True, 'error': None}
+    except Exception as exc:
+        logger.exception('Password reset email failed.')
+        return {'success': False, 'error': str(exc)}
+
+
 def send_welcome_email(to_email: str, first_name: str) -> dict:
     """Send a welcome message after a new applicant account is created."""
     site_name = 'MULTIBIZ INTERNATIONAL CORPORATION'

@@ -459,8 +459,13 @@
                                 <div class="py-3 {% if not forloop.first %}border-top{% endif %}">
                                     <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
                                         <strong>{{ interview.interview_date|date:"M d, Y" }} · {{ interview.interview_time|default:"Time not set" }}</strong>
-                                        <span class="badge bg-light text-dark">{{ interview.status|title }} · Applicant {{ interview.get_applicant_response_display }}</span>
+                                        <span class="badge {% if interview.is_overdue %}bg-warning text-dark{% else %}bg-light text-dark{% endif %}">{% if interview.is_overdue %}Past due · {% endif %}{{ interview.status|title }} · Applicant {{ interview.get_applicant_response_display }}</span>
                                     </div>
+                                    {% if interview.is_overdue %}
+                                        <div class="alert alert-warning py-2 px-3 small" role="status">
+                                            <i class="fa-solid fa-clock me-1"></i> This interview time has passed. Please mark it complete, reschedule it, or cancel it.
+                                        </div>
+                                    {% endif %}
                                     {% if interview.applicant_response_notes %}<p class="small text-muted mb-2">{{ interview.applicant_response_notes }}</p>{% endif %}
                                     {% if interview.status == 'scheduled' %}
                                         <form method="POST" class="d-flex flex-column gap-2">

@@ -55,6 +55,8 @@ urlpatterns = [
     path('login/', views_auth.login_register_view, name='login'),
     path('register/', views_auth.login_register_view, name='register'),
     re_path(r'^(?:frontend/)?loginregister\.php$', views_auth.login_register_view),
+    path('password-reset/', views_auth.password_reset_request_view, name='password_reset'),
+    path('password-reset/confirm/', views_auth.password_reset_confirm_view, name='password_reset_confirm'),
     path('logout/', views_auth.logout_view, name='logout'),
     re_path(r'^(?:frontend/)?includes/auth/logout\.php$', views_auth.logout_view),
     re_path(r'^(?:frontend/)?send_otp\.php$', views_auth.send_otp_view),

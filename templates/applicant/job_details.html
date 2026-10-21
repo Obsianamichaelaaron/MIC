@@ -422,8 +422,8 @@
                             <div style="background: white; padding: 1.5rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #9C27B0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
                                     <div>
-                                        <span style="background: {% if interview.status == 'completed' %}#28a745{% elif interview.status == 'cancelled' %}#dc3545{% elif interview.status == 'rescheduled' %}#ff9800{% else %}#1866a3{% endif %}; color: white; padding: 0.25rem 0.75rem; border-radius: 15px; font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem;">
-                                            {{ interview.status|title }}
+                                        <span style="background: {% if interview.is_overdue %}#b45309{% elif interview.status == 'completed' %}#28a745{% elif interview.status == 'cancelled' %}#dc3545{% elif interview.status == 'rescheduled' %}#ff9800{% else %}#1866a3{% endif %}; color: white; padding: 0.25rem 0.75rem; border-radius: 15px; font-size: 0.85rem; font-weight: 600; margin-right: 0.5rem;">
+                                            {% if interview.is_overdue %}Past Due{% else %}{{ interview.status|title }}{% endif %}
                                         </span>
                                         <span style="color: #333; font-weight: 600; font-size: 1.1rem;">
                                             {{ interview.interview_date|date:"F d, Y" }}
@@ -434,8 +434,8 @@
                                             {{ interview.start_time|date:"h:i A" }} - 
                                             {{ interview.end_time|date:"h:i A" }}
                                         </span>
-                                        <span style="color: #9C27B0; font-weight: 600; font-size: 0.9rem;">
-                                            {{ interview.status|title }} Interview
+                                        <span style="color: {% if interview.is_overdue %}#b45309{% else %}#9C27B0{% endif %}; font-weight: 600; font-size: 0.9rem;">
+                                            {% if interview.is_overdue %}Follow-up Needed{% else %}{{ interview.status|title }} Interview{% endif %}
                                         </span>
                                     </div>
                                 </div>
@@ -485,13 +485,22 @@
                                 {% endif %}
                                 
                                 {% if interview.status == 'scheduled' %}
-                                    <div style="margin-top: 1rem; padding: 1rem; background: #e8f4f8; border-radius: 6px; border-left: 3px solid #17a2b8;">
-                                        <p style="color: #0c5460; margin: 0; font-size: 0.9rem;">
-                                            <i class="fas fa-bell"></i> 
-                                            <strong>Reminder:</strong> Please join the interview 5-10 minutes before the scheduled time.
-                                            {% if interview.interview_type == 'video' %}Ensure your camera and microphone are working properly.{% elif interview.interview_type == 'phone' %}Ensure you're in a quiet environment with good reception.{% endif %}
-                                        </p>
-                                    </div>
+                                    {% if interview.is_overdue %}
+                                        <div role="status" style="margin-top: 1rem; padding: 1rem; background: #fff7ed; border-radius: 6px; border-left: 3px solid #f59e0b;">
+                                            <p style="color: #9a3412; margin: 0; font-size: 0.9rem;">
+                                                <i class="fas fa-clock"></i>
+                                                <strong>Interview time has passed.</strong> Please contact the employer for an update.
+                                            </p>
+                                        </div>
+                                    {% else %}
+                                        <div style="margin-top: 1rem; padding: 1rem; background: #e8f4f8; border-radius: 6px; border-left: 3px solid #17a2b8;">
+                                            <p style="color: #0c5460; margin: 0; font-size: 0.9rem;">
+                                                <i class="fas fa-bell"></i>
+                                                <strong>Reminder:</strong> Please join the interview 5-10 minutes before the scheduled time.
+                                                {% if interview.interview_type == 'video' %}Ensure your camera and microphone are working properly.{% elif interview.interview_type == 'phone' %}Ensure you're in a quiet environment with good reception.{% endif %}
+                                            </p>
+                                        </div>
+                                    {% endif %}
                                 {% elif interview.status == 'completed' %}
                                     <div style="margin-top: 1rem; padding: 1rem; background: #d4edda; border-radius: 6px; border-left: 3px solid #28a745;">
                                         <p style="color: #155724; margin: 0; font-size: 0.9rem;">

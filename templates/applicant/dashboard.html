@@ -956,7 +956,7 @@
                 <!-- Upcoming Interviews Card -->
                 <section class="portal-card">
                     <div class="portal-card-heading">
-                        <h2><i class="fas fa-calendar-day" style="color:#f59e0b"></i> Upcoming Interviews</h2>
+                        <h2><i class="fas fa-calendar-day" style="color:#f59e0b"></i> Interview Schedule</h2>
                         <span class="portal-status">{{ upcoming_interviews|length }} Scheduled</span>
                     </div>
                     {% for interview in upcoming_interviews %}
@@ -965,6 +965,11 @@
                                 <strong style="color:#0f172a;font-size:.9rem;">{{ interview.application.job.title }}</strong>
                                 <span class="badge bg-warning text-dark rounded-pill px-2 py-0.5" style="font-size:0.68rem;font-weight:700;">{{ interview.interview_type|title }}</span>
                             </div>
+                            {% if interview.is_overdue %}
+                                <div class="alert alert-warning py-2 px-3 mb-2" role="status" style="font-size:.78rem;">
+                                    <i class="fas fa-clock me-1"></i> This interview date has passed. Please contact the employer for an update.
+                                </div>
+                            {% endif %}
                             <div style="font-size:.76rem;color:#475569;margin-bottom:.35rem;">
                                 <i class="fas fa-building me-1 text-primary"></i> {{ interview.employer.company_name|default:interview.application.job.employer.company_name|default:"MultiBiz Partner" }}
                             </div>

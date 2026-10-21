@@ -13,6 +13,7 @@ class Command(BaseCommand):
                 'Created reminders: '
                 f"admin={counts['admin']}, "
                 f"employer={counts['employer']}, "
-                f"interview={counts['interview']}"
+                f"interview={counts['interview']}, "
+                f"overdue_interview={counts['overdue_interview']}"
             )
         )
