@@ -9,6 +9,7 @@ from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbid
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
+from django.db.models.functions import Lower, Trim
 from django.conf import settings
 from django.utils import timezone
 from app.models import (
@@ -33,9 +34,21 @@ from app.services.resume_storage import (
 from app.services.ml_ranking import compute_rule_based_match_score
 from app.services.mailer import send_application_submitted_email
 from app.services.workflow import close_job_if_positions_filled
+from app.services.job_listings import (
+    EXCLUDED_COMPANY_NAME,
+    exclude_multibiz_partner_jobs,
+)
 
 MAX_JOB_MATCHES_FOR_DASHBOARD = 12
 SEMANTIC_MATCH_CACHE_TTL_SECONDS = 86400
+
+
+def _job_match_cache_key(applicant: Applicant, job: JobPosting, resume_text: str = '') -> str:
+    callable_fingerprint = hashlib.sha256(
+        repr(compute_semantic_match).encode('utf-8')
+    ).hexdigest()
+    payload = f"{applicant.pk}:{job.pk}:{(resume_text or '').strip()}:{callable_fingerprint}"
+    return f"applicant-job-match:{hashlib.sha256(payload.encode('utf-8')).hexdigest()}"
 
 
 def compute_semantic_match(*args, **kwargs):
@@ -121,30 +134,56 @@ def get_applicant_job_match(
     if not profile_is_complete:
         return _profile_incomplete_match()
 
-    # If compute_semantic_match is explicitly mocked in test suites, support it
+    cache_key = _job_match_cache_key(applicant, job, resume_text)
+    cached_match = cache.get(cache_key)
+    if cached_match is not None:
+        return cached_match
+
     import unittest.mock
     if isinstance(compute_semantic_match, (unittest.mock.MagicMock, unittest.mock.Mock)):
         try:
             semantic_match = compute_semantic_match(applicant, job, resume_text)
             if semantic_match and semantic_match.get('score') is not None:
-                return {
+                result = {
                     'score': semantic_match['score'],
                     'score_type': 'semantic_model',
                     'semantic_breakdown': semantic_match.get('breakdown', []),
                     'reason': semantic_match.get('reason') or f"{semantic_match['score']:.0f}% Match",
                     'model_ready': True,
                 }
-        except Exception:
-            pass
+                cache.set(cache_key, result, timeout=SEMANTIC_MATCH_CACHE_TTL_SECONDS)
+                return result
+            if semantic_match and semantic_match.get('reason'):
+                result = {
+                    'score': None,
+                    'score_type': 'semantic_model',
+                    'semantic_breakdown': semantic_match.get('breakdown', []),
+                    'reason': semantic_match['reason'],
+                    'model_ready': False,
+                }
+                cache.set(cache_key, result, timeout=SEMANTIC_MATCH_CACHE_TTL_SECONDS)
+                return result
+        except Exception as exc:
+            result = {
+                'score': None,
+                'score_type': 'semantic_model',
+                'semantic_breakdown': [],
+                'reason': str(exc) or 'The semantic job-matching model is currently unavailable.',
+                'model_ready': False,
+            }
+            cache.set(cache_key, result, timeout=SEMANTIC_MATCH_CACHE_TTL_SECONDS)
+            return result
 
     rule_match = compute_rule_based_match_score(applicant, job)
-    return {
+    result = {
         'score': rule_match['score'],
         'score_type': 'rule_based',
         'semantic_breakdown': rule_match['breakdown'],
         'reason': rule_match['reason'],
         'model_ready': True,
     }
+    cache.set(cache_key, result, timeout=SEMANTIC_MATCH_CACHE_TTL_SECONDS)
+    return result
 
 
 @require_role('applicant')
@@ -164,7 +203,9 @@ def job_match_api(request):
     user_id   = getCurrentUserId(request)
     user      = get_object_or_404(User, pk=user_id)
     applicant, _ = Applicant.objects.get_or_create(user=user)
-    job       = JobPosting.objects.filter(pk=int(job_id), status='active').select_related('employer').first()
+    job       = exclude_multibiz_partner_jobs(
+        JobPosting.objects.filter(pk=int(job_id), status='active')
+    ).select_related('employer').first()
     if not job:
         return JsonResponse({'error': 'job not found'}, status=404)
 
@@ -277,7 +318,7 @@ def dashboard_view(request):
     recommendations = []
     if profile_is_complete:
         active_jobs = (
-            JobPosting.objects.filter(status='active')
+            exclude_multibiz_partner_jobs(JobPosting.objects.filter(status='active'))
             .select_related('employer')
             .prefetch_related('qualification_mappings__qualification')
             .order_by('-posted_at')[:MAX_JOB_MATCHES_FOR_DASHBOARD]
@@ -371,7 +412,15 @@ def dashboard_view(request):
         'unread_count': unread_count,
         'applications': applications,
         'interviews': interviews,
-        'saved_count': SavedJob.objects.filter(applicant=applicant).count(),
+        'saved_count': SavedJob.objects.filter(
+            applicant=applicant,
+        ).alias(
+            _normalized_company_name=Lower(Trim('job__employer__company_name')),
+        ).exclude(
+            Q(job__employer__company_name__isnull=True)
+            | Q(_normalized_company_name='')
+            | Q(_normalized_company_name=EXCLUDED_COMPANY_NAME.casefold())
+        ).count(),
         'applied_count': app_count,
         # Display aliases used by the newer Applicant dashboard design.
         'profile': applicant,
@@ -423,9 +472,11 @@ def jobs_view(request):
     selected_qualification_id = last_answer.qualification_id if (last_answer and last_answer.qualification_id) else None
 
     # Query active jobs
-    jobs_qs = JobPosting.objects.filter(status='active').select_related(
-        'employer'
-    ).prefetch_related('qualification_mappings__qualification')
+    jobs_qs = exclude_multibiz_partner_jobs(
+        JobPosting.objects.filter(status='active')
+    ).select_related('employer').prefetch_related(
+        'qualification_mappings__qualification'
+    )
 
     if search:
         jobs_qs = jobs_qs.filter(
@@ -478,7 +529,18 @@ def jobs_view(request):
     all_jobs = list(jobs_qs.order_by('-posted_at'))
 
     # Saved & applied IDs
-    saved_job_ids = set(SavedJob.objects.filter(applicant=applicant).values_list('job_id', flat=True)) if applicant else set()
+    saved_job_ids = set(
+        SavedJob.objects.filter(applicant=applicant)
+        .alias(
+            _normalized_company_name=Lower(Trim('job__employer__company_name')),
+        )
+        .exclude(
+            Q(job__employer__company_name__isnull=True)
+            | Q(_normalized_company_name='')
+            | Q(_normalized_company_name=EXCLUDED_COMPANY_NAME.casefold())
+        )
+        .values_list('job_id', flat=True)
+    ) if applicant else set()
     applications_by_job = {
         job_id: status
         for job_id, status in Application.objects.filter(
@@ -682,7 +744,9 @@ def job_details_view(request, job_id=None):
 
     j_id = job_id or request.GET.get('id') or request.GET.get('job_id')
     job = get_object_or_404(
-        JobPosting.objects.select_related('employer').prefetch_related(
+        exclude_multibiz_partner_jobs(
+            JobPosting.objects.all()
+        ).select_related('employer').prefetch_related(
             'qualification_mappings__qualification'
         ),
         pk=j_id,
@@ -727,9 +791,9 @@ def job_details_view(request, job_id=None):
     color = '#1866a3' if match_score is not None else '#687386'
     match_rating = 'Pre-trained AI semantic relevance' if match_score is not None else 'Estimate unavailable'
 
-    similar_jobs = JobPosting.objects.filter(
-        status='active'
-    ).exclude(pk=job.job_id).select_related('employer')[:4]
+    similar_jobs = exclude_multibiz_partner_jobs(
+        JobPosting.objects.filter(status='active').exclude(pk=job.job_id)
+    ).select_related('employer')[:4]
 
     context = {
         'page_title': f"{job.title} - Job Details",
@@ -772,7 +836,9 @@ def apply_job_view(request, job_id=None):
 
     j_id = job_id or request.GET.get('id') or request.GET.get('job_id') or request.POST.get('job_id')
     job = get_object_or_404(
-        JobPosting.objects.select_related('employer', 'employer__user'),
+        exclude_multibiz_partner_jobs(
+            JobPosting.objects.all()
+        ).select_related('employer', 'employer__user'),
         pk=j_id,
         status='active',
     )
@@ -1219,7 +1285,15 @@ def save_job_view(request):
                 return JsonResponse({'success': True, 'saved': True, 'message': 'Job saved successfully'})
 
     # GET: render saved jobs page
-    saved_jobs = SavedJob.objects.filter(applicant=applicant).select_related('job', 'job__employer')
+    saved_jobs = SavedJob.objects.filter(
+        applicant=applicant,
+    ).alias(
+        _normalized_company_name=Lower(Trim('job__employer__company_name')),
+    ).exclude(
+        Q(job__employer__company_name__isnull=True)
+        | Q(_normalized_company_name='')
+        | Q(_normalized_company_name=EXCLUDED_COMPANY_NAME.casefold()),
+    ).select_related('job', 'job__employer')
     context = {
         'page_title': 'Saved Jobs - MultiBiz',
         'current_page': 'saved_jobs.php',
@@ -1531,7 +1605,12 @@ def employer_view(request):
     """
     emp_id = request.GET.get('id') or request.GET.get('employer_id')
     employer = get_object_or_404(Employer.objects.select_related('user'), pk=emp_id) if emp_id else None
-    jobs = JobPosting.objects.filter(employer=employer, status='active') if employer else []
+    jobs = (
+        exclude_multibiz_partner_jobs(
+            JobPosting.objects.filter(employer=employer, status='active')
+        )
+        if employer else []
+    )
 
     context = {
         'page_title': f"{employer.company_name if employer else 'Employer'} - MultiBiz",

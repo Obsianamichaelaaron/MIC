@@ -487,8 +487,28 @@ def send_otp_view(request):
     result = send_otp_email(email, first_name, otp)
     if result['success']:
         return JsonResponse({'success': True, 'message': f'Verification code sent to {email}. Please check your inbox.'})
-    else:
-        return JsonResponse({'success': False, 'message': f"Could not send email: {result.get('error', 'Unknown error')}"})
+
+    logger.error(
+        'Registration verification email could not be sent. Email provider error: %s',
+        result.get('error', 'Unknown error'),
+    )
+    request.session.pop('email_otp', None)
+    message = (
+        'We could not send your verification email right now. '
+        'Please try again later or contact support.'
+    )
+    if settings.DEBUG:
+        diagnostic = str(result.get('error') or 'Unknown email delivery error')
+        for secret in (settings.EMAIL_HOST_PASSWORD, settings.EMAIL_HOST_USER, email):
+            if secret:
+                diagnostic = diagnostic.replace(secret, '[redacted]')
+        message = f'{message} Local email error: {diagnostic[:300]}'
+
+    return JsonResponse({
+        'success': False,
+        'email_delivery_failed': True,
+        'message': message,
+    }, status=503)
 
 
 @csrf_exempt

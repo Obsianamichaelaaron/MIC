@@ -1,3 +1,22 @@
+from django.db.models import Q
+from django.db.models.functions import Lower, Trim
+
+
+EXCLUDED_COMPANY_NAME = 'Multibiz Partner'
+
+
+def exclude_multibiz_partner_jobs(queryset):
+    company_name_field = 'employer__company_name'
+    normalized_name = Lower(Trim(company_name_field))
+    return queryset.alias(
+        _normalized_company_name=normalized_name,
+    ).exclude(
+        Q(**{f'{company_name_field}__isnull': True})
+        | Q(_normalized_company_name='')
+        | Q(_normalized_company_name=EXCLUDED_COMPANY_NAME.casefold())
+    )
+
+
 def job_posting_duplicate_key(job):
     def normalize(value):
         return ' '.join(str(value or '').casefold().split())

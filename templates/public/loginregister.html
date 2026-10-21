@@ -778,7 +778,7 @@
     </style>
 </head>
 <body>
-<script src="/static/js/instant-navigation.js?v=2"></script>
+<script src="/static/js/instant-navigation.js?v=4"></script>
 <div id="toast-container"{% if toast_error %} data-toast-error="{{ toast_error }}"{% endif %}{% if toast_success %} data-toast-success="{{ toast_success }}"{% endif %}></div>
 
 <script>
@@ -1909,6 +1909,8 @@
                         }
                         if (data.success) {
                             openOtpModal(email, firstName, data);
+                        } else if (data.email_delivery_failed) {
+                            showFormError(data.message || 'We could not send your verification email right now. Please try again later.');
                         } else {
                             if (data.message) {
                                 showFieldError(emailInput, data.message);

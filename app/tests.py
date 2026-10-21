@@ -9,13 +9,14 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from django.test import TestCase, Client, override_settings
 from django.core import mail
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.utils import timezone
 from app.models import (
     User, Applicant, Employer, JobPosting, Application,
     Qualification, JobQualificationMapping, Skill, ContactInquiry, Message, AuditTrail,
-    Notification, InterviewSchedule, CmsHeroSlide, CmsBrand, CmsTestimonial,
+    Notification, InterviewSchedule, CmsHeroSlide, CmsBrand, CmsTestimonial, SavedJob,
     PasswordResetToken,
 )
 from app.auth_utils import verify_password, hash_password
@@ -256,6 +257,49 @@ class MultiBizConversionTests(TestCase):
         self.assertFalse(result['success'])
         self.assertIn('EMAIL_HOST_USER', result['error'])
         self.assertIn('EMAIL_HOST_PASSWORD', result['error'])
+
+    @patch(
+        'app.views.views_auth.send_otp_email',
+        return_value={
+            'success': False,
+            'error': 'Email delivery requires these environment settings: EMAIL_HOST_PASSWORD',
+        },
+    )
+    def test_otp_email_configuration_failure_shows_safe_message(self, mocked_send_otp):
+        response = self.client.post('/send_otp.php', {
+            'email': 'new-applicant@example.com',
+            'first_name': 'New',
+        })
+
+        self.assertEqual(response.status_code, 503)
+        self.assertFalse(response.json()['success'])
+        self.assertTrue(response.json()['email_delivery_failed'])
+        self.assertIn('contact support', response.json()['message'])
+        self.assertNotIn('EMAIL_HOST_PASSWORD', response.json()['message'])
+        mocked_send_otp.assert_called_once()
+
+    @override_settings(DEBUG=True)
+    @patch(
+        'app.views.views_auth.send_otp_email',
+        return_value={
+            'success': False,
+            'error': 'Email delivery requires these environment settings: EMAIL_HOST_PASSWORD',
+        },
+    )
+    def test_otp_email_failure_shows_sanitized_local_diagnostic(self, mocked_send_otp):
+        response = self.client.post('/send_otp.php', {
+            'email': 'local-applicant@example.com',
+            'first_name': 'Local',
+        })
+
+        self.assertEqual(response.status_code, 503)
+        payload = response.json()
+        self.assertFalse(payload['success'])
+        self.assertNotIn('dev_otp', payload)
+        self.assertIn('Local email error:', payload['message'])
+        self.assertIn('EMAIL_HOST_PASSWORD', payload['message'])
+        self.assertNotIn('local-applicant@example.com', payload['message'])
+        mocked_send_otp.assert_called_once()
 
     @patch(
         'app.views.views_admin.send_job_posted_live_notification',
@@ -1045,6 +1089,110 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(response.context['total_jobs_count'], 32)
         self.assertContains(response, 'MultiBiz Corporation')
 
+    @patch(
+        'app.views.views_applicant.get_applicant_job_match',
+        return_value={
+            'score': 80,
+            'score_type': 'semantic_model',
+            'reason': '',
+            'semantic_breakdown': [],
+        },
+    )
+    def test_multibiz_partner_jobs_are_hidden_from_all_public_applicant_lists(self, match_job):
+        partner_user = User.objects.create(
+            email='partner-employer@example.com',
+            password=hash_password('partner123'),
+            role='employer',
+            first_name='Partner',
+            last_name='Employer',
+            status='active',
+        )
+        partner_employer = Employer.objects.create(
+            user=partner_user,
+            company_name='mUlTiBiZ pArTnEr',
+        )
+        partner_job = JobPosting.objects.create(
+            employer=partner_employer,
+            title='Partner Web Developer',
+            status='active',
+        )
+        SavedJob.objects.create(applicant=self.applicant, job=partner_job)
+
+        unnamed_user = User.objects.create(
+            email='unnamed-employer@example.com',
+            password=hash_password('unnamed123'),
+            role='employer',
+            first_name='Unnamed',
+            last_name='Employer',
+            status='active',
+        )
+        unnamed_employer = Employer.objects.create(
+            user=unnamed_user,
+            company_name='',
+        )
+        unnamed_job = JobPosting.objects.create(
+            employer=unnamed_employer,
+            title='Job With No Company Name',
+            status='active',
+        )
+        SavedJob.objects.create(applicant=self.applicant, job=unnamed_job)
+
+        self._complete_applicant_profile()
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        homepage = self.client.get('/')
+        careers = self.client.get('/careers.php')
+        dashboard = self.client.get('/applicant/dashboard.php')
+        browse_jobs = self.client.get('/applicant/jobs.php')
+        saved_jobs = self.client.get('/applicant/save_job.php')
+        employer_profile = self.client.get(f'/applicant/employer.php?id={partner_employer.pk}')
+        unnamed_employer_profile = self.client.get(f'/applicant/employer.php?id={unnamed_employer.pk}')
+
+        self.assertEqual(homepage.status_code, 200)
+        self.assertEqual(careers.status_code, 200)
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertEqual(browse_jobs.status_code, 200)
+        self.assertEqual(saved_jobs.status_code, 200)
+        self.assertEqual(employer_profile.status_code, 200)
+        self.assertEqual(unnamed_employer_profile.status_code, 200)
+        self.assertNotIn(partner_job, homepage.context['featured_jobs'])
+        self.assertNotIn(unnamed_job, homepage.context['featured_jobs'])
+        self.assertNotIn(partner_job, careers.context['jobs'])
+        self.assertNotIn(unnamed_job, careers.context['jobs'])
+        self.assertNotIn(
+            partner_job.job_id,
+            [item['job_id'] for item in dashboard.context['recommendations']],
+        )
+        self.assertNotIn(
+            unnamed_job.job_id,
+            [item['job_id'] for item in dashboard.context['recommendations']],
+        )
+        self.assertNotIn(partner_job.job_id, [item['job_id'] for item in browse_jobs.context['jobs']])
+        self.assertNotIn(unnamed_job.job_id, [item['job_id'] for item in browse_jobs.context['jobs']])
+        self.assertEqual(list(saved_jobs.context['saved_jobs']), [])
+        self.assertEqual(dashboard.context['saved_count'], 0)
+        self.assertEqual(list(employer_profile.context['jobs']), [])
+        self.assertEqual(list(unnamed_employer_profile.context['jobs']), [])
+        self.assertEqual(
+            self.client.get(f'/job_details_public.php?id={partner_job.job_id}').status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.get(f'/applicant/job_details.php?id={partner_job.job_id}').status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.get(f'/applicant/apply_job.php?id={partner_job.job_id}').status_code,
+            404,
+        )
+        self.assertEqual(
+            [call.args[1] for call in match_job.call_args_list],
+            [self.job, self.job],
+        )
+
     def test_admin_active_jobs_match_public_careers_list(self):
         duplicate_job = JobPosting.objects.create(
             employer=self.employer,
@@ -1203,6 +1351,21 @@ class MultiBizConversionTests(TestCase):
 
         self.assertContains(admin_response, '/static/js/instant-navigation.js')
         self.assertContains(public_response, '/static/js/instant-navigation.js')
+
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+        applicant_response = self.client.get('/applicant/dashboard.php')
+
+        session = self.client.session
+        session['user_id'] = self.employer_user.user_id
+        session['role'] = 'employer'
+        session.save()
+        employer_response = self.client.get('/employer/dashboard.php')
+
+        self.assertContains(applicant_response, '/static/js/instant-navigation.js?v=4')
+        self.assertContains(employer_response, '/static/js/instant-navigation.js?v=4')
 
     def test_homepage_featured_jobs_are_unique_and_use_employer_names(self):
         JobPosting.objects.create(

@@ -7,6 +7,7 @@ function initHeroSlider() {
     const heroPrev = document.getElementById('heroPrev');
     const heroNext = document.getElementById('heroNext');
     const heroSection = document.querySelector('.hero');
+    const networkProfile = window.__MULTIBIZ_NETWORK_PROFILE__ || { slow: false, label: 'fast' };
     
     if (!heroImages || heroImages.length === 0) return;
     
@@ -52,6 +53,10 @@ function initHeroSlider() {
     
     // Auto slide
     function startAutoSlide() {
+        if (networkProfile.slow) {
+            clearInterval(autoSlideInterval);
+            return;
+        }
         if (!isPaused && totalSlides > 1) {
             clearInterval(autoSlideInterval);
             autoSlideInterval = setInterval(nextSlide, 6000);
@@ -124,6 +129,10 @@ function initHeroSlider() {
 
 // Latest News Horizontal Scrolling
 function initNewsSlider() {
+    if (window.__MULTIBIZ_NETWORK_PROFILE__?.slow) {
+        return;
+    }
+
     const newsTrack = document.getElementById('newsTrack');
     const newsPrev = document.getElementById('newsPrev');
     const newsNext = document.getElementById('newsNext');

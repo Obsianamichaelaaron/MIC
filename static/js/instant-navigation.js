@@ -2,12 +2,53 @@
     if (window.__instantNavigationInstalled) return;
     window.__instantNavigationInstalled = true;
 
+    const MAX_INSTANT_NAV_SCRIPTS = 3;
+    const MAX_IDLE_PREFETCHES = 4;
     const nativeDocumentAdd = document.addEventListener.bind(document);
     const nativeWindowAdd = window.addEventListener.bind(window);
     const loadedScripts = new Set(
         Array.from(document.querySelectorAll('script[src]'))
             .map((script) => new URL(script.src, window.location.href).href)
     );
+    const pageCache = new Map();
+    const inflightPrefetches = new Map();
+
+    function pageCacheKey(url) {
+        return `${url.origin}${url.pathname}${url.search}`;
+    }
+
+    async function fetchPageHtml(url) {
+        const key = pageCacheKey(url);
+        if (pageCache.has(key)) return pageCache.get(key);
+        if (inflightPrefetches.has(key)) return inflightPrefetches.get(key);
+
+        const request = fetch(url.href, {
+            credentials: 'same-origin',
+            headers: { Accept: 'text/html' },
+        })
+            .then(async (response) => {
+                const contentType = response.headers.get('content-type') || '';
+                if (!response.ok || !contentType.includes('text/html')) {
+                    throw new Error('Not HTML');
+                }
+                const html = await response.text();
+                pageCache.set(key, html);
+                return html;
+            })
+            .finally(() => inflightPrefetches.delete(key));
+
+        inflightPrefetches.set(key, request);
+        return request;
+    }
+
+    function shouldUseNativeNavigation(url) {
+        const isPortalRoute = /^\/(?:applicant|employer)\//.test(url.pathname);
+        const isAdminRoute = /^\/admin\//.test(url.pathname);
+        const currentScriptCount = document.querySelectorAll('script[src]').length;
+        const hasManyScripts = !isPortalRoute && currentScriptCount > MAX_INSTANT_NAV_SCRIPTS;
+        const hasForcedFallback = document.body && document.body.dataset.noInstantNav === 'true';
+        return hasForcedFallback || hasManyScripts || isAdminRoute;
+    }
     let pageScope = new AbortController();
     let pageIntervals = new Set();
     let activeRequest = null;
@@ -131,28 +172,38 @@
         setNavigationBusy(true);
 
         try {
-            const response = await fetch(url.href, {
-                credentials: 'same-origin',
-                headers: { 'Accept': 'text/html' },
-                signal: request.signal,
-            });
-            const contentType = response.headers.get('content-type') || '';
-            if (!response.ok || !contentType.includes('text/html')) {
-                window.location.assign(response.url || url.href);
-                return;
+            let html;
+            let finalUrl = url.href;
+            let redirected = false;
+
+            if (pageCache.has(pageCacheKey(url))) {
+                html = pageCache.get(pageCacheKey(url));
+            } else {
+                const response = await fetch(url.href, {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'text/html' },
+                    signal: request.signal,
+                });
+                const contentType = response.headers.get('content-type') || '';
+                if (!response.ok || !contentType.includes('text/html')) {
+                    window.location.assign(response.url || url.href);
+                    return;
+                }
+                redirected = response.redirected && new URL(response.url).pathname !== url.pathname;
+                if (redirected) {
+                    window.location.assign(response.url);
+                    return;
+                }
+                finalUrl = response.url || url.href;
+                html = await response.text();
+                pageCache.set(pageCacheKey(new URL(finalUrl)), html);
             }
 
-            const html = await response.text();
             if (request !== activeRequest) return;
 
             const nextDocument = new DOMParser().parseFromString(html, 'text/html');
             if (!nextDocument.body || !nextDocument.head) {
-                window.location.assign(response.url || url.href);
-                return;
-            }
-
-            if (response.redirected && new URL(response.url).pathname !== url.pathname) {
-                window.location.assign(response.url);
+                window.location.assign(finalUrl || url.href);
                 return;
             }
 
@@ -162,7 +213,7 @@
                     '',
                     window.location.href
                 );
-                history.pushState({}, '', url.href);
+                history.pushState({}, '', finalUrl);
             }
 
             resetPageScope();
@@ -176,9 +227,8 @@
             document.body.innerHTML = nextDocument.body.innerHTML;
             setNavigationBusy(true);
 
-            await executePageScripts(nextDocument, response.url || url.href);
-            if (options.scrollY !== undefined) {
-                window.scrollTo(0, options.scrollY);
+            await executePageScripts(nextDocument, finalUrl);
+            if (options.scrollY !== undefined) {                window.scrollTo(0, options.scrollY);
             } else if (url.hash) {
                 const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
                 if (target) target.scrollIntoView();
@@ -198,6 +248,27 @@
         }
     }
 
+    function prefetchLink(link) {
+        const url = new URL(link.href, window.location.href);
+        if (url.origin !== window.location.origin || url.href === window.location.href) return;
+        if (url.pathname === window.location.pathname && url.hash) return;
+        if (/\/logout\/?$/.test(url.pathname) ||
+            /(?:export|download|excel|csv)/i.test(url.pathname) ||
+            /\.(?:pdf|xlsx?|csv|docx?|zip|png|jpe?g|gif|webp|svg|mp4|mp3)$/i.test(url.pathname)) return;
+        if (shouldUseNativeNavigation(url)) return;
+        fetchPageHtml(url).catch(() => {});
+    }
+
+    nativeDocumentAdd('mouseover', (event) => {
+        const link = event.target.closest && event.target.closest('a[href]');
+        if (link) prefetchLink(link);
+    }, { passive: true });
+
+    nativeDocumentAdd('focusin', (event) => {
+        const link = event.target.closest && event.target.closest('a[href]');
+        if (link) prefetchLink(link);
+    }, { passive: true });
+
     nativeDocumentAdd('click', (event) => {
         if (event.defaultPrevented || event.button !== 0 ||
             event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -214,6 +285,10 @@
             /(?:export|download|excel|csv)/i.test(url.pathname) ||
             /\.(?:pdf|xlsx?|csv|docx?|zip|png|jpe?g|gif|webp|svg|mp4|mp3)$/i.test(url.pathname)) return;
 
+        if (shouldUseNativeNavigation(url)) {
+            return;
+        }
+
         event.preventDefault();
         navigate(url);
     });
@@ -224,4 +299,28 @@
             scrollY: event.state && Number.isFinite(event.state.scrollY) ? event.state.scrollY : 0,
         });
     });
+
+    nativeDocumentAdd('DOMContentLoaded', () => {
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (connection && (connection.saveData ||
+            ['slow-2g', '2g'].includes(connection.effectiveType))) return;
+
+        const links = Array.from(document.querySelectorAll('a[href]'))
+            .filter((link) => {
+                const url = new URL(link.href, window.location.href);
+                return url.origin === window.location.origin &&
+                    !shouldUseNativeNavigation(url) &&
+                    !/\/logout\/?$/.test(url.pathname) &&
+                    !/(?:export|download|excel|csv)/i.test(url.pathname) &&
+                    !/\.(?:pdf|xlsx?|csv|docx?|zip|png|jpe?g|gif|webp|svg|mp4|mp3)$/i.test(url.pathname);
+            })
+            .slice(0, MAX_IDLE_PREFETCHES);
+
+        const prefetch = () => links.forEach(prefetchLink);
+        if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(prefetch, { timeout: 1500 });
+        } else {
+            window.setTimeout(prefetch, 300);
+        }
+    }, { once: true });
 })();

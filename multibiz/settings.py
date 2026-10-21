@@ -6,8 +6,24 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 IS_VERCEL = os.environ.get('VERCEL') == '1'
 
+if not IS_VERCEL:
+    local_env_file = BASE_DIR / '.env'
+    if local_env_file.is_file():
+        for line in local_env_file.read_text(encoding='utf-8-sig').splitlines():
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            name, value = line.split('=', 1)
+            name = name.strip()
+            value = value.strip().strip('"').strip("'")
+            if name and not os.environ.get(name):
+                os.environ[name] = value
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_DEBUG', 'false').lower() == 'true'
+DEBUG = os.environ.get(
+    'DJANGO_DEBUG',
+    'false' if IS_VERCEL else 'true',
+).lower() == 'true'
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
@@ -197,7 +213,7 @@ EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true'
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'false').lower() == 'true'
 if EMAIL_USE_TLS and EMAIL_USE_SSL:
     raise RuntimeError('Configure only one of EMAIL_USE_TLS or EMAIL_USE_SSL.')
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'reccapinto8@gmail.com')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
 DEFAULT_FROM_EMAIL = os.environ.get(

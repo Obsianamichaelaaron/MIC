@@ -79,8 +79,58 @@ const brandData = {
 // - about.js (initAboutPage)
 // - services.js (initServicesPage)
 
+function getNetworkProfile() {
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const effectiveType = connection?.effectiveType || '4g';
+    const downlink = Number(connection?.downlink || 0) || 0;
+    const isSlowConnection = ['slow-2g', '2g'].includes(effectiveType) || downlink > 0 && downlink < 1.5;
+    const profile = {
+        effectiveType,
+        downlink,
+        slow: isSlowConnection,
+        label: isSlowConnection ? 'slow' : (effectiveType === '3g' ? 'medium' : 'fast'),
+    };
+
+    document.documentElement.setAttribute('data-network-profile', profile.label);
+    document.body?.setAttribute('data-network-profile', profile.label);
+    window.__MULTIBIZ_NETWORK_PROFILE__ = profile;
+    return profile;
+}
+
+function initNetworkAwarePerformance() {
+    const profile = getNetworkProfile();
+    const body = document.body;
+    if (body) {
+        body.classList.toggle('network-slow', profile.slow);
+        body.classList.toggle('network-medium', !profile.slow && profile.label === 'medium');
+        body.classList.toggle('network-fast', !profile.slow && profile.label === 'fast');
+    }
+
+    if (profile.slow) {
+        const style = document.createElement('style');
+        style.id = 'multibiz-network-slow-style';
+        style.textContent = `
+            html[data-network-profile="slow"] *,
+            html[data-network-profile="slow"] *::before,
+            html[data-network-profile="slow"] *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+                scroll-behavior: auto !important;
+            }
+        `;
+        if (!document.getElementById(style.id)) {
+            document.head.appendChild(style);
+        }
+    }
+}
+
 // Enhanced Scroll Animation
 function initScrollAnimations() {
+    if (window.__MULTIBIZ_NETWORK_PROFILE__?.slow) {
+        return;
+    }
+
     const animateElements = document.querySelectorAll('.animate-on-scroll');
     
     function checkScroll() {
@@ -329,17 +379,29 @@ function initGoogleSignIn() {
 
 // Performance Optimizations
 function initPerformance() {
+    initNetworkAwarePerformance();
+
+    const networkProfile = window.__MULTIBIZ_NETWORK_PROFILE__ || getNetworkProfile();
+
     // Lazy loading for images
     if ('IntersectionObserver' in window) {
         const imageObserver = new IntersectionObserver((entries, observer) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     const img = entry.target;
-                    img.src = img.dataset.src;
+                    if (networkProfile.slow) {
+                        img.loading = 'lazy';
+                    }
+                    if (img.dataset.src) {
+                        img.src = img.dataset.src;
+                    }
                     img.classList.remove('lazy');
                     imageObserver.unobserve(img);
                 }
             });
+        }, {
+            rootMargin: networkProfile.slow ? '200px' : '50px',
+            threshold: 0.15,
         });
         
         document.querySelectorAll('img[data-src]').forEach(img => {
@@ -353,7 +415,7 @@ function initPerformance() {
         clearTimeout(scrollTimeout);
         scrollTimeout = setTimeout(() => {
             // Scroll-based actions here
-        }, 100);
+        }, networkProfile.slow ? 200 : 100);
     });
 }
 
@@ -380,6 +442,8 @@ function initErrorHandling() {
 // Main DOM Content Loaded Function - Common functionality only
 document.addEventListener('DOMContentLoaded', function() {
     console.log('DOM loaded - script.js is working!');
+
+    initNetworkAwarePerformance();
     
     // Initialize common/shared functionality
     initScrollAnimations();
@@ -472,6 +536,10 @@ function initHeaderEffects() {
 }
 
 function initTestimonials() {
+    if (window.__MULTIBIZ_NETWORK_PROFILE__?.slow) {
+        return;
+    }
+
     const testimonialItems = document.querySelectorAll('.testimonial-item');
     const testimonialDots = document.querySelectorAll('.testimonial-dot');
     

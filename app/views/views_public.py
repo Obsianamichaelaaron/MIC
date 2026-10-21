@@ -22,6 +22,7 @@ from app.models import (
 )
 from app.services.resume_storage import ResumeStorageError, read_resume
 from app.services.job_listings import (
+    exclude_multibiz_partner_jobs,
     unique_featured_job_postings,
     unique_public_job_postings,
 )
@@ -162,11 +163,13 @@ def index_view(request):
         # Keep landing-page jobs in sync with the applicant-visible active listings.
         try:
             featured_jobs = unique_featured_job_postings(
-                JobPosting.objects.filter(
-                    status='active',
-                    employer__company_name__isnull=False,
-                ).exclude(
-                    employer__company_name='',
+                exclude_multibiz_partner_jobs(
+                    JobPosting.objects.filter(
+                        status='active',
+                        employer__company_name__isnull=False,
+                    ).exclude(
+                        employer__company_name='',
+                    )
                 ).select_related('employer').order_by('-posted_at', '-job_id'),
                 limit=6,
             )
@@ -349,8 +352,8 @@ def careers_view(request):
     emp_type = request.GET.get('employment_type', '') or request.GET.get('type', '')
     location = request.GET.get('location', '').strip()
 
-    jobs_qs = JobPosting.objects.filter(
-        status='active',
+    jobs_qs = exclude_multibiz_partner_jobs(
+        JobPosting.objects.filter(status='active')
     ).select_related('employer').order_by('-posted_at', '-job_id')
 
     if search_query:
@@ -403,13 +406,18 @@ def job_details_public_view(request, job_id=None):
     if not j_id:
         return redirect('/careers.php')
 
-    job = get_object_or_404(JobPosting.objects.select_related('employer'), pk=j_id)
+    job = get_object_or_404(
+        exclude_multibiz_partner_jobs(
+            JobPosting.objects.all()
+        ).select_related('employer'),
+        pk=j_id,
+    )
     qualifications = job.qualification_mappings.select_related('qualification').all()
     skills = [s.strip() for s in (job.skills_required or '').split(',') if s.strip()]
 
-    similar_jobs = JobPosting.objects.filter(
-        status='active'
-    ).exclude(pk=job.job_id).select_related('employer')[:4]
+    similar_jobs = exclude_multibiz_partner_jobs(
+        JobPosting.objects.filter(status='active').exclude(pk=job.job_id)
+    ).select_related('employer')[:4]
 
     context = {
         'page_title': f"{job.title} - MULTIBIZ INTERNATIONAL CORPORATION",
