@@ -38,7 +38,9 @@ def compute_rule_based_match_score(applicant: Applicant, job: JobPosting, chatbo
     experience_years = int(applicant.experience_years or 0)
     score += min(25.0, experience_years * 5.0) if experience_years > 0 else 5.0
 
-    job_quals = list(job.qualification_mappings.all())
+    job_quals = list(
+        job.qualification_mappings.select_related('qualification').all()
+    )
     applicant_qual_text = (applicant.qualifications or '').lower()
     if job_quals:
         matched_q = [
@@ -99,8 +101,8 @@ def calculate_candidate_ml_score(candidate_data: dict) -> dict:
 
 
 def compute_job_match_result(applicant: Applicant, job: JobPosting) -> dict:
-    """Classify candidates automatically from their existing employability score."""
-    match_score = round(float(applicant.employability_score or 0), 2)
+    """Score a candidate against a specific job using the shared profile matcher."""
+    match_score = compute_rule_based_match_score(applicant, job)['score']
     qualification_status = classify_match_score(match_score)
     match_class = {
         'qualified': 'high',
@@ -109,7 +111,7 @@ def compute_job_match_result(applicant: Applicant, job: JobPosting) -> dict:
     }[qualification_status]
     return {
         'ready': True,
-        'reason': '',
+        'reason': f'{match_score:.0f}% Match',
         'match_score': match_score,
         'match_class': match_class,
         'qualification_status': qualification_status,
@@ -119,4 +121,3 @@ def compute_job_match_result(applicant: Applicant, job: JobPosting) -> dict:
 def compute_job_match_score(applicant: Applicant, job: JobPosting, chatbot_answers=None) -> float | None:
     """Return the applicant's match score using rule-based calculations."""
     return compute_rule_based_match_score(applicant, job, chatbot_answers)['score']
-

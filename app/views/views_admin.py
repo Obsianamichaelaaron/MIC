@@ -29,7 +29,7 @@ from app.models import (
     ContactInquiry, ContactReply, AuditTrail, CmsHeroSlide,
     CmsTestimonial, CmsBrand, CmsNews, CmsSection, CmsContent
 )
-from app.auth_utils import require_role, getCurrentUserId, hash_password
+from app.auth_utils import require_role, getCurrentUser, getCurrentUserId, hash_password
 from app.services.audit_trail import log_audit_trail
 from app.services.mailer import (
     send_contact_reply, send_application_status_update_email,
@@ -182,7 +182,7 @@ def dashboard_view(request):
     Optimised: collapses ~25 individual count() calls into ~5 aggregated queries.
     """
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
 
     # ── 1 query: all user role counts at once ─────────────────────────────────
     role_counts_qs = (
@@ -556,7 +556,7 @@ def users_view(request):
     context = {
         'page_title': 'User Management - MultiBiz',
         'current_page': 'users.php',
-        'admin_user': get_object_or_404(User, pk=admin_id),
+        'admin_user': getCurrentUser(request),
         'users': users_qs,
         'pending_employer_verifications': Employer.objects.filter(
             verification_status='pending',
@@ -707,7 +707,7 @@ def post_job_view(request):
     Supports 1-click prefill when reviewing from inquiries (?inquiry_id=123).
     """
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
 
     error = None
     inquiry_id = request.GET.get('inquiry_id') or request.POST.get('inquiry_id')
@@ -828,7 +828,7 @@ def edit_job_view(request, job_id=None):
     Admin Edit Job matching admin/edit_job.php.
     """
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
 
     j_id = job_id or request.GET.get('id') or request.GET.get('job_id')
     job = get_object_or_404(JobPosting.objects.select_related('employer'), pk=j_id)
@@ -900,7 +900,7 @@ def jobs_view(request):
     - Filter by Pending, Approved, Active/Posted, Rejected, Closed
     """
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
     search = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '').strip()
 
@@ -1227,7 +1227,7 @@ def job_request_action_api(request):
         return JsonResponse({'success': False, 'message': 'POST method required'})
 
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
     job_id = request.POST.get('job_id')
     action = request.POST.get('action')
     reason = request.POST.get('reason', '').strip()
@@ -1573,7 +1573,7 @@ def view_candidate_view(request, application_id=None):
     - Automatically sends email to candidate!
     """
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
 
     app_id = application_id or request.GET.get('id') or request.GET.get('application_id')
     application = get_object_or_404(
@@ -1758,7 +1758,7 @@ def forward_candidate_api(request):
         return JsonResponse({'success': False, 'message': 'POST method required'})
 
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
     app_id = request.POST.get('application_id')
     admin_notes = request.POST.get('admin_notes', '').strip()
 
@@ -1838,7 +1838,7 @@ def batch_forward_candidates_api(request):
         return JsonResponse({'success': False, 'message': 'POST method required'})
 
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
     raw_ids = request.POST.get('application_ids', '')
     job_id = request.POST.get('job_id', '')
     scope = request.POST.get('scope', 'selected')
@@ -1972,7 +1972,7 @@ def update_status_api(request):
         return JsonResponse({'success': False, 'message': 'Invalid method'})
 
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
 
     app_id = request.POST.get('application_id')
     status = request.POST.get('status')
@@ -2841,7 +2841,7 @@ def forward_qualified_candidates_view(request, job_id):
     Forwards all qualified candidates for a specific job posting to the employer company.
     """
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
     job = get_object_or_404(JobPosting.objects.select_related('employer', 'employer__user'), pk=job_id)
 
     try:
@@ -3377,7 +3377,7 @@ def messages_view(request):
     Contact Inquiries Inbox matching admin/messages.php.
     """
     admin_id = getCurrentUserId(request)
-    admin_user = get_object_or_404(User, pk=admin_id)
+    admin_user = getCurrentUser(request)
 
     inquiry_id = request.GET.get('id')
     selected_inquiry = None

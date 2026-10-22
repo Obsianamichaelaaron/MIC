@@ -413,16 +413,16 @@
                         All <span class="badge bg-white text-dark ms-1.5">{{ counts.all }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&qual=qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
-                        High Employability <span class="badge bg-success text-white ms-1.5">{{ counts.qualified }}</span>
+                        High Match <span class="badge bg-success text-white ms-1.5">{{ counts.qualified }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&forwarded=yes{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if forwarded_filter == 'yes' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         <i class="fa-solid fa-paper-plane me-1"></i> Sent to Employer <span class="badge bg-info text-white ms-1.5">{{ counts.forwarded }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&qual=under_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'under_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
-                        Medium Employability <span class="badge bg-warning text-dark ms-1.5">{{ counts.under_qualified }}</span>
+                        Medium Match <span class="badge bg-warning text-dark ms-1.5">{{ counts.under_qualified }}</span>
                     </a>
                     <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&qual=not_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'not_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
-                        Low Employability <span class="badge bg-danger text-white ms-1.5">{{ counts.not_qualified }}</span>
+                        Low Match <span class="badge bg-danger text-white ms-1.5">{{ counts.not_qualified }}</span>
                     </a>
                 </div>
             </div>
@@ -553,15 +553,15 @@
                             </div>
                         {% elif cand.qualification_status == 'qualified' %}
                             <div class="status-badge-pill badge-qual-qualified">
-                                <i class="fa-solid fa-circle-check"></i> High Employability
+                                <i class="fa-solid fa-circle-check"></i> High Match
                             </div>
                         {% elif cand.qualification_status == 'under_qualified' %}
                             <div class="status-badge-pill badge-qual-under">
-                                <i class="fa-solid fa-triangle-exclamation"></i> Medium Employability
+                                <i class="fa-solid fa-triangle-exclamation"></i> Medium Match
                             </div>
                         {% else %}
                             <div class="status-badge-pill badge-qual-not">
-                                <i class="fa-solid fa-circle-xmark"></i> Low Employability
+                                <i class="fa-solid fa-circle-xmark"></i> Low Match
                             </div>
                         {% endif %}
 

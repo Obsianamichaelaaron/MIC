@@ -34,12 +34,13 @@ class UserSessionValidationMiddleware:
             pk=int(session_user_id),
             status='active',
         ).only(
-            'user_id', 'email', 'role', 'first_name', 'last_name',
+            'user_id', 'email', 'role', 'first_name', 'last_name', 'phone', 'status',
         ).first()
         if user is None:
             request.session.flush()
             return None
 
+        request.validated_session_user = user
         session_values = {
             'email': user.email,
             'role': user.role,

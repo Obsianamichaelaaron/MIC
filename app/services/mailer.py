@@ -957,7 +957,7 @@ def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str,
     safe_title = html.escape(job_title or 'Job Position')
     safe_notes = html.escape(admin_notes or '').replace('\n', '<br>') if admin_notes else ''
     match_score_html = (
-        f"<p style='margin:4px 0 0;color:#64748b;font-size:13px;'>Applicant employability score: <strong>{match_score:.0f}%</strong></p>"
+        f"<p style='margin:4px 0 0;color:#64748b;font-size:13px;'>Applicant job match score: <strong>{match_score:.0f}%</strong></p>"
         if match_score is not None else
         "<p style='margin:4px 0 0;color:#64748b;font-size:13px;'>ML match score: unavailable</p>"
     )

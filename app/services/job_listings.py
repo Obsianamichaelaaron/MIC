@@ -39,7 +39,7 @@ def job_posting_duplicate_key(job):
 def unique_public_job_postings(queryset, limit=None):
     jobs = []
     seen_jobs = set()
-    for job in queryset.iterator(chunk_size=100):
+    for job in queryset:
         key = job_posting_duplicate_key(job)
         if key in seen_jobs:
             continue
@@ -50,10 +50,14 @@ def unique_public_job_postings(queryset, limit=None):
     return jobs
 
 
-def unique_featured_job_postings(queryset, limit):
+def unique_company_title_job_postings(queryset, limit=None):
+    if limit is not None and limit <= 0:
+        return []
+
     jobs = []
     seen_jobs = set()
-    for job in queryset.iterator(chunk_size=100):
+    job_rows = queryset.iterator(chunk_size=100) if limit is not None else queryset
+    for job in job_rows:
         company_name = ' '.join((job.employer.company_name or '').casefold().split())
         title = ' '.join((job.title or '').casefold().split())
         if not company_name or not title:
@@ -64,6 +68,10 @@ def unique_featured_job_postings(queryset, limit):
             continue
         seen_jobs.add(key)
         jobs.append(job)
-        if len(jobs) == limit:
+        if limit is not None and len(jobs) == limit:
             break
     return jobs
+
+
+def unique_featured_job_postings(queryset, limit):
+    return unique_company_title_job_postings(queryset, limit=limit)

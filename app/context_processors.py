@@ -1,5 +1,9 @@
 from django.core.cache import cache
-from .models import User, Applicant, ContactInquiry, Message, Notification
+from .models import Applicant, ContactInquiry
+from app.services.dashboard_counts import (
+    get_unread_message_count,
+    get_unread_notification_count,
+)
 
 def global_context(request):
     """
@@ -54,25 +58,11 @@ def global_context(request):
             cache.set(_inq_key, cached_count, 60)
         unread_inquiries_count = cached_count
             
-    # Unread messages count — cache 30s per user
-    unread_messages_count = 0
-    if user_id:
-        _msg_key = f'unread_msgs_{user_id}'
-        cached_msgs = cache.get(_msg_key)
-        if cached_msgs is None:
-            try:
-                cached_msgs = Message.objects.filter(receiver_id=user_id, is_read=False).count()
-            except Exception:
-                cached_msgs = 0
-            cache.set(_msg_key, cached_msgs, 30)
-        unread_messages_count = cached_msgs
+    unread_messages_count = get_unread_message_count(user_id)
 
     unread_notification_count = 0
     if role in {'applicant', 'employer', 'admin'} and user_id:
-        unread_notification_count = Notification.objects.filter(
-            user_id=user_id,
-            is_read=False,
-        ).count()
+        unread_notification_count = get_unread_notification_count(user_id)
 
     return {
         'is_logged_in': bool(user_id),

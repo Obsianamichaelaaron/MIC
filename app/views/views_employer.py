@@ -5,7 +5,7 @@ from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Window
 from django.conf import settings
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_time
@@ -16,12 +16,18 @@ from app.models import (
     CandidateFeedback, CandidateRecommendation, ChatbotAnswer,
     Notification, ContactInquiry
 )
-from app.auth_utils import require_role, require_verified_employer, getCurrentUserId
+from app.auth_utils import (
+    require_role,
+    require_verified_employer,
+    getCurrentUser,
+    getCurrentUserId,
+)
 from app.services.ml_ranking import (
     calculate_candidate_ml_score,
     compute_job_match_result,
     compute_job_match_score,
 )
+from app.services.dashboard_counts import get_unread_message_count
 from app.services.qualification import classify_match_score
 from app.services.mailer import (
     send_application_status_update_email,
@@ -128,16 +134,23 @@ def dashboard_view(request):
     recent job requests with status badges, and recently forwarded candidates.
     """
     user_id = getCurrentUserId(request)
-    user = get_object_or_404(User, pk=user_id)
+    user = getCurrentUser(request)
     employer, _ = Employer.objects.get_or_create(user=user)
     _sync_admin_postings_to_employer(employer)
 
-    # Job Requests metrics
-    total_job_requests = JobPosting.objects.filter(employer=employer).count()
-    active_jobs = JobPosting.objects.filter(employer=employer, status='active').count()
-    pending_job_requests = JobPosting.objects.filter(employer=employer, status='pending').count()
-    approved_job_requests = JobPosting.objects.filter(employer=employer, status='approved').count()
-    rejected_job_requests = JobPosting.objects.filter(employer=employer, status='rejected').count()
+    # Fetch all job-status totals in one database round trip.
+    job_metrics = JobPosting.objects.filter(employer=employer).aggregate(
+        total=Count('pk'),
+        active=Count('pk', filter=Q(status='active')),
+        pending=Count('pk', filter=Q(status='pending')),
+        approved=Count('pk', filter=Q(status='approved')),
+        rejected=Count('pk', filter=Q(status='rejected')),
+    )
+    total_job_requests = job_metrics['total']
+    active_jobs = job_metrics['active']
+    pending_job_requests = job_metrics['pending']
+    approved_job_requests = job_metrics['approved']
+    rejected_job_requests = job_metrics['rejected']
 
     # Forwarded Candidates Metrics (Only applicants forwarded by Admin)
     forwarded_qs = Application.objects.filter(
@@ -145,22 +158,42 @@ def dashboard_view(request):
         forwarded_to_employer=True
     ).select_related('job', 'applicant', 'applicant__user')
 
-    total_applicants = forwarded_qs.count()
-    applicants_for_review = forwarded_qs.filter(employer_status='for_review').count()
-    qualified_applicants = forwarded_qs.filter(employer_status='qualified').count()
-    not_qualified_applicants = forwarded_qs.filter(employer_status='not_qualified').count()
-    applicants_for_interview = forwarded_qs.filter(employer_status='for_interview').count()
-    interview_completed_count = forwarded_qs.filter(employer_status='interview_completed').count()
-    hired_applicants = forwarded_qs.filter(employer_status='hired').count()
-    rejected_applicants = forwarded_qs.filter(employer_status='rejected').count()
+    applicant_metrics = forwarded_qs.aggregate(
+        total=Count('pk'),
+        for_review=Count('pk', filter=Q(employer_status='for_review')),
+        qualified=Count('pk', filter=Q(employer_status='qualified')),
+        not_qualified=Count('pk', filter=Q(employer_status='not_qualified')),
+        for_interview=Count('pk', filter=Q(employer_status='for_interview')),
+        interview_completed=Count('pk', filter=Q(employer_status='interview_completed')),
+        hired=Count('pk', filter=Q(employer_status='hired')),
+        rejected=Count('pk', filter=Q(employer_status='rejected')),
+    )
+    total_applicants = applicant_metrics['total']
+    applicants_for_review = applicant_metrics['for_review']
+    qualified_applicants = applicant_metrics['qualified']
+    not_qualified_applicants = applicant_metrics['not_qualified']
+    applicants_for_interview = applicant_metrics['for_interview']
+    interview_completed_count = applicant_metrics['interview_completed']
+    hired_applicants = applicant_metrics['hired']
+    rejected_applicants = applicant_metrics['rejected']
 
     # Upcoming scheduled interviews
     upcoming_interviews_qs = InterviewSchedule.objects.filter(
         employer=employer,
         interview_date__gte=timezone.now().date(),
         status='scheduled'
-    ).select_related('application', 'application__applicant', 'application__applicant__user', 'application__job').order_by('interview_date', 'start_time')
-    upcoming_interviews_count = upcoming_interviews_qs.count()
+    ).select_related(
+        'application',
+        'application__applicant',
+        'application__applicant__user',
+        'application__job',
+    ).annotate(
+        total_interviews=Window(expression=Count('pk')),
+    ).order_by('interview_date', 'start_time')
+    upcoming_interviews = list(upcoming_interviews_qs[:4])
+    upcoming_interviews_count = (
+        upcoming_interviews[0].total_interviews if upcoming_interviews else 0
+    )
 
     # Recent Forwarded Applicants (6 latest)
     recent_candidates = []
@@ -206,13 +239,7 @@ def dashboard_view(request):
         applicant_count=Count('applications', filter=Q(applications__forwarded_to_employer=True))
     ).order_by('-posted_at')[:5]
 
-    # Unread messages
-    unread_count = 0
-    try:
-        from app.models import Message
-        unread_count = Message.objects.filter(receiver_id=user_id, is_read=False).count()
-    except Exception:
-        pass
+    unread_count = get_unread_message_count(user_id)
 
     # Match the dashboard template contract used by the employer portal.
     recent_applications = [
@@ -252,7 +279,7 @@ def dashboard_view(request):
         'hired_count': hired_applicants,
         'rejected_applicants': rejected_applicants,
         'upcoming_interviews_count': upcoming_interviews_count,
-        'upcoming_interviews': upcoming_interviews_qs[:4],
+        'upcoming_interviews': upcoming_interviews,
         'recent_candidates': recent_candidates,
         'recent_applications': recent_applications,
         'recent_job_requests': recent_job_requests,
@@ -358,7 +385,7 @@ def post_job_view(request):
     Employer CANNOT directly publish jobs; status defaults to 'pending' awaiting Admin Review.
     """
     user_id = getCurrentUserId(request)
-    user = get_object_or_404(User, pk=user_id)
+    user = getCurrentUser(request)
     employer, _ = Employer.objects.get_or_create(user_id=user_id)
 
     error = None

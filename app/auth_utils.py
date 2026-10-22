@@ -84,6 +84,15 @@ def hasRole(request, role: str) -> bool:
 def getCurrentUserId(request):
     return request.session.get('user_id')
 
+def getCurrentUser(request):
+    user_id = getCurrentUserId(request)
+    validated_user = getattr(request, 'validated_session_user', None)
+    if validated_user and str(validated_user.pk) == str(user_id):
+        return validated_user
+
+    from app.models import User
+    return get_object_or_404(User, pk=user_id)
+
 def getCurrentUserEmail(request):
     return request.session.get('email')
 

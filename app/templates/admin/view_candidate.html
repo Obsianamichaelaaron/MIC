@@ -15,14 +15,14 @@
             </div>
             <div style="display:flex;gap:.5rem;margin-left:auto;">
                 <a href="{% url 'admin_job_candidates' job.job_id %}" class="btn btn-primary-custom btn-sm px-3.5 py-2 shadow-sm d-inline-flex align-items-center gap-2" style="text-decoration:none;">
-                    <i class="fas fa-arrow-left"></i> Candidate Roster
+                    <i class="fas fa-arrow-left"></i> Back to Candidates
                 </a>
             </div>
         </div>
     </div>
 
     {% if success_msg %}
-        <div style="background:#dcfce7;border:1px solid #22c55e;color:#15803d;padding:.9rem 1.25rem;border-radius:10px;margin-bottom:1.5rem;font-weight:600;display:flex;align-items:center;gap:.6rem;">
+        <div id="forwardSuccessMessage" style="background:#dcfce7;border:1px solid #22c55e;color:#15803d;padding:.9rem 1.25rem;border-radius:10px;margin-bottom:1.5rem;font-weight:600;display:flex;align-items:center;gap:.6rem;opacity:1;transition:opacity .3s ease;">
             <i class="fas fa-check-circle" style="font-size:1.1rem;"></i> {{ success_msg }}
         </div>
     {% endif %}
@@ -59,6 +59,16 @@
                         </span>
                     </div>
                 </div>
+                <script>
+                    setTimeout(function() {
+                        const successMessage = document.getElementById('forwardSuccessMessage');
+                        if (!successMessage) return;
+                        successMessage.style.opacity = '0';
+                        setTimeout(function() {
+                            successMessage.remove();
+                        }, 300);
+                    }, 2000);
+                </script>
 
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;font-size:.9rem;">
                     <div>
@@ -150,63 +160,6 @@
                 {% endif %}
             </div>
 
-            <!-- 3. Remarks & Activity Log History -->
-            <div style="background:#fff;border-radius:14px;border:1px solid #e2e8f0;padding:1.6rem;box-shadow:0 3px 12px rgba(0,0,0,0.04);">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;padding-bottom:.6rem;border-bottom:1px solid #e2e8f0;">
-                    <h3 style="margin:0;font-size:1.15rem;color:#0a3d6b;font-weight:700;">
-                        <i class="fas fa-clock-rotate-left" style="color:#1866a3;margin-right:.4rem;"></i> Application Remarks & Review Log
-                    </h3>
-                    <span style="font-size:.78rem;font-weight:600;color:#64748b;">
-                        {{ application.remarks_history|parse_remarks|length }} Recorded Events
-                    </span>
-                </div>
-
-                {% with history=application.remarks_history|parse_remarks %}
-                    {% if history %}
-                        <div style="display:flex;flex-direction:column;gap:1rem;position:relative;padding-left:1.5rem;border-left:2px solid #e2e8f0;margin-left:.75rem;">
-                            {% for item in history %}
-                                <div style="position:relative;">
-                                    <!-- Timeline Node Circle -->
-                                    <div style="position:absolute;left:-1.95rem;top:.25rem;width:12px;height:12px;border-radius:50%;background:#0284c7;border:3px solid #fff;box-shadow:0 0 0 2px #0284c7;"></div>
-                                    
-                                    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:.85rem 1.1rem;">
-                                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.4rem;">
-                                            <div style="display:flex;align-items:center;gap:.5rem;">
-                                                {% if item.status %}
-                                                    <span style="padding:.2rem .65rem;border-radius:999px;font-size:.72rem;font-weight:700;text-transform:capitalize;
-                                                        {% if item.status == 'accepted' or item.status == 'hired' %}background:#dcfce7;color:#15803d;
-                                                        {% elif item.status == 'interviewed' or 'interview' in item.status %}background:#ede9fe;color:#6d28d9;
-                                                        {% elif item.status == 'shortlisted' %}background:#e0f2fe;color:#0369a1;
-                                                        {% elif item.status == 'rejected' %}background:#fee2e2;color:#b91c1c;
-                                                        {% else %}background:#ffedd5;color:#c2410c;{% endif %}">
-                                                        {{ item.status|title }}
-                                                    </span>
-                                                {% endif %}
-                                                <span style="font-size:.8rem;font-weight:700;color:#334155;">
-                                                    <i class="fas fa-user-check" style="color:#94a3b8;font-size:.75rem;"></i> {{ item.reviewed_by|default:"Recruitment Team" }}
-                                                </span>
-                                            </div>
-                                            {% if item.timestamp %}
-                                                <span style="font-size:.76rem;color:#64748b;display:inline-flex;align-items:center;gap:.3rem;">
-                                                    <i class="fas fa-clock" style="color:#94a3b8;"></i> {{ item.timestamp }}
-                                                </span>
-                                            {% endif %}
-                                        </div>
-
-                                        {% if item.remarks %}
-                                            <div style="font-size:.86rem;color:#1e293b;line-height:1.5;background:#fff;padding:.6rem .85rem;border-radius:7px;border-left:3px solid #0284c7;margin-top:.35rem;">
-                                                {{ item.remarks }}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <p style="color:#94a3b8;font-size:.85rem;margin:0;font-style:italic;">No remarks or audit history recorded yet.</p>
-                    {% endif %}
-                {% endwith %}
-            </div>
         </div>
 
         <!-- Right Column: Admin Actions, Forwarding & Interview Tracker -->
@@ -230,8 +183,8 @@
                 </div>
 
                 <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:.9rem 1rem;margin-bottom:1.25rem;font-size:.84rem;color:#1e3a8a;">
-                    <strong>Automatic Employability Tier:</strong> {{ qualification_status|title }}
-                    <span class="d-block mt-1">Employability score: {{ application.match_score|floatformat:0 }}%</span>
+                    <strong>Automatic Job Match Tier:</strong> {{ qualification_status|title }}
+                    <span class="d-block mt-1">Job match score: {{ application.match_score|floatformat:0 }}%</span>
                 </div>
 
                 {% if application.forwarded_to_employer %}
@@ -241,7 +194,7 @@
                         </div>
                         <div style="color:#334155;line-height:1.45;">
                             Forwarded on <strong>{{ application.forwarded_at|date:"M d, Y H:i" }}</strong><br>
-                            Automatic Employability Tier: <strong>{{ qualification_status|title }}</strong><br>
+                            Automatic Job Match Tier: <strong>{{ qualification_status|title }}</strong><br>
                             Employer Status: <strong>{{ application.get_employer_status_display|default:application.employer_status|title }}</strong>
                         </div>
                         {% if application.admin_notes %}

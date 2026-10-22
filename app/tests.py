@@ -611,6 +611,42 @@ class MultiBizConversionTests(TestCase):
             [99, 83, 39, 22],
         )
 
+    @patch(
+        'app.views.views_applicant.get_applicant_job_match',
+        return_value={
+            'score': 80,
+            'score_type': 'semantic_model',
+            'reason': '',
+        },
+    )
+    def test_dashboard_recommendations_show_one_post_per_company_and_title(self, match_job):
+        self._complete_applicant_profile()
+        posted_at = timezone.now()
+        duplicate_jobs = [
+            JobPosting.objects.create(
+                employer=self.employer,
+                title='  PRINCIPAL   PYTHON AI ARCHITECT ',
+                description=f'Repeated posting {index}',
+                status='active',
+                posted_at=posted_at - timedelta(days=index),
+            )
+            for index in range(3)
+        ]
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        response = self.client.get('/applicant/dashboard.php')
+
+        self.assertEqual(response.status_code, 200)
+        recommended_ids = {
+            item['job_id']
+            for item in response.context['recommendations']
+            if item['job_id'] in {job.job_id for job in duplicate_jobs}
+        }
+        self.assertEqual(recommended_ids, {duplicate_jobs[0].job_id})
+
     @patch('app.views.views_applicant.get_applicant_job_match')
     def test_dashboard_hides_recommendations_until_profile_is_complete(self, match_job):
         self.applicant.profile_completed = True
@@ -695,6 +731,49 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(response, 'Complete your profile and upload a resume to see job matches.')
         self.assertNotContains(response, 'class="job-score-old"')
 
+    def test_browse_jobs_shows_one_post_per_company_and_title(self):
+        posted_at = timezone.now()
+        duplicate_jobs = [
+            JobPosting.objects.create(
+                employer=self.employer,
+                title='  PRINCIPAL   PYTHON AI ARCHITECT ',
+                description=f'Repeated posting {index}',
+                status='active',
+                posted_at=posted_at - timedelta(days=index),
+            )
+            for index in range(6)
+        ]
+        other_company_user = User.objects.create(
+            email='other-company-employer@example.com',
+            password='test-password',
+            role='employer',
+            status='active',
+        )
+        other_company = Employer.objects.create(
+            user=other_company_user,
+            company_name='Another Technology Company',
+        )
+        other_company_job = JobPosting.objects.create(
+            employer=other_company,
+            title='Senior Full Stack Developer',
+            status='active',
+        )
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        response = self.client.get('/applicant/jobs.php')
+
+        self.assertEqual(response.status_code, 200)
+        visible_jobs = response.context['jobs']
+        visible_ids = {job['job_id'] for job in visible_jobs}
+        duplicate_ids = {job.job_id for job in duplicate_jobs}
+        self.assertEqual(len(visible_ids & duplicate_ids), 1)
+        self.assertIn(duplicate_jobs[0].job_id, visible_ids)
+        self.assertIn(other_company_job.job_id, visible_ids)
+        self.assertEqual(len(visible_jobs), 3)
+
     def test_browse_jobs_use_pretrained_semantic_model_without_review_labels(self):
         self._complete_applicant_profile()
         session = self.client.session
@@ -739,23 +818,24 @@ class MultiBizConversionTests(TestCase):
             calculate_candidate_ml_score({'match_score': 42})['ml_ranking_score']
         )
 
-    def test_job_match_result_automatically_uses_employability_score(self):
-        for score, match_class, status in (
-            ('0', 'low', 'not_qualified'),
-            ('39.99', 'low', 'not_qualified'),
-            ('40', 'medium', 'under_qualified'),
-            ('60', 'medium', 'under_qualified'),
-            ('60.01', 'high', 'qualified'),
-            ('100', 'high', 'qualified'),
-        ):
-            with self.subTest(score=score):
-                self.applicant.employability_score = Decimal(score)
-                result = compute_job_match_result(self.applicant, self.job)
-                self.assertTrue(result['ready'])
-                self.assertEqual(result['match_score'], float(score))
-                self.assertEqual(result['match_class'], match_class)
-                self.assertEqual(result['qualification_status'], status)
-                self.assertEqual(result['reason'], '')
+    def test_job_match_result_uses_the_same_job_specific_score_as_applicant(self):
+        from app.services.ml_ranking import compute_rule_based_match_score
+
+        self.applicant.employability_score = Decimal('83')
+        expected_score = compute_rule_based_match_score(
+            self.applicant,
+            self.job,
+        )['score']
+
+        result = compute_job_match_result(self.applicant, self.job)
+
+        self.assertTrue(result['ready'])
+        self.assertEqual(result['match_score'], expected_score)
+        self.assertEqual(result['reason'], f'{expected_score:.0f}% Match')
+        self.assertEqual(
+            result['qualification_status'],
+            classify_match_score(expected_score),
+        )
 
     def test_job_list_uses_semantic_model_regardless_of_review_labels(self):
         self._complete_applicant_profile()
@@ -1846,7 +1926,7 @@ class MultiBizConversionTests(TestCase):
         candidate_list = self.client.get(response['Location'])
         self.assertEqual(candidate_list.status_code, 200)
         self.assertEqual(candidate_list.context['counts']['qualified'], 1)
-        self.assertContains(candidate_list, 'High Employability')
+        self.assertContains(candidate_list, 'High Match')
 
     def test_admin_dossier_shows_automatic_tier_without_manual_assessment(self):
         application = Application.objects.create(
@@ -1864,12 +1944,14 @@ class MultiBizConversionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['qualification_status'], 'qualified')
-        self.assertContains(response, 'Automatic Employability Tier')
+        self.assertContains(response, 'Automatic Job Match Tier')
+        self.assertContains(response, '}, 2000);')
+        self.assertNotContains(response, 'Application Remarks &amp; Review Log')
         self.assertNotContains(response, 'Record Admin ML Assessment')
         self.assertNotContains(response, 'Admin Qualification Assessment')
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
-    def test_admin_dispatch_notice_uses_automatic_employability_tier(self):
+    def test_admin_dispatch_notice_uses_automatic_job_match_score(self):
         application = Application.objects.create(
             job=self.job,
             applicant=self.applicant,
@@ -1896,7 +1978,11 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(application.status, 'reviewed')
         self.assertTrue(Notification.objects.filter(user=self.applicant_user).exists())
         self.assertEqual(len(mail.outbox), 1)
-        self.assertIn('86%', mail.outbox[0].body)
+        expected_score = compute_job_match_result(
+            self.applicant,
+            self.job,
+        )['match_score']
+        self.assertIn(f'{expected_score:.0f}%', mail.outbox[0].body)
 
     def test_forwarded_candidate_is_visible_in_employer_candidates_page(self):
         application = Application.objects.create(
@@ -1914,11 +2000,22 @@ class MultiBizConversionTests(TestCase):
 
         response = self.client.get('/employer/candidates.php')
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '86% High Employability')
-        self.assertNotContains(response, '0% Low Employability')
+        expected_score = compute_job_match_result(
+            self.applicant,
+            self.job,
+        )['match_score']
+        match_label = {
+            'qualified': 'High',
+            'under_qualified': 'Medium',
+            'not_qualified': 'Low',
+        }[classify_match_score(expected_score)]
+        self.assertContains(
+            response,
+            f'{expected_score:.0f}% {match_label} Match',
+        )
         self.assertEqual(
             response.context['applications'][0].qualification_status,
-            'qualified',
+            classify_match_score(expected_score),
         )
 
         with patch(
@@ -1930,8 +2027,8 @@ class MultiBizConversionTests(TestCase):
             },
         ):
             inconsistent_score_response = self.client.get('/employer/candidates.php')
-        self.assertContains(inconsistent_score_response, '89% High Employability')
-        self.assertNotContains(inconsistent_score_response, '89% Low Employability')
+        self.assertContains(inconsistent_score_response, '89% High Match')
+        self.assertNotContains(inconsistent_score_response, '89% Low Match')
         self.assertEqual(
             inconsistent_score_response.context['applications'][0].match_class,
             'high',
@@ -1939,6 +2036,33 @@ class MultiBizConversionTests(TestCase):
 
         application.refresh_from_db()
         self.assertEqual(application.match_score, Decimal('0.00'))
+
+    def test_applicant_and_employer_candidate_pages_show_the_same_job_match_score(self):
+        self._complete_applicant_profile()
+        Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            forwarded_to_employer=True,
+        )
+
+        applicant_session = self.client.session
+        applicant_session['user_id'] = self.applicant_user.user_id
+        applicant_session['role'] = 'applicant'
+        applicant_session.save()
+        applicant_response = self.client.get('/applicant/applications.php')
+        self.assertEqual(applicant_response.status_code, 200)
+        applicant_score = applicant_response.context['applications'][0]['app'].match_score
+
+        employer_client = Client()
+        employer_session = employer_client.session
+        employer_session['user_id'] = self.employer_user.user_id
+        employer_session['role'] = 'employer'
+        employer_session.save()
+        employer_response = employer_client.get('/employer/candidates.php')
+        self.assertEqual(employer_response.status_code, 200)
+        employer_score = employer_response.context['applications'][0].match_score
+
+        self.assertEqual(applicant_score, employer_score)
 
     def test_batch_forward_does_not_use_legacy_unclassified_score_bands(self):
         applications_by_score = {}
@@ -1986,6 +2110,10 @@ class MultiBizConversionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, self.job.title)
+        self.assertContains(response, 'id="jobCloseModal"')
+        self.assertContains(response, 'name="closure_reason"')
+        self.assertContains(response, f'data-close-job-id="{self.job.job_id}"')
+        self.assertNotContains(response, 'placeholder="Reason for closing"')
         self.assertNotContains(response, 'No Job Requisitions Found')
 
     def test_admin_post_job_form_omits_employer_login_section(self):
@@ -2345,6 +2473,8 @@ class MultiBizConversionTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Interview successfully scheduled')
+        self.assertContains(response, 'employer-success-notification')
+        self.assertContains(response, '}, 2000);')
         self.assertNotContains(response, '> Schedule Interview</h6>')
         self.assertNotContains(response, 'Online Video')
         self.assertNotContains(response, 'Meeting Link / Location:')
@@ -2368,6 +2498,12 @@ class MultiBizConversionTests(TestCase):
             f'/employer/view_candidate.php?id={application.application_id}'
         )
         self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, self.applicant_user.email)
+        self.assertContains(detail_response, 'Application Timeline')
+        self.assertNotContains(
+            detail_response,
+            '<i class="fa-solid fa-calendar-check text-primary me-1"></i> Interview Schedule',
+        )
         self.assertNotContains(detail_response, 'Schedule Interview')
 
     def test_employer_verification_is_required_to_submit_job_requests(self):
@@ -3234,6 +3370,7 @@ class ApplicantNotificationTests(TestCase):
             user=self.user,
             title='Application update for me',
             message='This notification belongs to this applicant.',
+            type='application',
         )
         other_notification = Notification.objects.create(
             user=other_user,
@@ -3244,6 +3381,8 @@ class ApplicantNotificationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, own_notification.title)
+        self.assertContains(response, 'href="/applicant/applications.php"')
+        self.assertContains(response, 'Open related page')
         self.assertNotContains(response, other_notification.title)
         self.assertEqual(response.context['unread_notification_count'], 1)
 
@@ -3314,6 +3453,7 @@ class AdminNotificationTests(TestCase):
         own_notification = Notification.objects.create(
             user=self.user,
             title='New job request for me',
+            type='job_update',
         )
         other_notification = Notification.objects.create(
             user=other_admin,
@@ -3324,6 +3464,8 @@ class AdminNotificationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, own_notification.title)
+        self.assertContains(response, 'href="/admin/jobs.php"')
+        self.assertContains(response, 'Open related page')
         self.assertNotContains(response, other_notification.title)
         self.assertEqual(response.context['unread_notification_count'], 1)
 
@@ -3521,6 +3663,8 @@ class AdminNotificationTests(TestCase):
         notifications_page = employer_client.get('/employer/notifications/')
         self.assertEqual(notifications_page.status_code, 200)
         self.assertContains(notifications_page, notification.message)
+        self.assertContains(notifications_page, 'href="/employer/candidates.php"')
+        self.assertContains(notifications_page, 'Open related page')
         self.assertNotContains(notifications_page, 'Private employer notification')
         mark_read_response = employer_client.post(
             '/employer/notifications/',
@@ -3810,6 +3954,10 @@ class UserSessionValidationMiddlewareTests(TestCase):
         middleware.process_view(request, lambda current_request: None, (), {})
 
         self.assertFalse(session.modified)
+        self.assertEqual(request.validated_session_user.pk, user.pk)
+        from app.auth_utils import getCurrentUser
+        with self.assertNumQueries(0):
+            self.assertEqual(getCurrentUser(request).pk, user.pk)
 
 
 @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')

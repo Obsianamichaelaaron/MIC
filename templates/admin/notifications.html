@@ -134,6 +134,25 @@
     overflow-wrap: anywhere;
 }
 .notification-date { color: #687386; font-size: .73rem; }
+.notification-open-link {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+}
+.notification-open-link:hover .notification-title,
+.notification-open-link:focus-visible .notification-title { color: #1866a3; }
+.notification-open-link:focus-visible {
+    outline: 2px solid #1866a3;
+    outline-offset: 4px;
+    border-radius: 4px;
+}
+.notification-open-hint {
+    display: inline-block;
+    margin-top: .35rem;
+    color: #1866a3;
+    font-size: .75rem;
+    font-weight: 700;
+}
 .notification-mark-read {
     flex-shrink: 0;
     padding: .45rem .65rem;
@@ -206,19 +225,22 @@
             {% for notification in notifications %}
                 <article class="notification-card{% if not notification.is_read %} unread{% endif %}">
                     <div class="notification-copy">
-                        <h2 class="notification-title">
-                            {{ notification.title }}
-                            {% if not notification.is_read %}
-                                <span class="notification-new">New</span>
+                        <a class="notification-open-link" href="{% if current_role == 'employer' %}{% if notification.type == 'application' %}/employer/candidates.php{% elif notification.type == 'job_update' %}/employer/jobs.php{% else %}/employer/dashboard.php{% endif %}{% elif notification.type == 'application' %}/admin/candidates.php{% elif notification.type == 'job_update' %}/admin/jobs.php{% else %}/admin/dashboard.php{% endif %}">
+                            <h2 class="notification-title">
+                                {{ notification.title }}
+                                {% if not notification.is_read %}
+                                    <span class="notification-new">New</span>
+                                {% endif %}
+                            </h2>
+                            {% if notification.message %}
+                                <p class="notification-message">{{ notification.message }}</p>
                             {% endif %}
-                        </h2>
-                        {% if notification.message %}
-                            <p class="notification-message">{{ notification.message }}</p>
-                        {% endif %}
-                        <time class="notification-date" datetime="{{ notification.created_at|date:'c' }}">
-                            <i class="far fa-clock" aria-hidden="true"></i>
-                            {{ notification.created_at|date:"M d, Y g:i A" }}
-                        </time>
+                            <time class="notification-date" datetime="{{ notification.created_at|date:'c' }}">
+                                <i class="far fa-clock" aria-hidden="true"></i>
+                                {{ notification.created_at|date:"M d, Y g:i A" }}
+                            </time>
+                            <span class="notification-open-hint">Open related page <i class="fas fa-arrow-right" aria-hidden="true"></i></span>
+                        </a>
                     </div>
                     {% if not notification.is_read %}
                         <form method="post">

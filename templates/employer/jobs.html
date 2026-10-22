@@ -251,6 +251,62 @@
     border-color: #0056b3;
     box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.12);
 }
+.job-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+.job-card-actions > a,
+.job-card-actions > button {
+    min-height: 38px;
+    white-space: nowrap;
+}
+@media (max-width: 640px) {
+    .job-card-actions {
+        width: 100%;
+    }
+}
+.job-close-modal[hidden] {
+    display: none;
+}
+.job-close-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(15, 23, 42, 0.58);
+}
+.job-close-dialog {
+    width: min(100%, 440px);
+    padding: 1.5rem;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.28);
+}
+.job-close-dialog h2 {
+    margin: 0 0 0.5rem;
+    color: #1e293b;
+    font-size: 1.2rem;
+    font-weight: 700;
+}
+.job-close-dialog p {
+    margin: 0 0 1rem;
+    color: #64748b;
+}
+.job-close-dialog textarea {
+    min-height: 96px;
+    resize: vertical;
+}
+.job-close-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.6rem;
+    margin-top: 1rem;
+}
 
 </style>
 
@@ -373,7 +429,7 @@
                                         <span><i class="fa-solid fa-users me-1 text-info"></i> {{ job.applicant_count|default:0 }} Endorsed</span>
                                     </div>
                                 </div>
-                                <div class="d-flex gap-2">
+                                <div class="job-card-actions">
                                     <a href="/employer/candidates.php?job_id={{ job.job_id }}" class="btn btn-sm btn-outline-primary px-3 fw-semibold" style="border-radius:6px; font-size:0.8rem;">
                                         <i class="fa-solid fa-users-viewfinder me-1"></i> Candidates ({{ job.applicant_count|default:0 }})
                                     </a>
@@ -381,13 +437,9 @@
                                         <i class="fa-solid fa-pen-to-square me-1"></i> Edit
                                     </a>
                                     {% if job.status == 'active' %}
-                                        <form method="POST" action="{% url 'employer_jobs' %}" onsubmit="return confirm('Close this job and notify applicants?');">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="action" value="close_job">
-                                            <input type="hidden" name="job_id" value="{{ job.job_id }}">
-                                            <input type="text" name="closure_reason" class="form-control form-control-sm" placeholder="Reason for closing" aria-label="Reason for closing" required>
-                                            <button class="btn btn-sm btn-outline-danger px-3 fw-semibold" type="submit"><i class="fa-solid fa-lock me-1"></i> Close</button>
-                                        </form>
+                                        <button class="btn btn-sm btn-outline-danger px-3 fw-semibold" type="button" data-close-job-id="{{ job.job_id }}" data-close-job-title="{{ job.title }}">
+                                            <i class="fa-solid fa-lock me-1"></i> Close
+                                        </button>
                                     {% elif job.status == 'closed' or job.status == 'rejected' %}
                                         <form method="POST" action="{% url 'employer_jobs' %}">
                                             {% csrf_token %}
@@ -420,4 +472,55 @@
 
     </div>
 </div>
+<div class="job-close-modal" id="jobCloseModal" hidden>
+    <section class="job-close-dialog" role="dialog" aria-modal="true" aria-labelledby="jobCloseTitle" aria-describedby="jobCloseDescription">
+        <h2 id="jobCloseTitle">Close job posting</h2>
+        <p id="jobCloseDescription">Provide a reason for closing <strong id="jobCloseJobTitle"></strong>. Applicants will be notified.</p>
+        <form method="POST" action="{% url 'employer_jobs' %}" id="jobCloseForm">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="close_job">
+            <input type="hidden" name="job_id" id="jobCloseJobId">
+            <label class="form-label fw-semibold" for="jobClosureReason">Reason for closing</label>
+            <textarea class="form-control" id="jobClosureReason" name="closure_reason" required></textarea>
+            <div class="job-close-dialog-actions">
+                <button class="btn btn-outline-secondary" type="button" id="cancelJobClose">Cancel</button>
+                <button class="btn btn-danger" type="submit"><i class="fa-solid fa-lock me-1"></i> Close job</button>
+            </div>
+        </form>
+    </section>
+</div>
+<script>
+(() => {
+    const modal = document.getElementById('jobCloseModal');
+    const jobTitle = document.getElementById('jobCloseJobTitle');
+    const jobId = document.getElementById('jobCloseJobId');
+    const reason = document.getElementById('jobClosureReason');
+    const cancelButton = document.getElementById('cancelJobClose');
+    let lastTrigger = null;
+
+    const closeModal = () => {
+        modal.hidden = true;
+        if (lastTrigger) lastTrigger.focus();
+    };
+
+    document.querySelectorAll('[data-close-job-id]').forEach((button) => {
+        button.addEventListener('click', () => {
+            lastTrigger = button;
+            jobId.value = button.dataset.closeJobId;
+            jobTitle.textContent = button.dataset.closeJobTitle;
+            reason.value = '';
+            modal.hidden = false;
+            reason.focus();
+        });
+    });
+
+    cancelButton.addEventListener('click', closeModal);
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) closeModal();
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !modal.hidden) closeModal();
+    });
+})();
+</script>
 {% include 'includes/footer.html' %}

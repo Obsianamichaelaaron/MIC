@@ -4,7 +4,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q, Max, Count
 from django.utils import timezone
 from app.models import User, Message, Applicant, Employer
-from app.auth_utils import require_login, getCurrentUserId
+from app.auth_utils import require_login, getCurrentUser, getCurrentUserId
 
 @require_login
 def chat_view(request):
@@ -13,7 +13,7 @@ def chat_view(request):
     Matching applicant/chat.php, employer/chat.php, admin/chat.php.
     """
     user_id = getCurrentUserId(request)
-    current_user = get_object_or_404(User, pk=user_id)
+    current_user = getCurrentUser(request)
     active_recipient_id = request.GET.get('recipient_id') or request.GET.get('user_id')
 
     active_recipient = None
@@ -42,7 +42,7 @@ def message_handler_api(request):
     Message Handler API matching includes/handlers/message_handler.php.
     """
     user_id = getCurrentUserId(request)
-    current_user = get_object_or_404(User, pk=user_id)
+    current_user = getCurrentUser(request)
     action = request.POST.get('action') or request.GET.get('action') or ''
 
     if action == 'send':

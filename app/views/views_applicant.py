@@ -8,7 +8,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q
+from django.db.models import Q, Count, Window
 from django.db.models.functions import Lower, Trim
 from django.conf import settings
 from django.utils import timezone
@@ -17,7 +17,7 @@ from app.models import (
     InterviewSchedule, Qualification, Skill, ChatbotAnswer,
     ChatbotRecommendation, ResumeAnalysis, Employer, Notification
 )
-from app.auth_utils import require_role, getCurrentUserId
+from app.auth_utils import require_role, getCurrentUser, getCurrentUserId
 from app.services.resume_parser import (
     parse_and_save_applicant_resume,
     parse_resume_text,
@@ -37,7 +37,9 @@ from app.services.workflow import close_job_if_positions_filled
 from app.services.job_listings import (
     EXCLUDED_COMPANY_NAME,
     exclude_multibiz_partner_jobs,
+    unique_company_title_job_postings,
 )
+from app.services.dashboard_counts import get_unread_message_count
 
 MAX_JOB_MATCHES_FOR_DASHBOARD = 12
 SEMANTIC_MATCH_CACHE_TTL_SECONDS = 86400
@@ -201,7 +203,7 @@ def job_match_api(request):
         return JsonResponse({'error': 'invalid job_id'}, status=400)
 
     user_id   = getCurrentUserId(request)
-    user      = get_object_or_404(User, pk=user_id)
+    user      = getCurrentUser(request)
     applicant, _ = Applicant.objects.get_or_create(user=user)
     job       = exclude_multibiz_partner_jobs(
         JobPosting.objects.filter(pk=int(job_id), status='active')
@@ -248,11 +250,10 @@ def dashboard_view(request):
     - No N+1 re-fetch of recommended jobs.
     """
     user_id = getCurrentUserId(request)
-    user = get_object_or_404(User, pk=user_id)
+    user = getCurrentUser(request)
     applicant, _ = Applicant.objects.get_or_create(user=user)
 
     # ── 1 query: all application status counts at once ─────────────────────────
-    from django.db.models import Count
     app_counts_qs = (
         Application.objects.filter(applicant=applicant)
         .values('status')
@@ -321,7 +322,11 @@ def dashboard_view(request):
             exclude_multibiz_partner_jobs(JobPosting.objects.filter(status='active'))
             .select_related('employer')
             .prefetch_related('qualification_mappings__qualification')
-            .order_by('-posted_at')[:MAX_JOB_MATCHES_FOR_DASHBOARD]
+            .order_by('-posted_at', '-job_id')
+        )
+        active_jobs = unique_company_title_job_postings(
+            active_jobs,
+            limit=MAX_JOB_MATCHES_FOR_DASHBOARD,
         )
         for job in active_jobs:
             match = get_applicant_job_match(applicant, job, '')
@@ -349,9 +354,15 @@ def dashboard_view(request):
     feedback_count = 0
     try:
         from app.models import CandidateFeedback
-        feedback_qs    = CandidateFeedback.objects.filter(applicant_id=applicant.pk).order_by('-created_at')
-        feedback_count = feedback_qs.count()
-        for fb in feedback_qs[:3]:
+        feedback_rows = list(
+            CandidateFeedback.objects.filter(applicant_id=applicant.pk)
+            .annotate(total_feedback=Window(expression=Count('pk')))
+            .order_by('-created_at')[:3]
+        )
+        feedback_count = (
+            feedback_rows[0].total_feedback if feedback_rows else 0
+        )
+        for fb in feedback_rows:
             feedback_list.append({
                 'feedback_message': fb.feedback_message or '',
                 'created_at': fb.created_at,
@@ -360,12 +371,7 @@ def dashboard_view(request):
         pass
 
     # Unread messages count (already cached in context_processors — reuse it)
-    unread_count = 0
-    try:
-        from app.models import Message
-        unread_count = Message.objects.filter(receiver_id=user_id, is_read=False).count()
-    except Exception:
-        pass
+    unread_count = get_unread_message_count(user_id)
 
     # Recent applications — no ML model call here
     applications = (
@@ -526,7 +532,9 @@ def jobs_view(request):
             pass
 
     # Active status determines availability; incomplete employer profiles use a display fallback.
-    all_jobs = list(jobs_qs.order_by('-posted_at'))
+    all_jobs = unique_company_title_job_postings(
+        jobs_qs.order_by('-posted_at', '-job_id')
+    )
 
     # Saved & applied IDs
     saved_job_ids = set(
@@ -830,7 +838,7 @@ def apply_job_view(request, job_id=None):
     Applicant Apply for Job matching applicant/apply_job.php.
     """
     user_id = getCurrentUserId(request)
-    user = get_object_or_404(User, pk=user_id)
+    user = getCurrentUser(request)
     applicant, _ = Applicant.objects.get_or_create(user=user)
     chatbot_answers = list(ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number'))
 
@@ -925,7 +933,7 @@ def apply_job_view(request, job_id=None):
                 job=job,
                 applicant=applicant,
                 status='pending',
-                match_score=Decimal('0'),
+                match_score=Decimal(str(match_score or 0)),
                 cover_letter=cover_letter,
                 resume_file=resume_path,
                 classification=classification,
@@ -1090,7 +1098,7 @@ def profile_view(request):
     Applicant Profile Editor matching applicant/profile.php.
     """
     user_id = getCurrentUserId(request)
-    user = get_object_or_404(User, pk=user_id)
+    user = getCurrentUser(request)
     applicant, _ = Applicant.objects.get_or_create(user=user)
 
     success_msg = None
@@ -1308,7 +1316,7 @@ def chatbot_view(request):
     Conversational AI Quiz matching applicant/chatbot.php.
     """
     user_id = getCurrentUserId(request)
-    user = get_object_or_404(User, pk=user_id)
+    user = getCurrentUser(request)
     applicant, _ = Applicant.objects.get_or_create(user=user)
     qualifications = Qualification.objects.filter(status='active').order_by('name')
 

@@ -380,15 +380,15 @@
                                                 </span>
                                             {% elif app.match_class == 'high' %}
                                                 <span class="badge-match badge-match-excellent">
-                                                    <i class="fa-solid fa-circle-check"></i> {{ app.match_score|floatformat:0 }}% High Employability
+                                                    <i class="fa-solid fa-circle-check"></i> {{ app.match_score|floatformat:0 }}% High Match
                                                 </span>
                                             {% elif app.match_class == 'medium' %}
                                                 <span class="badge-match badge-match-average">
-                                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ app.match_score|floatformat:0 }}% Medium Employability
+                                                    <i class="fa-solid fa-triangle-exclamation"></i> {{ app.match_score|floatformat:0 }}% Medium Match
                                                 </span>
                                             {% else %}
                                                 <span class="badge-match badge-match-low">
-                                                    <i class="fa-solid fa-circle-xmark"></i> {{ app.match_score|floatformat:0 }}% Low Employability
+                                                    <i class="fa-solid fa-circle-xmark"></i> {{ app.match_score|floatformat:0 }}% Low Match
                                                 </span>
                                             {% endif %}
                                         </div>
