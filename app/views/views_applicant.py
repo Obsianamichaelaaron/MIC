@@ -87,7 +87,7 @@ def _semantic_model_status(match=None):
         return {'ready': False, 'reason': match['reason']}
     return {
         'ready': True,
-        'reason': 'Uses a pre-trained sentence-transformer model; no admin-reviewed outcomes are required.',
+        'reason': 'Profile-based recommendations help surface relevant openings.',
     }
 
 
@@ -373,12 +373,30 @@ def dashboard_view(request):
     # Unread messages count (already cached in context_processors — reuse it)
     unread_count = get_unread_message_count(user_id)
 
-    # Recent applications — no ML model call here
-    applications = (
+    # Recent applications — calculate the same profile match shown in the full tracker.
+    applications = list(
         Application.objects.filter(applicant=applicant)
         .select_related('job', 'job__employer')
+        .prefetch_related('job__qualification_mappings__qualification')
         .order_by('-applied_at')[:5]
     )
+    resume_text = ''
+    if profile_is_complete and applications:
+        resume_text = (
+            ResumeAnalysis.objects
+            .filter(applicant=applicant)
+            .order_by('-analysis_date')
+            .values_list('extracted_text', flat=True)
+            .first() or ''
+        )
+    for application in applications:
+        if profile_is_complete:
+            match = get_applicant_job_match(applicant, application.job, resume_text)
+            application.match_score = match['score']
+            application.match_score_type = match['score_type']
+            application.match_reason = match['reason']
+        else:
+            application.match_score = None
 
     # Upcoming interviews
     interviews = InterviewSchedule.objects.filter(
@@ -1054,6 +1072,7 @@ def applications_view(request):
         application__applicant=applicant,
         status__in=('scheduled', 'completed'),
     ).select_related('employer').order_by('-interview_date', '-created_at')
+    now = timezone.now()
     for inv in interviews:
         interviews_map.setdefault(inv.application_id, inv)
 
@@ -1070,9 +1089,11 @@ def applications_view(request):
         app_item.match_score = result['score']
         app_item.match_score_type = result['score_type']
         app_item.match_reason = result['reason']
+        interview = interviews_map.get(app_item.application_id)
         apps_list.append({
             'app': app_item,
-            'interview': interviews_map.get(app_item.application_id)
+            'interview': interview,
+            'interview_overdue': bool(interview and interview.is_overdue_at(now)),
         })
 
     context = {
@@ -1083,7 +1104,7 @@ def applications_view(request):
         'total_count': len(apps_list),
         'match_model_status': {
             'ready': True,
-            'reason': 'Uses a pre-trained sentence-transformer model; no admin-reviewed outcomes are required.',
+            'reason': 'Profile-based recommendations help surface relevant openings.',
         },
         'applied_success': applied_success,
         'successful_application': successful_application,
@@ -1567,6 +1588,10 @@ def notifications_view(request):
                 existing_application_messages.add(message)
         if missing_notifications:
             Notification.objects.bulk_create(missing_notifications)
+        Notification.objects.filter(
+            user_id=user_id,
+            is_read=False,
+        ).update(is_read=True)
 
     if request.method == 'POST':
         action = request.POST.get('action')

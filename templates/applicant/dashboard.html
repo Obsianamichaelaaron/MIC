@@ -846,7 +846,7 @@
                             <thead>
                                 <tr>
                                     <th>Role & Company</th>
-                                    <th>Match</th>
+                                    <th>Profile</th>
                                     <th>Stage</th>
                                     <th>Submitted</th>
                                 </tr>
@@ -859,11 +859,7 @@
                                             <small class="text-muted"><i class="fas fa-building"></i> {{ app.job.employer.company_name|default:"MultiBiz Partner" }}</small>
                                         </td>
                                         <td>
-                                            {% if profile_is_complete and app.match_score != None %}
-                                                <span class="portal-match" title="Pre-trained semantic relevance; not a probability of being hired" style="padding: 0.15rem 0.45rem; font-size: 0.68rem;">{{ app.match_score|floatformat:0 }}% AI relevance</span>
-                                            {% else %}
-                                                <span class="portal-match text-muted" style="padding: 0.15rem 0.45rem; font-size: 0.68rem;">{% if profile_is_complete %}Estimate unavailable{% else %}Complete profile to view{% endif %}</span>
-                                            {% endif %}
+                                            <span class="portal-match text-muted" style="padding: 0.15rem 0.45rem; font-size: 0.68rem;">{% if profile_is_complete %}Profile ready{% else %}Complete profile{% endif %}</span>
                                         </td>
                                         <td>
                                             <span class="portal-status">{{ app.status|title }}</span>
@@ -1088,7 +1084,7 @@ function showMatchScorePopup(jobId, jobTitle, matchScore) {
         <div style="text-align: left; background: #f8f9fa; padding: 1rem; border-radius: 10px; margin-bottom: 1rem;">
             <h4 style="color: #333; margin-bottom: 0.6rem; font-size: 0.85rem;">About this estimate:</h4>
             <ul style="color: #666; line-height: 1.6; margin: 0; padding-left: 1.2rem; font-size: 0.8rem;">
-                <li>A pre-trained sentence-transformer compares the meaning of your profile/resume and the job requirements.</li>
+                <li>A pre-trained sentence-transformer compares your profile/resume with the job requirements.</li>
                 <li>Text is processed inside this app and is not sent to an external AI API.</li>
                 <li>This percentage measures semantic relevance; it is not a hiring probability.</li>
             </ul>

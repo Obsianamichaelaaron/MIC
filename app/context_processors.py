@@ -4,6 +4,7 @@ from app.services.dashboard_counts import (
     get_unread_message_count,
     get_unread_notification_count,
 )
+from app.request_utils import is_public_page_view
 
 def global_context(request):
     """
@@ -18,6 +19,8 @@ def global_context(request):
     first_name = request.session.get('first_name', '')
     last_name = request.session.get('last_name', '')
     email = request.session.get('email', '')
+    resolver_match = getattr(request, 'resolver_match', None)
+    is_public_page = resolver_match and is_public_page_view(resolver_match.func)
     
     full_name = f"{first_name} {last_name}".strip()
     
@@ -33,7 +36,7 @@ def global_context(request):
         avatar_initials = 'U'
         
     profile_pic = ''
-    if role == 'applicant' and user_id:
+    if not is_public_page and role == 'applicant' and user_id:
         # Cache the profile pic per applicant — changes rarely
         _pp_key = f'profile_pic_{user_id}'
         profile_pic = cache.get(_pp_key)
@@ -47,7 +50,7 @@ def global_context(request):
             
     # Unread inquiries count for Admin — cache 60s
     unread_inquiries_count = 0
-    if role == 'admin':
+    if not is_public_page and role == 'admin':
         _inq_key = 'admin_unread_inquiries'
         cached_count = cache.get(_inq_key)
         if cached_count is None:
@@ -58,10 +61,16 @@ def global_context(request):
             cache.set(_inq_key, cached_count, 60)
         unread_inquiries_count = cached_count
             
-    unread_messages_count = get_unread_message_count(user_id)
+    unread_messages_count = (
+        0 if is_public_page else get_unread_message_count(user_id)
+    )
 
     unread_notification_count = 0
-    if role in {'applicant', 'employer', 'admin'} and user_id:
+    if (
+        not is_public_page
+        and role in {'applicant', 'employer', 'admin'}
+        and user_id
+    ):
         unread_notification_count = get_unread_notification_count(user_id)
 
     return {

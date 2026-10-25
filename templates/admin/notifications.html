@@ -210,15 +210,6 @@
                 Your notifications
                 <span>({{ notifications|length }})</span>
             </p>
-            {% if unread_notification_count %}
-                <form method="post">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="mark_all_read">
-                    <button class="notifications-mark-all" type="submit">
-                        <i class="fas fa-check-double" aria-hidden="true"></i> Mark all as read
-                    </button>
-                </form>
-            {% endif %}
         </section>
 
         <section class="notifications-list" aria-label="Your notifications">

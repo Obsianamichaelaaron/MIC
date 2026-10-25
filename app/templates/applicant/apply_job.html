@@ -570,9 +570,9 @@ body { background: #d8e0eb; }
                 <p class="studio-crumbs"><a href="dashboard.php">Dashboard</a> / <a href="jobs.php">Jobs</a> / {{ job.title }} / Application Studio</p>
                 <div class="studio-job"><div class="studio-avatar">{{ job.employer.company_name|slice:":1"|upper|default:"M" }}</div><div><h1>{{ job.title }}</h1><p><i class="fas fa-building"></i> {{ job.employer.company_name|default:"Multibiz Partner" }} · <i class="fas fa-location-dot"></i> {{ job.location }}</p></div></div>
             </div>
-            <span class="studio-match"><i class="fas fa-bolt"></i>
-                {% if match_score != None %}{{ match_score|floatformat:0 }}% pre-trained AI relevance{% else %}{{ match_reason|default:"AI estimate unavailable" }}{% endif %}
-            </span>
+            {% if match_reason %}
+                <span class="studio-match"><i class="fas fa-bolt"></i> {{ match_reason }}</span>
+            {% endif %}
         </header>
         {% if error %}
             <div style="background:#fee2e2;border:1px solid #ef4444;color:#b91c1c;padding:.85rem 1.25rem;border-radius:10px;margin-bottom:1.25rem;display:flex;align-items:center;gap:.75rem;font-size:.9rem;font-weight:600;">

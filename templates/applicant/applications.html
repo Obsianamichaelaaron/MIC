@@ -566,23 +566,19 @@
         <section class="applications-card">
             <div class="applications-table-wrap">
                 <table class="applications-table">
-                    <thead><tr><th>Job Title and Organization</th><th>Match Score</th><th>Applied Date</th><th>Qualification / Stage</th><th>Recruiter Feedback</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Job Title and Organization</th><th>Profile</th><th>Applied Date</th><th>Qualification / Stage</th><th>Recruiter Feedback</th><th>Actions</th></tr></thead>
                     <tbody>
                     {% for item in applications %}
-                        {% with app=item.app interview=item.interview %}
+                        {% with app=item.app interview=item.interview interview_overdue=item.interview_overdue %}
                         <tr>
                             <td><div class="application-job"><div class="company-avatar-box">{{ app.job.employer.company_name|slice:":1"|upper|default:"M" }}</div><div><strong><a href="job_details.php?id={{ app.job.job_id }}" style="color:inherit;text-decoration:none">{{ app.job.title }}</a></strong><small><i class="fas fa-building"></i> {{ app.job.employer.company_name|default:"Multibiz Partner" }} · {{ app.job.location }}</small></div></div></td>
                             <td>
-                                {% if app.match_score != None %}
-                                    <span class="application-match" title="Pre-trained semantic relevance; not a probability of being hired"><i class="fas fa-brain"></i> {{ app.match_score|floatformat:0 }}% AI relevance</span>
-                                {% else %}
-                                    <span class="application-match text-muted" title="{{ app.match_reason }}">Estimate unavailable</span>
-                                {% endif %}
+                                <span class="application-match text-muted">{{ app.status|title }}</span>
                             </td>
                             <td>{{ app.applied_at|date:"M d, Y" }}<small style="display:block;color:#687386;font-size:.68rem">{{ app.applied_at|timesince }} ago</small></td>
                             <td><span class="application-status">{{ app.status|title }}</span></td>
                             <td>{% with remarks=app.get_remarks_list %}{% if remarks %}<button class="application-action" type="button" data-bs-toggle="modal" data-bs-target="#remarksModal{{ app.application_id }}"><i class="fas fa-clock-rotate-left"></i> Feedback ({{ remarks|length }})</button>{% else %}<span style="color:#9aa5b4;font-size:.7rem">No feedback yet</span>{% endif %}{% endwith %}</td>
-                            <td><div class="application-actions"><a class="application-action" href="job_details.php?id={{ app.job.job_id }}" title="View Job Details"><i class="fas fa-eye"></i></a>{% if app.status == 'offer_sent' %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#offerModal{{ app.application_id }}"><i class="fas fa-file-signature"></i> Review Offer</button>{% endif %}{% if interview %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#interviewModal{{ app.application_id }}"><i class="fas fa-video"></i> Interview</button>{% endif %}{% if app.status != 'accepted' and app.status != 'hired' and app.status != 'rejected' and app.status != 'withdrawn' and app.status != 'job_closed' and app.status != 'offer_declined' and app.status != 'offer_sent' %}<form method="POST" action="update_application.php" onsubmit="return confirm('Withdraw this application?');">{% csrf_token %}<input type="hidden" name="application_id" value="{{ app.application_id }}"><input type="hidden" name="action" value="withdraw"><button class="application-action" type="submit" title="Withdraw application"><i class="fas fa-xmark"></i> Withdraw</button></form>{% endif %}</div></td>
+                            <td><div class="application-actions"><a class="application-action" href="job_details.php?id={{ app.job.job_id }}" title="View Job Details"><i class="fas fa-eye"></i></a>{% if app.status == 'offer_sent' %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#offerModal{{ app.application_id }}"><i class="fas fa-file-signature"></i> Review Offer</button>{% endif %}{% if interview %}{% if interview_overdue %}<a class="application-action primary" href="/applicant/chat.php?user_id={{ app.job.employer.user_id }}"><i class="fas fa-comment-dots"></i> Follow Up</a><button class="application-action" type="button" data-bs-toggle="modal" data-bs-target="#interviewModal{{ app.application_id }}"><i class="fas fa-circle-info"></i> Details</button>{% else %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#interviewModal{{ app.application_id }}"><i class="fas fa-video"></i> Interview</button>{% endif %}{% endif %}{% if app.status != 'accepted' and app.status != 'hired' and app.status != 'rejected' and app.status != 'withdrawn' and app.status != 'job_closed' and app.status != 'offer_declined' and app.status != 'offer_sent' %}<form method="POST" action="update_application.php" onsubmit="return confirm('Withdraw this application?');">{% csrf_token %}<input type="hidden" name="application_id" value="{{ app.application_id }}"><input type="hidden" name="action" value="withdraw"><button class="application-action" type="submit" title="Withdraw application"><i class="fas fa-xmark"></i> Withdraw</button></form>{% endif %}</div></td>
                         </tr>
                         {% endwith %}
                     {% empty %}<tr><td colspan="6"><div class="application-empty"><i class="fas fa-folder-open" style="font-size:2rem;opacity:.45"></i><h3>No applications submitted yet</h3><a href="jobs.php" class="applications-explore">Explore Openings</a></div></td></tr>{% endfor %}
@@ -592,7 +588,7 @@
         </section>
 
         {% for item in applications %}
-            {% with app=item.app interview=item.interview %}
+            {% with app=item.app interview=item.interview interview_overdue=item.interview_overdue %}
                 {% with remarks=app.get_remarks_list %}
                     {% if remarks %}
                     <div class="modal fade" id="remarksModal{{ app.application_id }}" tabindex="-1" aria-hidden="true">
@@ -607,7 +603,7 @@
                 <div class="modal fade" id="interviewModal{{ app.application_id }}" tabindex="-1" aria-hidden="true">
                     <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="border-radius:14px;border:none;box-shadow:0 10px 30px rgba(0,0,0,0.15);">
                         <div class="modal-header" style="background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:1.1rem 1.4rem;">
-                            <h5 class="modal-title" style="font-weight:700;color:#0a3d6b;font-size:1.05rem;"><i class="fas fa-calendar-check text-primary me-2"></i>Scheduled Interview Details</h5>
+                            <h5 class="modal-title" style="font-weight:700;color:#0a3d6b;font-size:1.05rem;"><i class="fas fa-calendar-check text-primary me-2"></i>{% if interview_overdue %}Past Interview Details{% else %}Scheduled Interview Details{% endif %}</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body" style="padding:1.4rem;">
@@ -632,7 +628,7 @@
                                     </div>
                                 {% endif %}
                             </div>
-                            {% if interview.meeting_link %}
+                            {% if interview.meeting_link and not interview_overdue %}
                                 <div class="mt-3 text-center">
                                     <a href="{{ interview.meeting_link }}" target="_blank" class="btn btn-primary btn-sm px-4 py-2 fw-bold shadow-sm" style="border-radius:8px;">
                                         <i class="fas fa-video me-1"></i> Launch Video Call
@@ -650,9 +646,9 @@
                                         <input type="hidden" name="action" value="respond_interview">
                                         <textarea name="response_notes" rows="2" class="form-control" placeholder="Optional note; required for a reschedule request"></textarea>
                                         <div class="d-flex flex-wrap gap-2">
-                                            <button class="btn btn-sm btn-success" name="response" value="confirmed" type="submit">Confirm</button>
+                                            {% if not interview_overdue %}<button class="btn btn-sm btn-success" name="response" value="confirmed" type="submit">Confirm</button>{% endif %}
                                             <button class="btn btn-sm btn-outline-primary" name="response" value="reschedule_requested" type="submit">Request reschedule</button>
-                                            <button class="btn btn-sm btn-outline-danger" name="response" value="declined" type="submit">Decline</button>
+                                            {% if not interview_overdue %}<button class="btn btn-sm btn-outline-danger" name="response" value="declined" type="submit">Decline</button>{% endif %}
                                         </div>
                                     </form>
                                 {% endif %}
@@ -743,7 +739,7 @@
         {% if applications %}
             <div class="apps-list">
                 {% for item in applications %}
-                    {% with app=item.app interview=item.interview %}
+                    {% with app=item.app interview=item.interview interview_overdue=item.interview_overdue %}
                     <div class="app-card">
                         
                         <!-- Header -->
@@ -781,7 +777,7 @@
                                             data-match-score="{{ app.match_score }}"
                                             data-job-id="{{ app.job.job_id }}"
                                             onclick="handleScoreBtnClick(this)">
-                                        <i class="fas fa-chart-line"></i> {{ app.match_score|floatformat:1 }}% ML Match
+                                        <i class="fas fa-chart-line"></i> {{ app.match_score|floatformat:1 }}% Match
                                     </button>
                                 {% endif %}
                             </div>
@@ -818,7 +814,7 @@
                             <div class="interview-box">
                                 <div class="interview-title">
                                     <i class="fas fa-calendar-check" style="color:#1866a3;"></i>
-                                    Interview Scheduled
+                                    {% if interview_overdue %}Interview time passed{% else %}Interview Scheduled{% endif %}
                                 </div>
                                 <div class="interview-details">
                                     <span><i class="fas fa-calendar-day"></i> {{ interview.interview_date|date:"F d, Y" }}</span>
@@ -828,7 +824,7 @@
                                     {% if interview.interview_type %}
                                         <span><i class="fas fa-video"></i> {{ interview.interview_type|title }}</span>
                                     {% endif %}
-                                    {% if interview.meeting_link %}
+                                    {% if interview.meeting_link and not interview_overdue %}
                                         <a href="{{ interview.meeting_link }}" target="_blank" style="color:#1866a3;font-weight:600;text-decoration:underline;">
                                             Join Meeting Link <i class="fas fa-external-link-alt" style="font-size:0.75rem;"></i>
                                         </a>
@@ -863,8 +859,8 @@
                                 </button>
                             {% endif %}
                             {% if app.job.employer.user_id %}
-                                <a href="chat.php?user_id={{ app.job.employer.user_id }}" class="btn-action btn-action-secondary">
-                                    <i class="fas fa-comment-dots"></i> Message Employer
+                                <a href="/applicant/chat.php?user_id={{ app.job.employer.user_id }}" class="btn-action {% if interview_overdue %}btn-action-accent{% else %}btn-action-secondary{% endif %}">
+                                    <i class="fas fa-comment-dots"></i> {% if interview_overdue %}Follow up with Employer{% else %}Message Employer{% endif %}
                                 </a>
                             {% endif %}
                         </div>

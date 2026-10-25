@@ -1,4 +1,5 @@
 from app.models import User
+from app.request_utils import is_public_page_view
 
 
 STATIC_PREFIXES = (
@@ -23,7 +24,7 @@ class UserSessionValidationMiddleware:
         return self.get_response(request)
 
     def process_view(self, request, view_func, view_args, view_kwargs):
-        if is_static_request(request.path_info):
+        if is_static_request(request.path_info) or is_public_page_view(view_func):
             return None
 
         session_user_id = request.session.get('user_id')

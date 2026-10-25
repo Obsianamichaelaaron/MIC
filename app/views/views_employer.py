@@ -363,6 +363,10 @@ def notifications_view(request):
 
         return redirect('employer_notifications')
 
+    Notification.objects.filter(
+        user_id=employer_user_id,
+        is_read=False,
+    ).update(is_read=True)
     notifications = Notification.objects.filter(
         user_id=employer_user_id,
     ).order_by('-created_at', '-notification_id')[:100]

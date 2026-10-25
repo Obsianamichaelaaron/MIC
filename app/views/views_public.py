@@ -15,6 +15,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
 from django.conf import settings
 from django.core.cache import cache
+from django.db import DatabaseError
 from app.models import (
     Application, Applicant, CmsSection, CmsContent, CmsHeroSlide,
     CmsTestimonial, CmsBrand, CmsNews, JobPosting, Qualification,
@@ -45,15 +46,15 @@ def get_cms_content_dict():
 
     cms = {}
     try:
-        contents = CmsContent.objects.filter(is_active=True).select_related('section')
-        for item in contents:
-            if item.section and item.section.section_key:
-                sec_key = item.section.section_key
-                if sec_key not in cms:
-                    cms[sec_key] = {}
-                cms[sec_key][item.field_key] = item.field_value
-    except Exception:
-        pass
+        contents = CmsContent.objects.filter(
+            is_active=True,
+            section__section_key__gt='',
+        ).values_list('section__section_key', 'field_key', 'field_value')
+        for section_key, field_key, field_value in contents:
+            cms.setdefault(section_key, {})[field_key] = field_value
+    except DatabaseError:
+        logger.exception('Unable to load active CMS content')
+        return {}
 
     cache.set(_CMS_CACHE_KEY, cms, _CMS_CACHE_TTL)
     return cms
@@ -134,7 +135,19 @@ def index_view(request):
             
         # Testimonials
         try:
-            testimonials = list(CmsTestimonial.objects.filter(is_active=True).order_by('sort_order', 'id'))
+            testimonials = list(
+                CmsTestimonial.objects.filter(is_active=True)
+                .only(
+                    'author_name',
+                    'author_role',
+                    'company',
+                    'content',
+                    'rating',
+                    'image_path',
+                    'sort_order',
+                )
+                .order_by('sort_order', 'id')
+            )
         except Exception:
             testimonials = []
 
@@ -156,7 +169,18 @@ def index_view(request):
         
         # News & Events
         try:
-            news_articles = list(CmsNews.objects.filter(is_active=True).order_by('-news_date', '-id')[:6])
+            news_articles = list(
+                CmsNews.objects.filter(is_active=True)
+                .only(
+                    'title',
+                    'category',
+                    'excerpt',
+                    'image_path',
+                    'news_date',
+                    'is_featured',
+                )
+                .order_by('-news_date', '-id')[:6]
+            )
         except Exception:
             news_articles = []
 
@@ -170,7 +194,19 @@ def index_view(request):
                     ).exclude(
                         employer__company_name='',
                     )
-                ).select_related('employer').order_by('-posted_at', '-job_id'),
+                )
+                .select_related('employer')
+                .only(
+                    'job_id',
+                    'employer__employer_id',
+                    'employer__company_name',
+                    'title',
+                    'location',
+                    'employment_type',
+                    'salary_range',
+                    'posted_at',
+                )
+                .order_by('-posted_at', '-job_id'),
                 limit=6,
             )
         except Exception:
@@ -333,7 +369,13 @@ def contactus_view(request):
 
 def news_view(request):
     """Public news listing matching news.php."""
-    news_articles = CmsNews.objects.filter(is_active=True).order_by('-news_date', '-id')
+    news_articles = CmsNews.objects.filter(is_active=True).only(
+        'title',
+        'category',
+        'excerpt',
+        'image_path',
+        'news_date',
+    ).order_by('-news_date', '-id')
     context = {
         'page_title': 'News - MULTIBIZ INTERNATIONAL CORPORATION',
         'current_page': 'news.php',
@@ -354,7 +396,21 @@ def careers_view(request):
 
     jobs_qs = exclude_multibiz_partner_jobs(
         JobPosting.objects.filter(status='active')
-    ).select_related('employer').order_by('-posted_at', '-job_id')
+    ).select_related('employer').only(
+        'job_id',
+        'employer__employer_id',
+        'employer__company_name',
+        'title',
+        'description',
+        'requirements',
+        'skills_required',
+        'location',
+        'employment_type',
+        'salary_range',
+        'positions_available',
+        'status',
+        'posted_at',
+    ).order_by('-posted_at', '-job_id')
 
     if search_query:
         jobs_qs = jobs_qs.filter(

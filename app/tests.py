@@ -7,11 +7,11 @@ from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 from unittest.mock import Mock, patch
-from django.test import TestCase, Client, override_settings
+from django.test import TestCase, Client, RequestFactory, override_settings
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.urls import reverse
+from django.urls import resolve, reverse
 from django.utils import timezone
 from app.models import (
     User, Applicant, Employer, JobPosting, Application,
@@ -20,6 +20,8 @@ from app.models import (
     PasswordResetToken,
 )
 from app.auth_utils import verify_password, hash_password
+from app.context_processors import global_context
+from app.middleware import UserSessionValidationMiddleware
 from app.services.mailer import send_application_status_update_email
 from app.services.resume_parser import (
     extract_resume_name,
@@ -121,6 +123,35 @@ class MultiBizConversionTests(TestCase):
             extracted_text='Applicant resume with education, skills, and experience.',
         )
         return applicant
+
+    def test_public_pages_skip_authenticated_user_lookups(self):
+        request = RequestFactory().get('/about/')
+        request.session = {
+            'user_id': self.applicant_user.user_id,
+            'role': 'applicant',
+        }
+        view_func = resolve('/about/').func
+
+        with patch('app.middleware.User.objects.filter') as user_query:
+            UserSessionValidationMiddleware(lambda req: None).process_view(
+                request,
+                view_func,
+                (),
+                {},
+            )
+        user_query.assert_not_called()
+
+        request.resolver_match = resolve('/about/')
+        with (
+            patch('app.context_processors.get_unread_message_count') as messages,
+            patch('app.context_processors.get_unread_notification_count') as notifications,
+            patch('app.context_processors.Applicant.objects.filter') as applicants,
+        ):
+            global_context(request)
+
+        messages.assert_not_called()
+        notifications.assert_not_called()
+        applicants.assert_not_called()
 
     def test_get_applicant_job_match_skips_expensive_model_for_empty_profile(self):
         empty_user = User.objects.create(
@@ -693,6 +724,35 @@ class MultiBizConversionTests(TestCase):
             0,
         )
 
+    def test_dashboard_pipeline_calculates_match_instead_of_showing_saved_zero(self):
+        self._complete_applicant_profile()
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            match_score=Decimal('0.00'),
+        )
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        with patch(
+            'app.views.views_applicant.get_applicant_job_match',
+            return_value={
+                'score': 73.4,
+                'score_type': 'rule_based',
+                'reason': '73% Match',
+            },
+        ):
+            response = self.client.get('/applicant/dashboard.php')
+
+        self.assertEqual(response.status_code, 200)
+        recent_application = response.context['recent_applications'][0]
+        self.assertEqual(recent_application.match_score, 73.4)
+        self.assertContains(response, '73% Match')
+        application.refresh_from_db()
+        self.assertEqual(application.match_score, Decimal('0.00'))
+
     @patch('app.views.views_applicant.compute_semantic_match')
     def test_job_match_api_withholds_score_until_profile_is_complete(self, semantic_match):
         session = self.client.session
@@ -799,8 +859,8 @@ class MultiBizConversionTests(TestCase):
                 response.context['scored_jobs'][0]['match_score_type'],
                 'semantic_model',
             )
-            self.assertContains(response, 'pre-trained all-MiniLM-L6-v2')
-            self.assertContains(response, 'not a hiring probability')
+            self.assertContains(response, 'Profile match estimate available based on your profile, resume, and the role requirements.')
+            self.assertContains(response, 'Estimated fit for this role')
             semantic_match.assert_called_once()
 
     def test_candidate_ml_ranking_adds_no_hand_weighted_bonuses(self):
@@ -854,7 +914,7 @@ class MultiBizConversionTests(TestCase):
         self.assertTrue(response.context['match_model_status']['ready'])
         self.assertEqual(response.context['jobs'][0]['match_score_type'], 'semantic_model')
         self.assertEqual(response.context['jobs'][0]['match_score'], 77.6)
-        self.assertContains(response, '78% AI relevance')
+        self.assertContains(response, '78% Match')
 
     def test_job_list_renders_rule_based_match_score_for_complete_profile(self):
         self._complete_applicant_profile()
@@ -905,9 +965,9 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(job_result['match_score_type'], 'semantic_model')
         self.assertEqual(response.context['min_match'], '80')
         self.assertEqual(len(response.context['jobs']), 1)
-        self.assertContains(response, 'Pre-trained AI')
-        self.assertContains(response, '83% AI relevance')
-        self.assertContains(response, 'does not depend on admin-reviewed outcomes')
+        self.assertContains(response, 'Profile Match')
+        self.assertContains(response, '83%')
+        self.assertContains(response, 'Profile match estimate available based on your profile, resume, and the role requirements.')
 
     def test_job_list_reports_model_download_failure(self):
         self._complete_applicant_profile()
@@ -1048,12 +1108,12 @@ class MultiBizConversionTests(TestCase):
 
         self.assertEqual(details.status_code, 200)
         self.assertEqual(details.context['match_score_type'], 'semantic_model')
-        self.assertContains(details, 'pre-trained AI relevance')
+        self.assertContains(details, 'Estimated fit between your profile and the role requirements.')
         self.assertEqual(apply.status_code, 200)
         self.assertEqual(apply.context['match_score_type'], 'semantic_model')
-        self.assertContains(apply, 'Meaning-based relevance')
+        self.assertContains(apply, 'Estimated fit between your profile and the role requirements.')
         self.assertEqual(applications.status_code, 200)
-        self.assertContains(applications, 'AI relevance')
+        self.assertContains(applications, 'Match')
 
     def test_admin_analytics_explains_automatic_tier_bands(self):
         session = self.client.session
@@ -3384,7 +3444,10 @@ class ApplicantNotificationTests(TestCase):
         self.assertContains(response, 'href="/applicant/applications.php"')
         self.assertContains(response, 'Open related page')
         self.assertNotContains(response, other_notification.title)
-        self.assertEqual(response.context['unread_notification_count'], 1)
+        self.assertEqual(response.context['unread_notification_count'], 0)
+        self.assertNotContains(response, 'Mark all as read')
+        own_notification.refresh_from_db()
+        self.assertTrue(own_notification.is_read)
 
         mark_read_response = self.client.post(
             '/applicant/notifications/',
@@ -3400,7 +3463,7 @@ class ApplicantNotificationTests(TestCase):
         self.assertTrue(own_notification.is_read)
         self.assertFalse(other_notification.is_read)
 
-    def test_mark_all_read_only_updates_current_applicant_notifications(self):
+    def test_opening_applicant_notifications_marks_all_owner_notifications_read(self):
         own_notification = Notification.objects.create(
             user=self.user,
             title='My unread notification',
@@ -3416,12 +3479,10 @@ class ApplicantNotificationTests(TestCase):
             title='Other unread notification',
         )
 
-        response = self.client.post(
-            '/applicant/notifications/',
-            {'action': 'mark_all_read'},
-        )
+        response = self.client.get('/applicant/notifications/')
 
-        self.assertRedirects(response, '/applicant/notifications/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['unread_notification_count'], 0)
         own_notification.refresh_from_db()
         other_notification.refresh_from_db()
         self.assertTrue(own_notification.is_read)
@@ -3467,7 +3528,10 @@ class AdminNotificationTests(TestCase):
         self.assertContains(response, 'href="/admin/jobs.php"')
         self.assertContains(response, 'Open related page')
         self.assertNotContains(response, other_notification.title)
-        self.assertEqual(response.context['unread_notification_count'], 1)
+        self.assertEqual(response.context['unread_notification_count'], 0)
+        self.assertNotContains(response, 'Mark all as read')
+        own_notification.refresh_from_db()
+        self.assertTrue(own_notification.is_read)
 
         mark_read_response = self.client.post(
             '/admin/notifications/',
@@ -3533,10 +3597,9 @@ class AdminNotificationTests(TestCase):
 
         poll_response = self.client.get('/admin/notifications/?poll=applications')
         self.assertEqual(poll_response.status_code, 200)
-        self.assertEqual(
-            [item['notification_id'] for item in poll_response.json()['notifications']],
-            [notification.notification_id],
-        )
+        self.assertEqual(poll_response.json()['notifications'], [])
+        notification.refresh_from_db()
+        self.assertTrue(notification.is_read)
 
     def test_new_application_notifications_are_returned_once_for_floating_toast(self):
         earlier_notification = Notification.objects.create(
@@ -3593,6 +3656,11 @@ class AdminNotificationTests(TestCase):
         self.assertEqual(notifications_page.status_code, 200)
         self.assertContains(notifications_page, unread_notification.title)
         self.assertContains(notifications_page, new_notification.title)
+        self.assertEqual(notifications_page.context['unread_notification_count'], 0)
+        unread_notification.refresh_from_db()
+        new_notification.refresh_from_db()
+        self.assertTrue(unread_notification.is_read)
+        self.assertTrue(new_notification.is_read)
 
         dashboard = self.client.get('/admin/analytics.php')
         self.assertContains(dashboard, 'id="applicationNotificationToast"')
@@ -3666,6 +3734,9 @@ class AdminNotificationTests(TestCase):
         self.assertContains(notifications_page, 'href="/employer/candidates.php"')
         self.assertContains(notifications_page, 'Open related page')
         self.assertNotContains(notifications_page, 'Private employer notification')
+        self.assertNotContains(notifications_page, 'Mark all as read')
+        notification.refresh_from_db()
+        self.assertTrue(notification.is_read)
         mark_read_response = employer_client.post(
             '/employer/notifications/',
             {
@@ -3677,7 +3748,7 @@ class AdminNotificationTests(TestCase):
         notification.refresh_from_db()
         self.assertTrue(notification.is_read)
 
-    def test_mark_all_read_only_updates_current_admin_notifications(self):
+    def test_opening_admin_notifications_marks_all_owner_notifications_read(self):
         own_notification = Notification.objects.create(
             user=self.user,
             title='My unread notification',
@@ -3693,12 +3764,11 @@ class AdminNotificationTests(TestCase):
             title='Other unread notification',
         )
 
-        response = self.client.post(
-            '/admin/notifications/',
-            {'action': 'mark_all_read'},
-        )
+        response = self.client.get('/admin/notifications/')
 
-        self.assertRedirects(response, '/admin/notifications/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['unread_notification_count'], 0)
+        self.assertNotContains(response, 'Mark all as read')
         own_notification.refresh_from_db()
         other_notification.refresh_from_db()
         self.assertTrue(own_notification.is_read)

@@ -3075,6 +3075,10 @@ def notifications_view(request):
 
         return redirect('admin_notifications')
 
+    Notification.objects.filter(
+        user_id=admin_id,
+        is_read=False,
+    ).update(is_read=True)
     notifications = Notification.objects.filter(
         user_id=admin_id,
     ).order_by('-created_at', '-notification_id')[:100]

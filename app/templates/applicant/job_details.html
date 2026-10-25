@@ -328,17 +328,7 @@
                 <span><i class="fas fa-money-bill-wave"></i> {{ job.salary_range }}</span>
             {% endif %}
         </div>
-        {% if match_score != None %}
-            <div role="status" style="margin: 1rem 0; padding: 1rem; border-radius: 8px; background: #eff6ff; color: #1e3a8a;">
-                <strong>
-                    {{ match_score|floatformat:0 }}% pre-trained AI relevance
-                </strong>
-                <div class="small" style="margin-top: .35rem;">Meaning-based relevance between your profile/resume and this job, computed with a pre-trained sentence-transformer. This is not a hiring probability and does not use admin-reviewed outcomes.</div>
-                {% for component in semantic_breakdown %}
-                    <div class="small" style="margin-top: .25rem;">{{ component.label }} relevance: {{ component.score|floatformat:0 }}%</div>
-                {% endfor %}
-            </div>
-        {% else %}
+        {% if match_reason %}
             <div class="small text-muted" role="status" style="margin: 1rem 0;">{{ match_reason }}</div>
         {% endif %}
 

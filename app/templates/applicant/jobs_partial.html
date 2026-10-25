@@ -1,6 +1,6 @@
 <span id="jobsCount">{{ jobs|length }}</span>
 <div class="small text-muted mb-2" role="status">
-    {{ match_model_status.reason }} Semantic relevance is not a probability of being hired.
+    {{ match_model_status.reason }}
 </div>
 <div id="activeFilters">
     {% if employment_type and employment_type != 'all' or remote_option and remote_option != 'all' or salary_range and salary_range != 'any' %}
@@ -71,16 +71,8 @@
                                 </p>
                             {% endif %}
                             
-                            {% if job.match_score != None and job.match_score_type == 'semantic_model' %}
-                                <button type="button" 
-                                        class="btn-match-score match-score-pill {% if job.match_score >= 80 %}score-badge-green{% elif job.match_score >= 60 %}score-badge-yellow{% elif job.match_score >= 40 %}score-badge-orange{% else %}score-badge-red{% endif %}"
-                                        data-job-id="{{ job.job_id }}"
-                                        data-job-title="{{ job.title }}"
-                                        data-match-score="{{ job.match_score }}">
-                                    <i class="fas fa-brain"></i> {{ job.match_score|floatformat:0 }}% AI relevance
-                                </button>
-                            {% else %}
-                                <span class="small text-muted" title="{{ job.match_reason }}">{{ job.match_reason|default:"Estimate unavailable" }}</span>
+                            {% if job.match_reason %}
+                                <span class="small text-muted" title="{{ job.match_reason }}">{{ job.match_reason }}</span>
                             {% endif %}
                         </div>
                     </div>
