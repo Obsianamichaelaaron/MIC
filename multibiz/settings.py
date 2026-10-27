@@ -25,15 +25,11 @@ DEBUG = os.environ.get(
     'false' if IS_VERCEL else 'true',
 ).lower() == 'true'
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or os.environ.get('SECRET_KEY')
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
-    SECRET_KEY = secrets.token_urlsafe(50)
     if IS_VERCEL:
-        # Vercel function instances are ephemeral; a generated key keeps the app
-        # available even before the deployment environment is configured.
-        os.environ['DJANGO_SECRET_KEY'] = SECRET_KEY
-    else:
-        os.environ['DJANGO_SECRET_KEY'] = SECRET_KEY
+        raise RuntimeError('DJANGO_SECRET_KEY must be configured in production.')
+    SECRET_KEY = secrets.token_urlsafe(50)
 
 ALLOWED_HOSTS = ['*']
 

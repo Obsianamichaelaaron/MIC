@@ -119,10 +119,7 @@ def enable_signed_context(apps, schema_editor):
     if schema_editor.connection.vendor != 'postgresql':
         return
 
-    secret = os.environ.get('RLS_CONTEXT_SECRET', '') or os.environ.get('DJANGO_SECRET_KEY', '')
-    if len(secret) < 32:
-        secret = os.urandom(32).hex()
-        os.environ['RLS_CONTEXT_SECRET'] = secret
+    secret = os.environ.get('RLS_CONTEXT_SECRET', '')
     if len(secret) < 32:
         raise RuntimeError(
             'Set RLS_CONTEXT_SECRET to a private random value of at least 32 '
