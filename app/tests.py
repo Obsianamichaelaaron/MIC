@@ -106,6 +106,37 @@ class VercelSqliteSeedTests(TestCase):
                 b'existing runtime database',
             )
 
+    def test_missing_seed_warns_and_runs_migrations(self):
+        from multibiz.runtime import prepare_vercel_database
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database_path = Path(temp_dir) / 'runtime' / 'db.sqlite3'
+
+            with (
+                patch.dict(os.environ, {'VERCEL': '1'}),
+                override_settings(
+                    DATABASES={
+                        'default': {
+                            'ENGINE': 'django.db.backends.sqlite3',
+                            'NAME': database_path,
+                        }
+                    },
+                    SQLITE_SEED_PATH=Path(temp_dir) / 'missing-seed.sqlite3',
+                ),
+                patch('django.core.management.call_command') as call_command,
+                self.assertWarnsRegex(
+                    RuntimeWarning,
+                    'Starting with an empty SQLite database',
+                ),
+            ):
+                prepare_vercel_database()
+
+            call_command.assert_called_once_with(
+                'migrate',
+                interactive=False,
+                verbosity=0,
+            )
+
 
 class CmsInitializationPerformanceTests(TestCase):
     def test_existing_landing_content_is_checked_with_three_queries(self):

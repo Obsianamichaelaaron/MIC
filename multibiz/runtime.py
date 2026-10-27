@@ -1,6 +1,7 @@
 import os
 import shutil
 import tempfile
+import warnings
 from pathlib import Path
 
 
@@ -20,10 +21,14 @@ def prepare_vercel_database():
         seed_path = Path(seed_path)
         database_path = Path(database['NAME'])
         if not seed_path.is_file():
-            raise FileNotFoundError(
-                f'SQLITE_SEED_PATH does not exist: {seed_path}'
+            warnings.warn(
+                f'SQLITE_SEED_PATH does not exist: {seed_path}. '
+                'Starting with an empty SQLite database; configure a valid '
+                'seed file to load its data.',
+                RuntimeWarning,
+                stacklevel=2,
             )
-        if seed_path.resolve() != database_path.resolve() and (
+        elif seed_path.resolve() != database_path.resolve() and (
             not database_path.exists() or database_path.stat().st_size == 0
         ):
             database_path.parent.mkdir(parents=True, exist_ok=True)
