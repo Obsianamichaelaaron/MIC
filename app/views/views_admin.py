@@ -162,17 +162,53 @@ def _automatic_tier_counts():
 
 
 def _ensure_landing_cms_content():
-    for section_key, fields in LANDING_CMS_DEFAULTS.items():
-        section, _ = CmsSection.objects.get_or_create(
-            section_key=section_key,
-            defaults={'section_name': section_key.replace('_', ' ').title(), 'content_type': 'text'},
+    section_keys = list(LANDING_CMS_DEFAULTS)
+    with transaction.atomic():
+        existing_section_keys = set(
+            CmsSection.objects.filter(
+                section_key__in=section_keys,
+            ).values_list('section_key', flat=True)
         )
-        for sort_order, (field_key, default_value) in enumerate(fields.items()):
-            CmsContent.objects.get_or_create(
-                section=section,
-                field_key=field_key,
-                defaults={'field_value': default_value, 'sort_order': sort_order},
-            )
+        CmsSection.objects.bulk_create(
+            [
+                CmsSection(
+                    section_key=section_key,
+                    section_name=section_key.replace('_', ' ').title(),
+                    content_type='text',
+                )
+                for section_key in section_keys
+                if section_key not in existing_section_keys
+            ],
+            ignore_conflicts=True,
+        )
+
+        sections = dict(
+            CmsSection.objects.filter(
+                section_key__in=section_keys,
+            ).values_list('section_key', 'id')
+        )
+        content_defaults = [
+            (sections[section_key], field_key, default_value, sort_order)
+            for section_key, fields in LANDING_CMS_DEFAULTS.items()
+            for sort_order, (field_key, default_value) in enumerate(fields.items())
+        ]
+        existing_content = set(
+            CmsContent.objects.filter(
+                section_id__in=sections.values(),
+            ).values_list('section_id', 'field_key')
+        )
+        CmsContent.objects.bulk_create(
+            [
+                CmsContent(
+                    section_id=section_id,
+                    field_key=field_key,
+                    field_value=default_value,
+                    sort_order=sort_order,
+                )
+                for section_id, field_key, default_value, sort_order in content_defaults
+                if (section_id, field_key) not in existing_content
+            ]
+        )
 
 
 @require_role('admin')
@@ -3352,11 +3388,11 @@ def cms_view(request):
             log_audit_trail(request, admin_id, 'update_cms_content', "Updated page section content")
             success_msg = "Content updated successfully!"
 
-    hero_slides = CmsHeroSlide.objects.order_by('sort_order', 'id')
-    testimonials = CmsTestimonial.objects.order_by('sort_order', 'id')
-    brands = CmsBrand.objects.order_by('sort_order', 'id')
-    news_items = CmsNews.objects.order_by('-created_at')
-    sections = CmsSection.objects.prefetch_related('contents').all()
+    hero_slides = list(CmsHeroSlide.objects.order_by('sort_order', 'id'))
+    testimonials = list(CmsTestimonial.objects.order_by('sort_order', 'id'))
+    brands = list(CmsBrand.objects.order_by('sort_order', 'id'))
+    news_items = list(CmsNews.objects.order_by('-created_at'))
+    sections = list(CmsSection.objects.prefetch_related('contents').all())
 
     context = {
         'page_title': 'CMS Management - MultiBiz',
@@ -3369,6 +3405,10 @@ def cms_view(request):
         'news_items': news_items,
         'news_articles': news_items,
         'sections': sections,
+        'slide_count': len(hero_slides),
+        'testimonial_count': len(testimonials),
+        'brand_count': len(brands),
+        'news_count': len(news_items),
         'success_msg': success_msg,
         'error_msg': error_msg,
     }

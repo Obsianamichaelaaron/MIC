@@ -100,8 +100,40 @@ PERSISTENT_DATA_DIR = Path(
 SQLITE_PATH = Path(
     os.environ.get('SQLITE_PATH', str(PERSISTENT_DATA_DIR / 'db.sqlite3'))
 )
+if not SQLITE_PATH.is_absolute():
+    SQLITE_PATH = BASE_DIR / SQLITE_PATH
+
+DATABASE_BACKEND = os.environ.get('DATABASE_BACKEND', '').strip().lower()
+if DATABASE_BACKEND not in {'', 'sqlite', 'postgresql'}:
+    raise RuntimeError(
+        'DATABASE_BACKEND must be either sqlite or postgresql.'
+    )
+
 DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
-if DATABASE_URL:
+if DATABASE_BACKEND == 'sqlite':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': SQLITE_PATH,
+            'OPTIONS': {'timeout': 20},
+        }
+    }
+elif DATABASE_BACKEND == 'postgresql':
+    if not DATABASE_URL:
+        raise RuntimeError(
+            'Set DATABASE_URL or POSTGRES_URL when DATABASE_BACKEND=postgresql.'
+        )
+    import dj_database_url
+
+    DATABASES = {
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=int(os.environ.get('DB_CONN_MAX_AGE', '60')),
+            conn_health_checks=True,
+            ssl_require=True,
+        )
+    }
+elif DATABASE_URL:
     import dj_database_url
 
     DATABASES = {
@@ -114,8 +146,8 @@ if DATABASE_URL:
     }
 elif IS_VERCEL:
     raise RuntimeError(
-        'Set DATABASE_URL to a persistent PostgreSQL database for Vercel. '
-        'SQLite in /tmp is not persistent.'
+        'Set DATABASE_URL for PostgreSQL, or explicitly set '
+        'DATABASE_BACKEND=sqlite for temporary SQLite testing on Vercel.'
     )
 else:
     DATABASES = {
@@ -125,11 +157,6 @@ else:
             'OPTIONS': {'timeout': 20},
         }
     }
-
-if IS_VERCEL and DATABASES['default']['ENGINE'].endswith('sqlite3'):
-    raise RuntimeError(
-        'Vercel deployments require persistent PostgreSQL via DATABASE_URL.'
-    )
 
 # Optional source databases used only by the one-time data import command.
 # The application itself always uses SQLite.

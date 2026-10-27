@@ -189,7 +189,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="cms-stat-label">Hero Slides</div>
-                        <div class="cms-stat-value">{{ slides.count }}</div>
+                        <div class="cms-stat-value">{{ slide_count }}</div>
                     </div>
                     <div class="cms-avatar-box" style="background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(37, 99, 235, 0.18)); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.25);">
                         <i class="fa-solid fa-images"></i>
@@ -202,7 +202,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="cms-stat-label">Partner Brands</div>
-                        <div class="cms-stat-value">{{ brands.count }}</div>
+                        <div class="cms-stat-value">{{ brand_count }}</div>
                     </div>
                     <div class="cms-avatar-box" style="background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(2, 132, 199, 0.18)); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.25);">
                         <i class="fa-solid fa-building"></i>
@@ -215,7 +215,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="cms-stat-label">Testimonials</div>
-                        <div class="cms-stat-value">{{ testimonials.count }}</div>
+                        <div class="cms-stat-value">{{ testimonial_count }}</div>
                     </div>
                     <div class="cms-avatar-box" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(217, 119, 6, 0.18)); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.25);">
                         <i class="fa-solid fa-star"></i>
@@ -228,7 +228,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="cms-stat-label">News Articles</div>
-                        <div class="cms-stat-value">{{ news_articles.count }}</div>
+                        <div class="cms-stat-value">{{ news_count }}</div>
                     </div>
                     <div class="cms-avatar-box" style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.18)); color: #059669; border: 1px solid rgba(16, 185, 129, 0.25);">
                         <i class="fa-solid fa-newspaper"></i>
@@ -244,28 +244,28 @@
             <button class="nav-link active" id="slides-tab" data-bs-toggle="pill" data-bs-target="#slides-pane" type="button" role="tab">
                 <i class="fa-solid fa-images"></i>
                 <span>Hero Carousel Slides</span>
-                <span class="badge bg-light text-dark rounded-pill ms-1">{{ slides.count }}</span>
+                <span class="badge bg-light text-dark rounded-pill ms-1">{{ slide_count }}</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="brands-tab" data-bs-toggle="pill" data-bs-target="#brands-pane" type="button" role="tab">
                 <i class="fa-solid fa-building"></i>
                 <span>Partner Brands</span>
-                <span class="badge bg-light text-dark rounded-pill ms-1">{{ brands.count }}</span>
+                <span class="badge bg-light text-dark rounded-pill ms-1">{{ brand_count }}</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="testimonials-tab" data-bs-toggle="pill" data-bs-target="#testimonials-pane" type="button" role="tab">
                 <i class="fa-solid fa-star"></i>
                 <span>Client Testimonials</span>
-                <span class="badge bg-light text-dark rounded-pill ms-1">{{ testimonials.count }}</span>
+                <span class="badge bg-light text-dark rounded-pill ms-1">{{ testimonial_count }}</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="news-tab" data-bs-toggle="pill" data-bs-target="#news-pane" type="button" role="tab">
                 <i class="fa-solid fa-newspaper"></i>
                 <span>News & Announcements</span>
-                <span class="badge bg-light text-dark rounded-pill ms-1">{{ news_articles.count }}</span>
+                <span class="badge bg-light text-dark rounded-pill ms-1">{{ news_count }}</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">

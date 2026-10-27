@@ -1,9 +1,9 @@
 # Deploying the Django app on Vercel
 
-Vercel Functions have an ephemeral filesystem. The app therefore requires a
-persistent PostgreSQL database; local SQLite files and `/tmp` are not used as
-the Vercel production database. Uploaded files also need persistent object
-storage if they must survive function invocations.
+Vercel Functions have an ephemeral filesystem. Use PostgreSQL for persistent
+production data. For temporary panel checks only, `DATABASE_BACKEND=sqlite`
+selects SQLite at `/tmp/db.sqlite3`; its data may disappear or differ between
+function instances. Uploaded files have the same persistence limitation.
 
 ## Configure the project
 
@@ -12,8 +12,8 @@ storage if they must survive function invocations.
 2. In **Project Settings → Environment Variables**, set `DATABASE_URL` to the
    same persistent PostgreSQL connection string that the working local app
    uses. Use a database owner/migration-capable connection string. Do not use
-   SQLite, a short-lived branch database, or a restricted runtime role.
-   Keeping the same database means existing local-app accounts remain
+   a short-lived branch database or a restricted runtime role. Keeping the
+   same database means existing local-app accounts remain
    available; no SQLite data copy is needed if local already uses PostgreSQL.
 3. Configure `DJANGO_SECRET_KEY` in the same Vercel environments. Generate a
    private value locally:
@@ -27,6 +27,12 @@ storage if they must survive function invocations.
    `RLS_CONTEXT_SECRET` with a private random value of at least 32 characters.
 4. Redeploy after saving the environment variables. The function applies
    database migrations at startup.
+
+For temporary SQLite testing instead, set `DATABASE_BACKEND=sqlite` in the
+Vercel environment and redeploy. The local SQLite copy is not uploaded to
+Vercel, so this creates a separate, ephemeral database and does not include
+the copied accounts. Remove `DATABASE_BACKEND` (or set it to `postgresql`)
+and redeploy to return to PostgreSQL.
 
 ## Import a local SQLite database when needed
 

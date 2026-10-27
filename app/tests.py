@@ -11,13 +11,15 @@ from django.test import TestCase, Client, RequestFactory, override_settings
 from django.core import mail
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.urls import resolve, reverse
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from app.models import (
     User, Applicant, Employer, JobPosting, Application,
     Qualification, JobQualificationMapping, Skill, ContactInquiry, Message, AuditTrail,
     Notification, InterviewSchedule, CmsHeroSlide, CmsBrand, CmsTestimonial, SavedJob,
-    PasswordResetToken,
+    PasswordResetToken, CmsSection, CmsContent,
 )
 from app.auth_utils import verify_password, hash_password
 from app.context_processors import global_context
@@ -30,6 +32,7 @@ from app.services.resume_parser import (
 )
 from app.services.ml_ranking import calculate_candidate_ml_score, compute_job_match_result
 from app.views.views_applicant import get_applicant_job_match
+from app.views.views_admin import _ensure_landing_cms_content
 from django.core.cache import cache
 from app.services.semantic_job_matching import (
     SemanticMatchingUnavailable,
@@ -38,6 +41,30 @@ from app.services.semantic_job_matching import (
     compute_semantic_match,
 )
 from app.services.qualification import classify_match_score
+
+
+class CmsInitializationPerformanceTests(TestCase):
+    def test_existing_landing_content_is_checked_with_three_queries(self):
+        _ensure_landing_cms_content()
+        content = CmsContent.objects.get(
+            section__section_key='hero',
+            field_key='eyebrow',
+        )
+        content.field_value = 'Customized hero text'
+        content.save(update_fields=['field_value'])
+
+        with CaptureQueriesContext(connection) as captured_queries:
+            _ensure_landing_cms_content()
+
+        database_queries = [
+            query for query in captured_queries.captured_queries
+            if not query['sql'].upper().startswith(('SAVEPOINT', 'RELEASE SAVEPOINT'))
+        ]
+        self.assertEqual(len(database_queries), 3)
+
+        content.refresh_from_db()
+        self.assertEqual(content.field_value, 'Customized hero text')
+        self.assertEqual(CmsSection.objects.count(), 9)
 
 class MultiBizConversionTests(TestCase):
     def setUp(self):

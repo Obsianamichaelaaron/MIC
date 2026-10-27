@@ -41,13 +41,20 @@
         return request;
     }
 
-    function shouldUseNativeNavigation(url) {
+    function isPanelNavigationLink(link) {
+        return Boolean(link && link.matches(
+            '.navbar-menu a[href], .ud-item[href], .navbar-brand[href]'
+        ));
+    }
+
+    function shouldUseNativeNavigation(url, link) {
         const isPortalRoute = /^\/(?:applicant|employer)\//.test(url.pathname);
         const isAdminRoute = /^\/admin\//.test(url.pathname);
         const currentScriptCount = document.querySelectorAll('script[src]').length;
         const hasManyScripts = !isPortalRoute && currentScriptCount > MAX_INSTANT_NAV_SCRIPTS;
         const hasForcedFallback = document.body && document.body.dataset.noInstantNav === 'true';
-        return hasForcedFallback || hasManyScripts || isAdminRoute;
+        const isPanelLink = isPanelNavigationLink(link);
+        return hasForcedFallback || (!isPanelLink && (hasManyScripts || isAdminRoute));
     }
     let pageScope = new AbortController();
     let pageIntervals = new Set();
@@ -176,9 +183,10 @@
             let finalUrl = url.href;
             let redirected = false;
 
-            if (pageCache.has(pageCacheKey(url))) {
-                html = pageCache.get(pageCacheKey(url));
-            } else {
+            try {
+                html = await fetchPageHtml(url);
+            } catch (error) {
+                if (request.signal.aborted) throw error;
                 const response = await fetch(url.href, {
                     credentials: 'same-origin',
                     headers: { 'Accept': 'text/html' },
@@ -228,7 +236,8 @@
             setNavigationBusy(true);
 
             await executePageScripts(nextDocument, finalUrl);
-            if (options.scrollY !== undefined) {                window.scrollTo(0, options.scrollY);
+            if (options.scrollY !== undefined) {
+                window.scrollTo(0, options.scrollY);
             } else if (url.hash) {
                 const target = document.getElementById(decodeURIComponent(url.hash.slice(1)));
                 if (target) target.scrollIntoView();
@@ -255,7 +264,7 @@
         if (/\/logout\/?$/.test(url.pathname) ||
             /(?:export|download|excel|csv)/i.test(url.pathname) ||
             /\.(?:pdf|xlsx?|csv|docx?|zip|png|jpe?g|gif|webp|svg|mp4|mp3)$/i.test(url.pathname)) return;
-        if (shouldUseNativeNavigation(url)) return;
+        if (shouldUseNativeNavigation(url, link)) return;
         fetchPageHtml(url).catch(() => {});
     }
 
@@ -268,6 +277,15 @@
         const link = event.target.closest && event.target.closest('a[href]');
         if (link) prefetchLink(link);
     }, { passive: true });
+
+    nativeDocumentAdd('pointerdown', (event) => {
+        const link = event.target.closest && event.target.closest('a[href]');
+        if (link) prefetchLink(link);
+    }, { passive: true });
+
+    nativeDocumentAdd('submit', () => {
+        pageCache.clear();
+    }, true);
 
     nativeDocumentAdd('click', (event) => {
         if (event.defaultPrevented || event.button !== 0 ||
@@ -285,7 +303,7 @@
             /(?:export|download|excel|csv)/i.test(url.pathname) ||
             /\.(?:pdf|xlsx?|csv|docx?|zip|png|jpe?g|gif|webp|svg|mp4|mp3)$/i.test(url.pathname)) return;
 
-        if (shouldUseNativeNavigation(url)) {
+        if (shouldUseNativeNavigation(url, link)) {
             return;
         }
 
@@ -305,11 +323,13 @@
         if (connection && (connection.saveData ||
             ['slow-2g', '2g'].includes(connection.effectiveType))) return;
 
-        const links = Array.from(document.querySelectorAll('a[href]'))
+        const links = Array.from(document.querySelectorAll(
+            '.navbar-menu a[href], .ud-item[href], .navbar-brand[href]'
+        ))
             .filter((link) => {
                 const url = new URL(link.href, window.location.href);
                 return url.origin === window.location.origin &&
-                    !shouldUseNativeNavigation(url) &&
+                    !shouldUseNativeNavigation(url, link) &&
                     !/\/logout\/?$/.test(url.pathname) &&
                     !/(?:export|download|excel|csv)/i.test(url.pathname) &&
                     !/\.(?:pdf|xlsx?|csv|docx?|zip|png|jpe?g|gif|webp|svg|mp4|mp3)$/i.test(url.pathname);
