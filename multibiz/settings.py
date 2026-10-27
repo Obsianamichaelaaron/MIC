@@ -260,8 +260,13 @@ ADMIN_NOTIFICATION_EMAIL = os.environ.get(
 WORKFLOW_REMINDER_TOKEN = os.environ.get('WORKFLOW_REMINDER_TOKEN', '')
 
 # Session Configuration
-# Use cached_db: reads from local cache, only writes to DB when session changes.
-SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
+USE_VERCEL_SQLITE_SESSIONS = IS_VERCEL and DATABASE_BACKEND == 'sqlite'
+if USE_VERCEL_SQLITE_SESSIONS:
+    SESSION_ENGINE = 'django.contrib.sessions.backends.signed_cookies'
+    SESSION_SERIALIZER = 'app.session_serializers.EncryptedJSONSerializer'
+else:
+    # Use cached_db: reads from local cache, only writes to DB when session changes.
+    SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
 SESSION_COOKIE_NAME = 'multibiz_sessionid'
 SESSION_COOKIE_AGE = 86400 * 7 # 7 days
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False

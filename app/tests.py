@@ -3331,6 +3331,57 @@ class MultiBizConversionTests(TestCase):
 
 
 class RoleAuthorizationTests(TestCase):
+    @override_settings(
+        SESSION_ENGINE='django.contrib.sessions.backends.signed_cookies',
+        SESSION_SERIALIZER='app.session_serializers.EncryptedJSONSerializer',
+    )
+    def test_admin_session_survives_independent_function_requests(self):
+        admin = User.objects.create(
+            email='serverless-session-admin@example.com',
+            password='not-a-real-account',
+            role='admin',
+            status='active',
+        )
+        first_client = Client()
+        session = first_client.session
+        session.update({
+            'user_id': admin.user_id,
+            'email': admin.email,
+            'role': admin.role,
+            'first_name': admin.first_name or '',
+            'last_name': admin.last_name or '',
+        })
+        session.save()
+        first_client.cookies['multibiz_sessionid'] = session.session_key
+        session_cookie = first_client.cookies['multibiz_sessionid'].value
+
+        second_client = Client()
+        second_client.cookies['multibiz_sessionid'] = session_cookie
+        response = second_client.get('/admin/dashboard.php')
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_login_page_distinguishes_expired_session_from_role_denial(self):
+        expired_session = self.client.get(
+            '/loginregister.php?error=login_required'
+        )
+        self.assertContains(
+            expired_session,
+            'Your session may have expired. Please log in again.',
+        )
+        self.assertNotContains(
+            expired_session,
+            'active applicant account',
+        )
+
+        role_denied = self.client.get(
+            '/loginregister.php?error=unauthorized'
+        )
+        self.assertContains(
+            role_denied,
+            'Your account does not have permission to access that page.',
+        )
+
     def test_session_role_is_reloaded_from_account_record(self):
         applicant = User.objects.create(
             email='rls-session-applicant@example.com',
@@ -3349,6 +3400,26 @@ class RoleAuthorizationTests(TestCase):
 
         self.assertEqual(response.status_code, 302)
         self.assertIn('error=unauthorized', response['Location'])
+
+
+class EncryptedSessionSerializerTests(TestCase):
+    def test_signed_cookie_session_serializer_encrypts_and_round_trips_data(self):
+        from app.session_serializers import EncryptedJSONSerializer
+        from cryptography.fernet import InvalidToken
+
+        session_data = {
+            'user_id': 123,
+            'email': 'private-admin@example.com',
+            'email_otp': {'code': '123456'},
+        }
+
+        encoded = EncryptedJSONSerializer.dumps(session_data)
+
+        self.assertNotIn(b'private-admin@example.com', encoded)
+        self.assertNotIn(b'123456', encoded)
+        self.assertEqual(EncryptedJSONSerializer.loads(encoded), session_data)
+        with self.assertRaises(InvalidToken):
+            EncryptedJSONSerializer.loads(b'tampered')
 
 
 class PrivateResumeAccessTests(TestCase):

@@ -44,7 +44,9 @@ staging directory. Each function instance copies the seed to its own
 `/tmp/db.sqlite3` on first startup and runs migrations. This is only a
 temporary sign-in/testing snapshot: changes are not shared across instances
 and may be lost when an instance restarts or is redeployed. Remove the seed
-environment variable and redeploy when finished.
+environment variable and redeploy when finished. Vercel SQLite deployments
+use encrypted, signed-cookie sessions so logins remain valid across function
+instances; keep `DJANGO_SECRET_KEY` unchanged between deployments.
 
 ## Import a local SQLite database when needed
 

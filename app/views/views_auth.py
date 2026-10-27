@@ -86,9 +86,9 @@ def login_register_view(request):
     session_expired = request.session.pop('session_expired', False)
     error = None
     if request.GET.get('error') == 'unauthorized':
-        error = 'Please log in with an active applicant account to browse jobs.'
+        error = 'Your account does not have permission to access that page.'
     elif request.GET.get('error') == 'login_required':
-        error = 'Please log in with an active applicant account to browse jobs.'
+        error = 'Your session may have expired. Please log in again.'
     success = None
 
     if request.method == 'POST':
