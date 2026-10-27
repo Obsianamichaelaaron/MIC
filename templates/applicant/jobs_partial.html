@@ -1,10 +1,6 @@
 <span id="jobsCount">{{ jobs|length }}</span>
 <div class="small text-muted mb-2" role="status">
-    {% if semantic_scores_available %}
-        Profile match estimate available based on your profile, resume, and the role requirements.
-    {% else %}
-        {{ match_model_status.reason }}
-    {% endif %}
+    {{ match_model_status.reason }}
 </div>
 <div id="activeFilters">
     {% if employment_type and employment_type != 'all' or remote_option and remote_option != 'all' or salary_range and salary_range != 'any' %}
