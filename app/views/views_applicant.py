@@ -82,20 +82,12 @@ def _semantic_match_cache_key(applicant: Applicant, job: JobPosting, resume_text
     return f"applicant-job-match:{applicant.pk}:{job.pk}:{fingerprint}"
 
 
-def _semantic_match_default_reason(score=None, *, detail_page=False):
-    if detail_page and score is not None:
-        return 'Estimated fit between your profile and the role requirements.'
-    if score is not None:
-        return 'Profile match estimate available based on your profile, resume, and the role requirements.'
-    return 'Profile match estimate available based on your profile, resume, and the role requirements.'
-
-
 def _semantic_model_status(match=None):
     if match and not match['model_ready']:
         return {'ready': False, 'reason': match['reason']}
     return {
         'ready': True,
-        'reason': _semantic_match_default_reason(score=match.get('score') if match else None),
+        'reason': 'Profile-based recommendations help surface relevant openings.',
     }
 
 
@@ -158,7 +150,7 @@ def get_applicant_job_match(
                     'score': semantic_match['score'],
                     'score_type': 'semantic_model',
                     'semantic_breakdown': semantic_match.get('breakdown', []),
-                    'reason': semantic_match.get('reason') or _semantic_match_default_reason(semantic_match.get('score')),
+                    'reason': semantic_match.get('reason') or f"{semantic_match['score']:.0f}% Match",
                     'model_ready': True,
                 }
                 cache.set(cache_key, result, timeout=SEMANTIC_MATCH_CACHE_TTL_SECONDS)
@@ -812,10 +804,6 @@ def job_details_view(request, job_id=None):
         if profile_completed else _profile_incomplete_match()
     )
     match_score = match['score']
-    if match['score_type'] == 'semantic_model':
-        match_reason = _semantic_match_default_reason(match.get('score'), detail_page=True)
-    else:
-        match_reason = match['reason'] or _semantic_match_default_reason(match.get('score'), detail_page=True)
 
     # Job qualifications
     job_qualifications = [qm.qualification for qm in job.qualification_mappings.select_related('qualification').all() if qm.qualification]
@@ -847,7 +835,7 @@ def job_details_view(request, job_id=None):
         'match_score': match_score,
         'match_score_type': match['score_type'],
         'semantic_breakdown': match['semantic_breakdown'],
-        'match_reason': match_reason,
+        'match_reason': match['reason'],
         'match_model_status': _semantic_model_status(match),
         'score': match_score,
         'color': color,
@@ -1031,10 +1019,6 @@ def apply_job_view(request, job_id=None):
     ).order_by('-analysis_date').values_list('extracted_text', flat=True).first() or ''
     match = get_applicant_job_match(applicant, job, resume_text)
     match_score = match['score']
-    if match['score_type'] == 'semantic_model':
-        match_reason = _semantic_match_default_reason(match.get('score'), detail_page=True)
-    else:
-        match_reason = match['reason'] or _semantic_match_default_reason(match.get('score'), detail_page=True)
     job_skills = [
         skill.strip()
         for skill in (job.skills_required or '').split(',')
@@ -1051,7 +1035,7 @@ def apply_job_view(request, job_id=None):
         'match_score': match_score,
         'match_score_type': match['score_type'],
         'job_skills': job_skills,
-        'match_reason': match_reason,
+        'match_reason': match['reason'],
         'match_model_status': _semantic_model_status(match),
         'error': error,
     }
