@@ -548,11 +548,16 @@
             <div class="applications-hero-content">
                 <div>
                     <p class="applications-breadcrumb"><a href="dashboard.php">Dashboard</a> / My Applications</p>
-                    <h1><i class="fas fa-list-check"></i> My Applications <span class="applications-count"><i class="fas fa-chart-line"></i> {{ applications|length }} Active Submissions</span></h1>
+                    <h1><i class="fas fa-list-check"></i> My Applications <span class="applications-count"><i class="fas fa-chart-line"></i> {{ applications|length }} Application Records</span></h1>
                 </div>
                 <a href="jobs.php" class="applications-explore"><i class="fas fa-magnifying-glass"></i> Explore More Jobs</a>
             </div>
         </section>
+
+        <nav aria-label="Application records" style="display:flex;gap:.5rem;margin-bottom:1rem;">
+            <a href="?status=" style="padding:.45rem .8rem;border-radius:999px;background:{% if not status_filter %}#1866a3{% else %}#fff{% endif %};color:{% if not status_filter %}#fff{% else %}#334155{% endif %};text-decoration:none;font-size:.8rem;font-weight:600;">Active</a>
+            <a href="?status=withdrawn" style="padding:.45rem .8rem;border-radius:999px;background:{% if status_filter == 'withdrawn' %}#1866a3{% else %}#fff{% endif %};color:{% if status_filter == 'withdrawn' %}#fff{% else %}#334155{% endif %};text-decoration:none;font-size:.8rem;font-weight:600;">Withdrawn history</a>
+        </nav>
 
         <section class="applications-card">
             <div class="applications-table-wrap">
@@ -573,12 +578,7 @@
                                     {% if app.status == 'offer_sent' %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#offerModal{{ app.application_id }}"><i class="fas fa-file-signature"></i> Review Offer</button>{% endif %}
                                     {% if interview %}{% if interview_overdue %}<a class="application-action primary" href="/applicant/chat.php?user_id={{ app.job.employer.user_id }}"><i class="fas fa-comment-dots"></i> Follow Up</a><button class="application-action" type="button" data-bs-toggle="modal" data-bs-target="#interviewModal{{ app.application_id }}"><i class="fas fa-circle-info"></i> Details</button>{% else %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#interviewModal{{ app.application_id }}"><i class="fas fa-video"></i> Interview</button>{% endif %}{% endif %}
                                     {% if app.status != 'accepted' and app.status != 'hired' and app.status != 'rejected' and app.status != 'withdrawn' and app.status != 'job_closed' and app.status != 'offer_declined' and app.status != 'offer_sent' %}
-                                        <form method="POST" action="update_application.php" onsubmit="return confirm('Withdraw this application?');">
-                                            {% csrf_token %}
-                                            <input type="hidden" name="application_id" value="{{ app.application_id }}">
-                                            <input type="hidden" name="action" value="withdraw">
-                                            <button class="application-action" type="submit" title="Withdraw application"><i class="fas fa-xmark"></i> Withdraw</button>
-                                        </form>
+                                        <button class="application-action" type="button" title="Withdraw application" onclick="showWithdrawModal('{{ app.application_id }}', '{{ app.job.title|escapejs }}')"><i class="fas fa-xmark"></i> Withdraw</button>
                                     {% endif %}
                                 </div>
                             </td>
@@ -896,6 +896,29 @@
 
 <!-- ══ Modals ══ -->
 
+<div id="withdrawApplicationModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="withdrawApplicationTitle">
+    <div class="modal-dialog">
+        <div class="modal-head">
+            <h3 id="withdrawApplicationTitle"><i class="fas fa-circle-exclamation"></i> Withdraw Application</h3>
+            <button type="button" class="modal-close-btn" aria-label="Close" onclick="closeModal('withdrawApplicationModal')">&times;</button>
+        </div>
+        <form method="POST" action="update_application.php">
+            {% csrf_token %}
+            <input type="hidden" name="application_id" id="withdrawApplicationId">
+            <input type="hidden" name="action" value="withdraw">
+            <div class="modal-body">
+                <p id="withdrawApplicationPrompt" style="margin:0 0 .75rem;color:#475569;"></p>
+                <label for="withdrawalReason" style="display:block;margin-bottom:.4rem;font-weight:600;">Why are you withdrawing this application?</label>
+                <textarea id="withdrawalReason" name="withdrawal_reason" required maxlength="2000" rows="4" style="width:100%;padding:.7rem;border:1px solid #cbd5e1;border-radius:8px;font:inherit;resize:vertical;" placeholder="Please share your reason"></textarea>
+            </div>
+            <div class="modal-foot">
+                <button type="button" class="btn-action btn-action-secondary" onclick="closeModal('withdrawApplicationModal')">Keep Application</button>
+                <button type="submit" class="btn-action btn-action-accent">Confirm Withdrawal</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Match Score Modal -->
 <div id="matchScoreModal" class="modal-overlay">
     <div class="modal-dialog">
@@ -975,6 +998,17 @@ function closeModal(id) {
         modal.style.display = 'none';
         document.body.style.overflow = 'auto';
     }
+}
+
+function showWithdrawModal(appId, jobTitle) {
+    document.getElementById('withdrawApplicationId').value = appId;
+    document.getElementById('withdrawApplicationPrompt').textContent =
+        `Please tell us why you want to withdraw from ${jobTitle}.`;
+    const reason = document.getElementById('withdrawalReason');
+    reason.value = '';
+    document.getElementById('withdrawApplicationModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    reason.focus();
 }
 
 function handleScoreBtnClick(btn) {

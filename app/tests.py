@@ -3,6 +3,7 @@ import os
 import sys
 import tempfile
 import types
+from contextlib import nullcontext
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -639,6 +640,40 @@ class MultiBizConversionTests(TestCase):
         profile_response = self.client.get('/applicant/profile.php')
         self.assertEqual(profile_response.status_code, 200)
         self.assertContains(profile_response, self.applicant.profile_pic)
+
+    def test_profile_photo_upload_refreshes_cached_header_dropdown(self):
+        self.client.post('/loginregister.php', {
+            'email': 'jobseeker@gmail.com',
+            'password': 'jobseeker123'
+        })
+        cache.set(f'profile_pic_{self.applicant_user.user_id}', 'old-profile.png', 120)
+
+        with (
+            patch(
+                'app.views.views_applicant.stage_uploaded_file',
+                return_value=nullcontext('staged-profile.png'),
+            ),
+            patch(
+                'app.views.views_applicant.store_profile_picture',
+                return_value='new-profile.png',
+            ),
+        ):
+            response = self.client.post('/applicant/profile.php', {
+                'action': 'upload_photo',
+                'profile_photo': SimpleUploadedFile(
+                    'new-profile.png',
+                    b'profile image',
+                    content_type='image/png',
+                ),
+            })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'new-profile.png')
+        self.assertNotContains(response, 'old-profile.png')
+        self.assertEqual(
+            cache.get(f'profile_pic_{self.applicant_user.user_id}'),
+            'new-profile.png',
+        )
 
     def test_successful_legacy_login_upgrades_plain_password_hash(self):
         legacy_user = User.objects.create(
@@ -1594,8 +1629,8 @@ class MultiBizConversionTests(TestCase):
         session.save()
         employer_response = self.client.get('/employer/dashboard.php')
 
-        self.assertContains(applicant_response, '/static/js/instant-navigation.js?v=4')
-        self.assertContains(employer_response, '/static/js/instant-navigation.js?v=4')
+        self.assertContains(applicant_response, '/static/js/instant-navigation.js?v=6')
+        self.assertContains(employer_response, '/static/js/instant-navigation.js?v=6')
 
     def test_homepage_featured_jobs_are_unique_and_use_employer_names(self):
         JobPosting.objects.create(
@@ -2777,6 +2812,14 @@ class MultiBizConversionTests(TestCase):
             status='forwarded',
             forwarded_to_employer=True,
         )
+        interview = InterviewSchedule.objects.create(
+            application=application,
+            employer=self.employer,
+            interview_date=timezone.localdate() + timedelta(days=2),
+            start_time='10:00',
+            end_time='11:00',
+            status='scheduled',
+        )
         session = self.client.session
         session['user_id'] = self.applicant_user.user_id
         session['role'] = 'applicant'
@@ -2785,6 +2828,7 @@ class MultiBizConversionTests(TestCase):
         response = self.client.post('/applicant/update_application.php', {
             'application_id': application.application_id,
             'action': 'withdraw',
+            'withdrawal_reason': 'I accepted another position.',
         }, follow=True)
 
         self.assertEqual(response.status_code, 200)
@@ -2792,10 +2836,104 @@ class MultiBizConversionTests(TestCase):
         self.assertEqual(application.status, 'withdrawn')
         self.assertEqual(application.employer_status, 'withdrawn')
         self.assertEqual(application.status_history[-1]['status'], 'withdrawn')
+        self.assertEqual(application.status_history[-1]['notes'], 'I accepted another position.')
+        self.assertIn('I accepted another position.', application.applicant_remarks_history)
+        interview.refresh_from_db()
+        self.assertEqual(interview.status, 'cancelled')
         self.assertTrue(Notification.objects.filter(
             user=self.employer_user,
             title='Applicant withdrew an application',
+            message__contains='I accepted another position.',
         ).exists())
+
+    def test_applicant_withdrawal_requires_a_reason(self):
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='forwarded',
+            forwarded_to_employer=True,
+        )
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        response = self.client.post('/applicant/update_application.php', {
+            'application_id': application.application_id,
+            'action': 'withdraw',
+            'withdrawal_reason': '   ',
+        }, follow=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Please tell us why you are withdrawing this application.')
+        self.assertContains(response, 'Why are you withdrawing this application?')
+        self.assertContains(response, 'name="withdrawal_reason" required')
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'forwarded')
+
+    def test_dashboard_hides_withdrawn_applications_and_interviews(self):
+        withdrawn_application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='withdrawn',
+        )
+        active_job = JobPosting.objects.create(
+            employer=self.employer,
+            title='Active Dashboard Application',
+            status='active',
+        )
+        active_application = Application.objects.create(
+            job=active_job,
+            applicant=self.applicant,
+            status='pending',
+        )
+        withdrawn_interview = InterviewSchedule.objects.create(
+            application=withdrawn_application,
+            employer=self.employer,
+            interview_date=timezone.localdate() + timedelta(days=2),
+            start_time='10:00',
+            end_time='11:00',
+            status='scheduled',
+        )
+        active_interview = InterviewSchedule.objects.create(
+            application=active_application,
+            employer=self.employer,
+            interview_date=timezone.localdate() + timedelta(days=3),
+            start_time='10:00',
+            end_time='11:00',
+            status='scheduled',
+        )
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        response = self.client.get('/applicant/dashboard.php')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [app.application_id for app in response.context['recent_applications']],
+            [active_application.application_id],
+        )
+        self.assertEqual(
+            [interview.id for interview in response.context['upcoming_interviews']],
+            [active_interview.id],
+        )
+        self.assertContains(response, active_job.title)
+        self.assertNotContains(response, self.job.title)
+        self.assertEqual(withdrawn_interview.status, 'scheduled')
+
+        tracker = self.client.get('/applicant/applications.php')
+        withdrawn_history = self.client.get('/applicant/applications.php?status=withdrawn')
+
+        self.assertEqual(
+            [item['app'].application_id for item in tracker.context['applications']],
+            [active_application.application_id],
+        )
+        self.assertEqual(
+            [item['app'].application_id for item in withdrawn_history.context['applications']],
+            [withdrawn_application.application_id],
+        )
 
     def test_applicant_can_request_interview_reschedule(self):
         application = Application.objects.create(

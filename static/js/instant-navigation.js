@@ -6,6 +6,40 @@
     const MAX_IDLE_PREFETCHES = 4;
     const nativeDocumentAdd = document.addEventListener.bind(document);
     const nativeWindowAdd = window.addEventListener.bind(window);
+    function setUserDropdownOpen(isOpen) {
+        const trigger = document.getElementById('udTrigger');
+        const dropdown = document.getElementById('udDropdown');
+        const caret = document.getElementById('udCaret');
+        if (!trigger || !dropdown) return;
+
+        dropdown.classList.toggle('open', isOpen);
+        if (caret) caret.classList.toggle('open', isOpen);
+        trigger.setAttribute('aria-expanded', String(isOpen));
+    }
+
+    nativeDocumentAdd('click', (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (!target) return;
+
+        const wrapper = document.getElementById('udWrapper');
+        if (!wrapper) return;
+
+        if (target.closest('#udTrigger')) {
+            event.stopPropagation();
+            const dropdown = document.getElementById('udDropdown');
+            setUserDropdownOpen(!dropdown || !dropdown.classList.contains('open'));
+        } else if (target.closest('#udClose')) {
+            event.stopPropagation();
+            setUserDropdownOpen(false);
+        } else if (!wrapper.contains(target)) {
+            setUserDropdownOpen(false);
+        }
+    });
+
+    nativeDocumentAdd('keydown', (event) => {
+        if (event.key === 'Escape') setUserDropdownOpen(false);
+    });
+
     const loadedScripts = new Set(
         Array.from(document.querySelectorAll('script[src]'))
             .map((script) => new URL(script.src, window.location.href).href)

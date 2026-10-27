@@ -260,7 +260,10 @@ def dashboard_view(request):
         .annotate(cnt=Count('pk'))
     )
     app_status_map = {row['status']: row['cnt'] for row in app_counts_qs}
-    app_count         = sum(app_status_map.values())
+    app_count         = sum(
+        count for status, count in app_status_map.items()
+        if status != 'withdrawn'
+    )
     pending_count     = app_status_map.get('pending', 0)
     shortlisted_count = app_status_map.get('shortlisted', 0)
     accepted_count    = app_status_map.get('accepted', 0)
@@ -376,6 +379,7 @@ def dashboard_view(request):
     # Recent applications — calculate the same profile match shown in the full tracker.
     applications = list(
         Application.objects.filter(applicant=applicant)
+        .exclude(status='withdrawn')
         .select_related('job', 'job__employer')
         .prefetch_related('job__qualification_mappings__qualification')
         .order_by('-applied_at')[:5]
@@ -402,6 +406,8 @@ def dashboard_view(request):
     interviews = InterviewSchedule.objects.filter(
         application__applicant=applicant,
         status__in=['scheduled', 'rescheduled'],
+    ).exclude(
+        application__status='withdrawn',
     ).select_related('employer', 'application', 'application__job').order_by('interview_date', 'start_time')
 
     # Recommended jobs list for the template (top 4 sorted by match score)
@@ -1054,8 +1060,12 @@ def applications_view(request):
     apps_qs = Application.objects.filter(applicant=applicant).select_related('job', 'job__employer').order_by('-applied_at')
     apps_qs = apps_qs.prefetch_related('job__qualification_mappings__qualification')
 
-    if status_filter:
+    if status_filter == 'withdrawn':
+        apps_qs = apps_qs.filter(status='withdrawn')
+    elif status_filter:
         apps_qs = apps_qs.filter(status=status_filter)
+    else:
+        apps_qs = apps_qs.exclude(status='withdrawn')
 
     applied_success = request.GET.get('applied') == 'success'
     successful_application = None
@@ -1071,6 +1081,8 @@ def applications_view(request):
     interviews = InterviewSchedule.objects.filter(
         application__applicant=applicant,
         status__in=('scheduled', 'completed'),
+    ).exclude(
+        application__status='withdrawn',
     ).select_related('employer').order_by('-interview_date', '-created_at')
     now = timezone.now()
     for inv in interviews:
@@ -1152,6 +1164,7 @@ def profile_view(request):
                             error_msg = str(exc)
                         else:
                             applicant.save(update_fields=['profile_pic'])
+                            cache.delete(f'profile_pic_{user_id}')
                             success_msg = "Profile picture updated!"
 
         elif action == 'upload_resume':
@@ -1423,27 +1436,44 @@ def update_application_view(request):
         if action == 'cancel' or action == 'withdraw':
             if application.status in ('accepted', 'hired', 'rejected', 'withdrawn', 'job_closed', 'offer_sent', 'offer_declined'):
                 return _application_action_response(request, 'This application can no longer be withdrawn.', False)
+            withdrawal_reason = request.POST.get('withdrawal_reason', '').strip()
+            if not withdrawal_reason:
+                return _application_action_response(request, 'Please tell us why you are withdrawing this application.', False)
+            if len(withdrawal_reason) > 2000:
+                return _application_action_response(request, 'Please keep the withdrawal reason under 2,000 characters.', False)
             now = timezone.now()
             application.status = 'withdrawn'
             application.employer_status = 'withdrawn'
-            application.applicant_remarks_history = f"[{now.strftime('%Y-%m-%d %H:%M')}] Application withdrawn by applicant."
+            timestamp = now.strftime('%Y-%m-%d %H:%M')
+            withdrawal_note = f"[{timestamp}] Application withdrawn by applicant. Reason: {withdrawal_reason}"
+            existing_applicant_history = (application.applicant_remarks_history or '').strip()
+            application.applicant_remarks_history = '\n'.join(
+                part for part in (existing_applicant_history, withdrawal_note) if part
+            )
             history = list(application.status_history or [])
             history.append({
                 'stage': 'Application Withdrawn',
                 'status': 'withdrawn',
                 'actor_name': applicant.user.full_name or applicant.user.email,
                 'actor_role': 'Applicant',
-                'timestamp': now.strftime('%Y-%m-%d %H:%M'),
-                'notes': '',
+                'timestamp': timestamp,
+                'notes': withdrawal_reason,
             })
             application.status_history = history
             application.save(update_fields=[
                 'status', 'employer_status', 'applicant_remarks_history', 'status_history', 'updated_at',
             ])
+            InterviewSchedule.objects.filter(
+                application=application,
+                status__in=['scheduled', 'rescheduled'],
+            ).update(status='cancelled', updated_at=now)
             Notification.objects.create(
                 user=application.job.employer.user,
                 title='Applicant withdrew an application',
-                message=f'{applicant.user.full_name or applicant.user.email} withdrew their application for {application.job.title}.',
+                message=(
+                    f'{applicant.user.full_name or applicant.user.email} withdrew their application '
+                    f'for {application.job.title}. Reason: {withdrawal_reason}'
+                ),
                 type='application',
             )
             return _application_action_response(request, 'Application withdrawn successfully.', True)

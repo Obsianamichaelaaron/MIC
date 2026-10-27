@@ -1018,7 +1018,7 @@
     </style>
 </head>
 <body{% if current_role == 'admin' %} class="admin-theme"{% endif %}>
-<script defer src="/static/js/instant-navigation.js?v=5"></script>
+<script defer src="/static/js/instant-navigation.js?v=6"></script>
 <script>
     // When the browser restores a page from back/forward cache (bfcache),
     // check if the session is still valid.
@@ -1289,46 +1289,6 @@
         mobileMenuBtn.addEventListener('click', handleBodyScroll);
         window.addEventListener('resize', handleBodyScroll);
     });
-
-    // ── User Dropdown ─────────────────────────────────────────
-    (function() {
-        function initDropdown() {
-            var trigger  = document.getElementById('udTrigger');
-            var dropdown = document.getElementById('udDropdown');
-            var caret    = document.getElementById('udCaret');
-            var closeBtn = document.getElementById('udClose');
-            if (!trigger || !dropdown) return;
-
-            function open() {
-                dropdown.classList.add('open');
-                if (caret) caret.classList.add('open');
-                trigger.setAttribute('aria-expanded', 'true');
-            }
-            function close() {
-                dropdown.classList.remove('open');
-                if (caret) caret.classList.remove('open');
-                trigger.setAttribute('aria-expanded', 'false');
-            }
-            function toggle() {
-                dropdown.classList.contains('open') ? close() : open();
-            }
-
-            trigger.addEventListener('click', function(e) { e.stopPropagation(); toggle(); });
-            if (closeBtn) closeBtn.addEventListener('click', function(e) { e.stopPropagation(); close(); });
-            document.addEventListener('click', function(e) {
-                var wrapper = document.getElementById('udWrapper');
-                if (wrapper && !wrapper.contains(e.target)) close();
-            });
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') close();
-            });
-        }
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initDropdown);
-        } else {
-            initDropdown();
-        }
-    })();
 
     {% if current_role == 'admin' or current_role == 'employer' %}
     (function() {
