@@ -2,6 +2,8 @@
 .gitignore
 .github
 .gemini
+.env*
+.vercel/
 __pycache__
 *.pyc
 Old/

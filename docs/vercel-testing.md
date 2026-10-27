@@ -34,6 +34,18 @@ Vercel, so this creates a separate, ephemeral database and does not include
 the copied accounts. Remove `DATABASE_BACKEND` (or set it to `postgresql`)
 and redeploy to return to PostgreSQL.
 
+To test existing accounts on Vercel SQLite, create a private seed file named
+`vercel_sqlite_seed.sqlite3` from the local database and set
+`SQLITE_SEED_PATH=vercel_sqlite_seed.sqlite3` in Vercel. Deploy from a private
+staging directory with the Vercel CLI and verify the seed is in the function
+bundle; the repository intentionally ignores the database. Do not add it to
+Git or GitHub, and do not include `.env` files or other credentials in the
+staging directory. Each function instance copies the seed to its own
+`/tmp/db.sqlite3` on first startup and runs migrations. This is only a
+temporary sign-in/testing snapshot: changes are not shared across instances
+and may be lost when an instance restarts or is redeployed. Remove the seed
+environment variable and redeploy when finished.
+
 ## Import a local SQLite database when needed
 
 Only use this import if the working local app uses SQLite rather than the

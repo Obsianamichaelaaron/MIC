@@ -43,6 +43,69 @@ from app.services.semantic_job_matching import (
 from app.services.qualification import classify_match_score
 
 
+class VercelSqliteSeedTests(TestCase):
+    def test_seed_database_is_copied_before_migrations(self):
+        from multibiz.runtime import prepare_vercel_database
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            seed_path = Path(temp_dir) / 'seed.sqlite3'
+            database_path = Path(temp_dir) / 'runtime' / 'db.sqlite3'
+            seed_contents = b'seed database contents'
+            seed_path.write_bytes(seed_contents)
+
+            with (
+                patch.dict(os.environ, {'VERCEL': '1'}),
+                override_settings(
+                    DATABASES={
+                        'default': {
+                            'ENGINE': 'django.db.backends.sqlite3',
+                            'NAME': database_path,
+                        }
+                    },
+                    SQLITE_SEED_PATH=seed_path,
+                ),
+                patch('django.core.management.call_command') as call_command,
+            ):
+                prepare_vercel_database()
+
+            self.assertEqual(database_path.read_bytes(), seed_contents)
+            call_command.assert_called_once_with(
+                'migrate',
+                interactive=False,
+                verbosity=0,
+            )
+
+    def test_existing_runtime_database_is_not_overwritten(self):
+        from multibiz.runtime import prepare_vercel_database
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            seed_path = Path(temp_dir) / 'seed.sqlite3'
+            database_path = Path(temp_dir) / 'runtime' / 'db.sqlite3'
+            seed_path.write_bytes(b'seed database contents')
+            database_path.parent.mkdir()
+            database_path.write_bytes(b'existing runtime database')
+
+            with (
+                patch.dict(os.environ, {'VERCEL': '1'}),
+                override_settings(
+                    DATABASES={
+                        'default': {
+                            'ENGINE': 'django.db.backends.sqlite3',
+                            'NAME': database_path,
+                        }
+                    },
+                    SQLITE_SEED_PATH=seed_path,
+                ),
+                patch('django.core.management.call_command'),
+            ):
+                prepare_vercel_database()
+
+            self.assertEqual(
+                database_path.read_bytes(),
+                b'existing runtime database',
+            )
+
+
 class CmsInitializationPerformanceTests(TestCase):
     def test_existing_landing_content_is_checked_with_three_queries(self):
         _ensure_landing_cms_content()

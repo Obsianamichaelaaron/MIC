@@ -102,6 +102,11 @@ SQLITE_PATH = Path(
 )
 if not SQLITE_PATH.is_absolute():
     SQLITE_PATH = BASE_DIR / SQLITE_PATH
+SQLITE_SEED_PATH = os.environ.get('SQLITE_SEED_PATH')
+if SQLITE_SEED_PATH:
+    SQLITE_SEED_PATH = Path(SQLITE_SEED_PATH)
+    if not SQLITE_SEED_PATH.is_absolute():
+        SQLITE_SEED_PATH = BASE_DIR / SQLITE_SEED_PATH
 
 DATABASE_BACKEND = os.environ.get('DATABASE_BACKEND', '').strip().lower()
 if DATABASE_BACKEND not in {'', 'sqlite', 'postgresql'}:
