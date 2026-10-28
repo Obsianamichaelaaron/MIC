@@ -72,6 +72,7 @@ urlpatterns = [
     re_path(r'^(?:frontend/)?(?:applicant/)?[Aa]pply_job(?:\.php|/)?$', views_applicant.apply_job_view),
     path('applicant/applications/', views_applicant.applications_view, name='applicant_applications'),
     re_path(r'^(?:frontend/)?(?:applicant/)?[Aa]pplications(?:\.php|/)?$', views_applicant.applications_view),
+    path('applicant/withdraw_application.php', views_applicant.withdraw_application_view, name='applicant_withdraw_application'),
     path('applicant/notifications/', views_applicant.notifications_view, name='applicant_notifications'),
     re_path(r'^(?:frontend/)?(?:applicant/)?[Nn]otifications(?:\.php|/)?$', views_applicant.notifications_view),
     path('applicant/profile/', views_applicant.profile_view, name='applicant_profile'),

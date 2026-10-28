@@ -239,24 +239,24 @@ MEDIA_ROOT = Path(
 
 # Email Configuration (PHPMailer replacement)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com').strip()
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true'
 EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'false').lower() == 'true'
 if EMAIL_USE_TLS and EMAIL_USE_SSL:
     raise RuntimeError('Configure only one of EMAIL_USE_TLS or EMAIL_USE_SSL.')
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '').strip()
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '').strip()
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '15'))
 DEFAULT_FROM_EMAIL = os.environ.get(
     'DEFAULT_FROM_EMAIL',
     f'MultiBiz Global <{EMAIL_HOST_USER}>',
-)
+).strip()
 SITE_URL = os.environ.get('SITE_URL', 'https://multibiz.global').rstrip('/')
 ADMIN_NOTIFICATION_EMAIL = os.environ.get(
     'ADMIN_NOTIFICATION_EMAIL',
     EMAIL_HOST_USER,
-)
+).strip()
 WORKFLOW_REMINDER_TOKEN = os.environ.get('WORKFLOW_REMINDER_TOKEN', '')
 
 # Session Configuration

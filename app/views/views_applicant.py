@@ -12,6 +12,7 @@ from django.db.models import Q, Count, Window
 from django.db.models.functions import Lower, Trim
 from django.conf import settings
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 from app.models import (
     User, Applicant, JobPosting, Application, SavedJob,
     InterviewSchedule, Qualification, Skill, ChatbotAnswer,
@@ -59,7 +60,7 @@ def compute_semantic_match(*args, **kwargs):
     return semantic_match(*args, **kwargs)
 
 
-def _application_action_response(request, message, success):
+def _application_action_response(request, message, success, redirect_url=None):
     if (
         request.headers.get('X-Requested-With') == 'XMLHttpRequest'
         or 'application/json' in request.headers.get('Accept', '')
@@ -72,7 +73,7 @@ def _application_action_response(request, message, success):
         messages.success(request, message)
     else:
         messages.error(request, message)
-    return redirect('applicant_applications')
+    return redirect(redirect_url or 'applicant_applications')
 
 
 def _semantic_match_cache_key(applicant: Applicant, job: JobPosting, resume_text: str = '') -> str:
@@ -1126,6 +1127,85 @@ def applications_view(request):
 
 
 @require_role('applicant')
+@require_POST
+def withdraw_application_view(request):
+    user_id = getCurrentUserId(request)
+    applicant = get_object_or_404(Applicant, user_id=user_id)
+    application = get_object_or_404(
+        Application,
+        pk=request.POST.get('application_id'),
+        applicant=applicant,
+    )
+
+    if application.status in (
+        'accepted', 'hired', 'rejected', 'withdrawn', 'job_closed',
+        'offer_sent', 'offer_declined',
+    ):
+        return _application_action_response(
+            request,
+            'This application can no longer be withdrawn.',
+            False,
+        )
+
+    withdrawal_reason = request.POST.get('withdrawal_reason', '').strip()
+    if not withdrawal_reason:
+        return _application_action_response(
+            request,
+            'Please tell us why you are withdrawing this application.',
+            False,
+        )
+    if len(withdrawal_reason) > 2000:
+        return _application_action_response(
+            request,
+            'Please keep the withdrawal reason under 2,000 characters.',
+            False,
+        )
+
+    now = timezone.now()
+    timestamp = now.strftime('%Y-%m-%d %H:%M')
+    actor_name = applicant.user.full_name or applicant.user.email
+    application.status = 'withdrawn'
+    application.employer_status = 'withdrawn'
+    withdrawal_note = f"[{timestamp}] Application withdrawn by applicant. Reason: {withdrawal_reason}"
+    existing_applicant_history = (application.applicant_remarks_history or '').strip()
+    application.applicant_remarks_history = '\n'.join(
+        part for part in (existing_applicant_history, withdrawal_note) if part
+    )
+    history = list(application.status_history or [])
+    history.append({
+        'stage': 'Application Withdrawn',
+        'status': 'withdrawn',
+        'actor_name': actor_name,
+        'actor_role': 'Applicant',
+        'timestamp': timestamp,
+        'notes': withdrawal_reason,
+    })
+    application.status_history = history
+    application.save(update_fields=[
+        'status', 'employer_status', 'applicant_remarks_history', 'status_history', 'updated_at',
+    ])
+    InterviewSchedule.objects.filter(
+        application=application,
+        status__in=('scheduled', 'rescheduled'),
+    ).update(status='cancelled', updated_at=now)
+    Notification.objects.create(
+        user=application.job.employer.user,
+        title='Applicant withdrew an application',
+        message=(
+            f'{actor_name} withdrew their application for {application.job.title}. '
+            f'Reason: {withdrawal_reason}'
+        ),
+        type='application',
+    )
+    return _application_action_response(
+        request,
+        'Application withdrawn successfully.',
+        True,
+        redirect_url='/applicant/applications.php?status=withdrawn',
+    )
+
+
+@require_role('applicant')
 def profile_view(request):
     """
     Applicant Profile Editor matching applicant/profile.php.
@@ -1476,7 +1556,12 @@ def update_application_view(request):
                 ),
                 type='application',
             )
-            return _application_action_response(request, 'Application withdrawn successfully.', True)
+            return _application_action_response(
+                request,
+                'Application withdrawn successfully.',
+                True,
+                redirect_url='/applicant/applications.php?status=withdrawn',
+            )
 
         if action == 'respond_offer':
             decision = request.POST.get('decision', '').strip()

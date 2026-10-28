@@ -123,54 +123,13 @@ def send_otp_email(to_email: str, first_name: str, otp_code: str) -> dict:
     """
     Sends 6-digit registration verification OTP email.
     """
-    site_name = 'MULTIBIZ INTERNATIONAL CORPORATION'
-    year = datetime.date.today().year
-    safe_name = html.escape(first_name or 'User')
-
-    html_content = f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset='UTF-8'>
-  <style>
-    body {{ font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }}
-    .container {{ max-width: 520px; margin: 40px auto; background: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }}
-    .header {{ background: linear-gradient(135deg, #1a73e8, #0d47a1); padding: 30px 20px; text-align: center; }}
-    .header h1 {{ color: #ffffff; margin: 0; font-size: 22px; }}
-    .body {{ padding: 35px 30px; }}
-    .body p {{ color: #444; font-size: 15px; line-height: 1.6; }}
-    .otp-box {{ margin: 28px auto; text-align: center; }}
-    .otp-code {{ display: inline-block; background: #f0f4ff; border: 2px dashed #1a73e8; border-radius: 10px; padding: 18px 36px; font-size: 42px; font-weight: 700; letter-spacing: 10px; color: #1a73e8; font-family: 'Courier New', monospace; }}
-    .expiry {{ text-align: center; color: #888; font-size: 13px; margin-top: 10px; }}
-    .footer {{ background: #f8f9fa; padding: 18px; text-align: center; color: #aaa; font-size: 12px; }}
-    .warning {{ background: #fff8e1; border-left: 4px solid #ffc107; padding: 12px 16px; border-radius: 4px; margin-top: 20px; font-size: 13px; color: #666; }}
-  </style>
-</head>
-<body>
-  <div class='container'>
-    <div class='header'>
-      <h1>&#x2709;&#xFE0F; Email Verification</h1>
-    </div>
-    <div class='body'>
-      <p>Hi <strong>{safe_name}</strong>,</p>
-      <p>Thank you for registering with <strong>{site_name}</strong>. Use the verification code below to complete your registration:</p>
-      <div class='otp-box'>
-        <div class='otp-code'>{otp_code}</div>
-      </div>
-      <p class='expiry'>&#x23F1; This code expires in <strong>10 minutes</strong>.</p>
-      <div class='warning'>
-        &#x26A0;&#xFE0F; <strong>Never share this code.</strong> Our team will never ask for your verification code.
-        If you did not request this, please ignore this email.
-      </div>
-    </div>
-    <div class='footer'>
-      &copy; {year} {site_name}. All rights reserved.
-    </div>
-  </div>
-</body>
-</html>"""
-
-    subject = f"{otp_code} is your {site_name} verification code"
-    plain_text = f"Hi {safe_name},\n\nYour verification code is: {otp_code}\n\nThis code expires in 10 minutes.\n\nMultiBiz Global"
+    subject = 'Verify your email address - MultiBiz Global'
+    plain_text = (
+        f"Hi {first_name.strip() or 'there'},\n\n"
+        f"Your MultiBiz Global verification code is: {otp_code}\n\n"
+        "This code expires in 10 minutes. Do not share it with anyone.\n"
+        "If you did not request this code, you can ignore this email."
+    )
 
     try:
         send_mail(
@@ -178,7 +137,6 @@ def send_otp_email(to_email: str, first_name: str, otp_code: str) -> dict:
             message=plain_text,
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[to_email],
-            html_message=html_content,
             fail_silently=False
         )
         return {'success': True, 'error': None}

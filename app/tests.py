@@ -25,7 +25,7 @@ from app.models import (
 from app.auth_utils import verify_password, hash_password
 from app.context_processors import global_context
 from app.middleware import UserSessionValidationMiddleware
-from app.services.mailer import send_application_status_update_email
+from app.services.mailer import send_application_status_update_email, send_otp_email
 from app.services.resume_parser import (
     extract_resume_name,
     parse_resume_text,
@@ -378,6 +378,23 @@ class MultiBizConversionTests(TestCase):
         self.assertIn('Unclassified', mail.outbox[0].body)
         self.assertIn('35%', mail.outbox[0].body)
         self.assertNotIn('Applications Page', mail.outbox[0].alternatives[0][0])
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_otp_email_uses_simple_plain_text_content(self):
+        result = send_otp_email(
+            to_email='new-applicant@example.com',
+            first_name='New Applicant',
+            otp_code='123456',
+        )
+
+        self.assertTrue(result['success'])
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(
+            mail.outbox[0].subject,
+            'Verify your email address - MultiBiz Global',
+        )
+        self.assertIn('Your MultiBiz Global verification code is: 123456', mail.outbox[0].body)
+        self.assertEqual(mail.outbox[0].alternatives, [])
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_email_helpers_report_backend_zero_delivery_as_failure(self):
@@ -2840,9 +2857,23 @@ class MultiBizConversionTests(TestCase):
         application = Application.objects.create(
             job=self.job,
             applicant=self.applicant,
-            status='forwarded',
+            status='interviewed',
             forwarded_to_employer=True,
         )
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        applications_page = self.client.get('/applicant/applications.php?status=')
+        self.assertEqual(applications_page.status_code, 200)
+        self.assertContains(applications_page, 'onclick="showWithdrawModal(')
+        self.assertContains(
+            applications_page,
+            'action="/applicant/withdraw_application.php"',
+        )
+        self.assertContains(applications_page, 'id="withdrawApplicationFeedback"')
+
         interview = InterviewSchedule.objects.create(
             application=application,
             employer=self.employer,
@@ -2851,18 +2882,17 @@ class MultiBizConversionTests(TestCase):
             end_time='11:00',
             status='scheduled',
         )
-        session = self.client.session
-        session['user_id'] = self.applicant_user.user_id
-        session['role'] = 'applicant'
-        session.save()
 
-        response = self.client.post('/applicant/update_application.php', {
+        response = self.client.post('/applicant/withdraw_application.php', {
             'application_id': application.application_id,
-            'action': 'withdraw',
             'withdrawal_reason': 'I accepted another position.',
-        }, follow=True)
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest', HTTP_ACCEPT='application/json')
 
         self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(response.content, {
+            'success': True,
+            'message': 'Application withdrawn successfully.',
+        })
         application.refresh_from_db()
         self.assertEqual(application.status, 'withdrawn')
         self.assertEqual(application.employer_status, 'withdrawn')
@@ -2876,6 +2906,8 @@ class MultiBizConversionTests(TestCase):
             title='Applicant withdrew an application',
             message__contains='I accepted another position.',
         ).exists())
+        withdrawn_history = self.client.get('/applicant/applications.php?status=withdrawn')
+        self.assertContains(withdrawn_history, self.job.title)
 
     def test_applicant_withdrawal_requires_a_reason(self):
         application = Application.objects.create(

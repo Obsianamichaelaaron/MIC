@@ -420,6 +420,7 @@
     overflow: hidden;
     animation: modalFadeIn 0.25s ease;
 }
+.modal-overlay > .modal-dialog { pointer-events: auto; }
 @keyframes modalFadeIn {
     from { opacity: 0; transform: translateY(-10px); }
     to { opacity: 1; transform: translateY(0); }
@@ -902,18 +903,18 @@
             <h3 id="withdrawApplicationTitle"><i class="fas fa-circle-exclamation"></i> Withdraw Application</h3>
             <button type="button" class="modal-close-btn" aria-label="Close" onclick="closeModal('withdrawApplicationModal')">&times;</button>
         </div>
-        <form method="POST" action="update_application.php">
+        <form id="withdrawApplicationForm" method="POST" action="/applicant/withdraw_application.php">
             {% csrf_token %}
             <input type="hidden" name="application_id" id="withdrawApplicationId">
-            <input type="hidden" name="action" value="withdraw">
             <div class="modal-body">
                 <p id="withdrawApplicationPrompt" style="margin:0 0 .75rem;color:#475569;"></p>
                 <label for="withdrawalReason" style="display:block;margin-bottom:.4rem;font-weight:600;">Why are you withdrawing this application?</label>
                 <textarea id="withdrawalReason" name="withdrawal_reason" required maxlength="2000" rows="4" style="width:100%;padding:.7rem;border:1px solid #cbd5e1;border-radius:8px;font:inherit;resize:vertical;" placeholder="Please share your reason"></textarea>
+                <p id="withdrawApplicationFeedback" role="status" hidden style="margin:.75rem 0 0;color:#b42318;"></p>
             </div>
             <div class="modal-foot">
                 <button type="button" class="btn-action btn-action-secondary" onclick="closeModal('withdrawApplicationModal')">Keep Application</button>
-                <button type="submit" class="btn-action btn-action-accent">Confirm Withdrawal</button>
+                <button id="confirmWithdrawalButton" type="submit" class="btn-action btn-action-accent">Confirm Withdrawal</button>
             </div>
         </form>
     </div>
@@ -1006,10 +1007,62 @@ function showWithdrawModal(appId, jobTitle) {
         `Please tell us why you want to withdraw from ${jobTitle}.`;
     const reason = document.getElementById('withdrawalReason');
     reason.value = '';
+    const feedback = document.getElementById('withdrawApplicationFeedback');
+    feedback.hidden = true;
+    feedback.textContent = '';
+    feedback.style.color = '#b42318';
+    const submitButton = document.getElementById('confirmWithdrawalButton');
+    submitButton.disabled = false;
+    submitButton.textContent = 'Confirm Withdrawal';
     document.getElementById('withdrawApplicationModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
     reason.focus();
 }
+
+document.getElementById('withdrawApplicationForm').addEventListener('submit', async function(event) {
+    event.preventDefault();
+
+    const form = event.currentTarget;
+    const submitButton = document.getElementById('confirmWithdrawalButton');
+    const feedback = document.getElementById('withdrawApplicationFeedback');
+    submitButton.disabled = true;
+    submitButton.textContent = 'Processing...';
+    feedback.hidden = false;
+    feedback.textContent = 'Submitting withdrawal...';
+
+    try {
+        const response = await fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+            throw new Error(
+                response.redirected
+                    ? 'Your session may have expired. Please sign in again and retry.'
+                    : `The server could not process the request (HTTP ${response.status}).`
+            );
+        }
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.message || `The server could not process the request (HTTP ${response.status}).`);
+        }
+
+        feedback.style.color = '#15803d';
+        feedback.textContent = result.message || 'Application withdrawn successfully.';
+        window.location.assign('/applicant/applications.php?status=withdrawn');
+    } catch (error) {
+        feedback.hidden = false;
+        feedback.textContent = error.message || 'Unable to submit your withdrawal. Please try again.';
+        submitButton.disabled = false;
+        submitButton.textContent = 'Confirm Withdrawal';
+    }
+});
 
 function handleScoreBtnClick(btn) {
     const appId = btn.getAttribute('data-app-id');
