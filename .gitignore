@@ -15,7 +15,6 @@ ENV/
 # Django
 db.sqlite3
 db_postgres_copy*.sqlite3
-vercel_sqlite_seed.sqlite3
 *.log
 local_settings.py
 db.sqlite3-journal
