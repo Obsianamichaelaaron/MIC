@@ -507,7 +507,7 @@
                         </div>
                         <div class="progress mb-2" style="height: 6px;">
                             {% if cand.match_score != None %}
-                                <div class="progress-bar {% if cand.ml_match_class == 'high' %}bg-success{% elif cand.ml_match_class == 'medium' %}bg-warning{% else %}bg-danger{% endif %}" role="progressbar" aria-valuenow="{{ cand.match_score }}" data-score="{{ cand.match_score }}" style="width:{{ cand.match_score }}%"></div>
+                                <div class="progress-bar {% if cand.ml_match_class == 'high' %}bg-success{% elif cand.ml_match_class == 'medium' %}bg-warning{% else %}bg-danger{% endif %}" role="progressbar" aria-valuenow="{{ cand.match_score }}" data-score="{{ cand.match_score }}"></div>
                             {% endif %}
                         </div>
 
