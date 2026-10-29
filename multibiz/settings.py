@@ -115,7 +115,7 @@ if DATABASE_BACKEND not in {'', 'sqlite', 'postgresql'}:
     )
 
 DATABASE_URL = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
-if DATABASE_BACKEND == 'sqlite':
+if DATABASE_BACKEND == 'sqlite' and not (IS_VERCEL and DATABASE_URL):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -123,7 +123,7 @@ if DATABASE_BACKEND == 'sqlite':
             'OPTIONS': {'timeout': 20},
         }
     }
-elif DATABASE_BACKEND == 'postgresql':
+elif DATABASE_BACKEND == 'postgresql' or (IS_VERCEL and DATABASE_URL):
     if not DATABASE_URL:
         raise RuntimeError(
             'Set DATABASE_URL or POSTGRES_URL when DATABASE_BACKEND=postgresql.'

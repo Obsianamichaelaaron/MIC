@@ -1890,7 +1890,12 @@ def batch_forward_candidates_api(request):
     admin_id = getCurrentUserId(request)
     admin_user = getCurrentUser(request)
     raw_ids = request.POST.get('application_ids', '')
-    job_id = request.POST.get('job_id', '')
+    raw_job_id = (request.POST.get('job_id', '') or '').strip()
+    if not raw_job_id and request.POST.get('job_ids'):
+        first_id = request.POST.get('job_ids', '').split(',')[0].strip()
+        if first_id.isdigit():
+            raw_job_id = first_id
+    job_id = raw_job_id if raw_job_id.isdigit() else ''
     scope = request.POST.get('scope', 'selected')
     admin_notes = request.POST.get('admin_notes', '').strip()
 
@@ -1920,6 +1925,8 @@ def batch_forward_candidates_api(request):
             grouped_job_ids = [grouped_job.job_id for grouped_job in grouped_jobs]
             if scope == 'all':
                 apps = Application.objects.filter(job_id__in=grouped_job_ids)
+                if not apps.exists() and job:
+                    apps = Application.objects.filter(job_id=job.job_id)
             elif scope in {'qualified', 'under_qualified', 'not_qualified'}:
                 expected_class = {
                     'qualified': 'high',
@@ -1948,10 +1955,11 @@ def batch_forward_candidates_api(request):
                     if result['match_class'] == expected_class
                 ]
             else:
-                apps = Application.objects.filter(
-                    job_id__in=grouped_job_ids,
-                    pk__in=app_ids,
-                )
+                apps = Application.objects.filter(pk__in=app_ids)
+                if grouped_job_ids:
+                    scoped_apps = apps.filter(job_id__in=grouped_job_ids)
+                    if scoped_apps.exists():
+                        apps = scoped_apps
         else:
             apps = Application.objects.filter(pk__in=app_ids)
     else:
