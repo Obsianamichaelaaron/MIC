@@ -978,3 +978,72 @@ def send_applicant_forwarded_to_employer_email(to_email: str, company_name: str,
     except Exception as e:
         logger.exception("Forwarded candidate email failed.")
         return {'success': False, 'error': str(e)}
+
+
+def send_application_withdrawn_email(to_email: str, employer_name: str, applicant_name: str, job_title: str, withdrawal_reason: str = '') -> dict:
+    """
+    Sends email notification to an employer when an applicant withdraws their application.
+    """
+    site_name = 'MULTIBIZ INTERNATIONAL CORPORATION'
+    year = datetime.date.today().year
+    safe_employer = html.escape(employer_name or 'Hiring Team')
+    safe_applicant = html.escape(applicant_name or 'An applicant')
+    safe_title = html.escape(job_title or 'Job Opening')
+    safe_reason = html.escape(withdrawal_reason or 'No reason provided').replace('\n', '<br>')
+
+    subject = f"Notice: Application Withdrawn for {job_title} - {applicant_name}"
+    html_content = f"""<!DOCTYPE html>
+<html lang='en'>
+<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head>
+<body style='margin:0;padding:0;background:#f0f2f5;font-family:Arial,sans-serif;'>
+  <div style='max-width:600px;margin:30px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08);'>
+    <div style='padding:26px 32px;text-align:center;background:linear-gradient(135deg,#0a1628,#b42318);'>
+      <h1 style='margin:0;color:#ffffff;font-size:22px;'>Application Withdrawn</h1>
+      <p style='margin:6px 0 0;color:rgba(255,255,255,.85);font-size:13px;'>MultiBiz Recruitment Operations</p>
+    </div>
+    <div style='padding:32px;color:#333;line-height:1.7;'>
+      <p style='font-size:16px;'>Hello <strong>{safe_employer}</strong>,</p>
+      <p>This is to notify you that <strong>{safe_applicant}</strong> has withdrawn their application for the following position:</p>
+      
+      <div style='background:#fef2f2;border-left:4px solid #b42318;padding:16px 20px;border-radius:6px;margin:20px 0;'>
+        <p style='margin:0;font-weight:700;color:#991b1b;font-size:15px;'>Position: {safe_title}</p>
+        <p style='margin:6px 0 0;color:#4b5563;font-size:13px;'><strong>Candidate:</strong> {safe_applicant}</p>
+        <p style='margin:6px 0 0;color:#4b5563;font-size:13px;'><strong>Reason for Withdrawal:</strong></p>
+        <div style='margin-top:4px;padding:8px 12px;background:#fff;border-radius:4px;border:1px solid #fecaca;font-size:12.5px;color:#374151;'>{safe_reason}</div>
+      </div>
+
+      <p style="font-size:13.5px;color:#4b5563;">Any scheduled interviews with this candidate have been automatically cancelled. You can review your remaining candidates in the Employer Portal.</p>
+
+      <div style='text-align:center;margin:26px 0 10px;'>
+        <a href='{settings.SITE_URL}/employer/candidates.php' style='background:#1866a3;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:700;font-size:14px;display:inline-block;'>
+          View Candidate Pipeline
+        </a>
+      </div>
+
+      <p style='margin-top:24px;margin-bottom:0;'>Best regards,<br><strong>The MultiBiz Recruitment Team</strong></p>
+    </div>
+    <div style='padding:16px 30px;text-align:center;background:#f8f9fc;border-top:1px solid #e8eaf0;color:#999;font-size:12px;'>&copy; {year} {site_name}. All rights reserved.</div>
+  </div>
+</body>
+</html>"""
+
+    plain_text = (
+        f"Hello {employer_name},\n\n"
+        f"{applicant_name} has withdrawn their application for {job_title}.\n\n"
+        f"Reason: {withdrawal_reason}\n\n"
+        f"Any scheduled interviews have been automatically cancelled.\n\n"
+        f"Best regards,\nMultiBiz Team"
+    )
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_text,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[to_email],
+            html_message=html_content,
+        )
+        return {'success': True, 'error': None}
+    except Exception as e:
+        logger.exception("Application withdrawal email failed.")
+        return {'success': False, 'error': str(e)}
+

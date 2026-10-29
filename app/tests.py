@@ -2909,6 +2909,70 @@ class MultiBizConversionTests(TestCase):
         withdrawn_history = self.client.get('/applicant/applications.php?status=withdrawn')
         self.assertContains(withdrawn_history, self.job.title)
 
+    def test_applicant_can_withdraw_accepted_or_any_application_and_it_is_permanent(self):
+        # Even with status 'accepted', the job should have a withdraw button and be withdrawable
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='accepted',
+            employer_status='hired',
+            forwarded_to_employer=True,
+        )
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        # Active page shows withdraw button for accepted application
+        active_page = self.client.get('/applicant/applications.php?status=')
+        self.assertEqual(active_page.status_code, 200)
+        self.assertContains(active_page, f"showWithdrawModal('{application.application_id}'")
+
+        # Withdraw the accepted application
+        response = self.client.post('/applicant/withdraw_application.php', {
+            'application_id': application.application_id,
+            'withdrawal_reason': 'Personal reasons / cannot take the role anymore.',
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest', HTTP_ACCEPT='application/json')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(response.content, {
+            'success': True,
+            'message': 'Application withdrawn successfully.',
+        })
+
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'withdrawn')
+        self.assertEqual(application.employer_status, 'withdrawn')
+
+        # Check Active list does NOT show the withdrawn job anymore
+        active_after = self.client.get('/applicant/applications.php?status=')
+        self.assertNotContains(active_after, f"showWithdrawModal('{application.application_id}'")
+
+        # Check Withdrawn history page DOES show the withdrawn job
+        history_after = self.client.get('/applicant/applications.php?status=withdrawn')
+        self.assertContains(history_after, self.job.title)
+
+        # Check employer received notification
+        self.assertTrue(Notification.objects.filter(
+            user=self.employer_user,
+            title='Applicant withdrew an application',
+            message__contains='Personal reasons',
+        ).exists())
+
+        # Employer cannot modify a withdrawn application
+        emp_session = self.client.session
+        emp_session['user_id'] = self.employer_user.user_id
+        emp_session['role'] = 'employer'
+        emp_session.save()
+        emp_update = self.client.post(f'/employer/view_candidate.php?id={application.application_id}', {
+            'action': 'update_status',
+            'employer_status': 'qualified',
+        })
+        self.assertEqual(emp_update.status_code, 200)
+        self.assertContains(emp_update, 'This application was withdrawn by the applicant and cannot be modified.')
+        application.refresh_from_db()
+        self.assertEqual(application.status, 'withdrawn')
+
     def test_applicant_withdrawal_requires_a_reason(self):
         application = Application.objects.create(
             job=self.job,

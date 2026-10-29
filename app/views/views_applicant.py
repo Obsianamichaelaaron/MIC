@@ -33,7 +33,7 @@ from app.services.resume_storage import (
     store_verified_resume,
 )
 from app.services.ml_ranking import compute_rule_based_match_score
-from app.services.mailer import send_application_submitted_email
+from app.services.mailer import send_application_submitted_email, send_application_withdrawn_email
 from app.services.workflow import close_job_if_positions_filled
 from app.services.job_listings import (
     EXCLUDED_COMPANY_NAME,
@@ -41,6 +41,9 @@ from app.services.job_listings import (
     unique_company_title_job_postings,
 )
 from app.services.dashboard_counts import get_unread_message_count
+import logging
+
+logger = logging.getLogger(__name__)
 
 MAX_JOB_MATCHES_FOR_DASHBOARD = 12
 SEMANTIC_MATCH_CACHE_TTL_SECONDS = 86400
@@ -1137,13 +1140,10 @@ def withdraw_application_view(request):
         applicant=applicant,
     )
 
-    if application.status in (
-        'accepted', 'hired', 'rejected', 'withdrawn', 'job_closed',
-        'offer_sent', 'offer_declined',
-    ):
+    if application.status == 'withdrawn':
         return _application_action_response(
             request,
-            'This application can no longer be withdrawn.',
+            'This application has already been withdrawn.',
             False,
         )
 
@@ -1188,15 +1188,32 @@ def withdraw_application_view(request):
         application=application,
         status__in=('scheduled', 'rescheduled'),
     ).update(status='cancelled', updated_at=now)
-    Notification.objects.create(
-        user=application.job.employer.user,
-        title='Applicant withdrew an application',
-        message=(
-            f'{actor_name} withdrew their application for {application.job.title}. '
-            f'Reason: {withdrawal_reason}'
-        ),
-        type='application',
-    )
+
+    # Notify employer via in-app notification and email
+    employer_user = getattr(getattr(application.job, 'employer', None), 'user', None)
+    if employer_user:
+        Notification.objects.create(
+            user=employer_user,
+            title='Applicant withdrew an application',
+            message=(
+                f'{actor_name} withdrew their application for {application.job.title}. '
+                f'Reason: {withdrawal_reason}'
+            ),
+            type='application',
+        )
+        if employer_user.email:
+            try:
+                employer_name = getattr(getattr(application.job, 'employer', None), 'company_name', '') or employer_user.first_name or 'Employer'
+                send_application_withdrawn_email(
+                    to_email=employer_user.email,
+                    employer_name=employer_name,
+                    applicant_name=actor_name,
+                    job_title=application.job.title,
+                    withdrawal_reason=withdrawal_reason,
+                )
+            except Exception as exc:
+                logger.warning("Could not send withdrawal email to employer: %s", exc)
+
     return _application_action_response(
         request,
         'Application withdrawn successfully.',
@@ -1514,8 +1531,8 @@ def update_application_view(request):
 
         application = get_object_or_404(Application, pk=app_id, applicant=applicant)
         if action == 'cancel' or action == 'withdraw':
-            if application.status in ('accepted', 'hired', 'rejected', 'withdrawn', 'job_closed', 'offer_sent', 'offer_declined'):
-                return _application_action_response(request, 'This application can no longer be withdrawn.', False)
+            if application.status == 'withdrawn':
+                return _application_action_response(request, 'This application has already been withdrawn.', False)
             withdrawal_reason = request.POST.get('withdrawal_reason', '').strip()
             if not withdrawal_reason:
                 return _application_action_response(request, 'Please tell us why you are withdrawing this application.', False)
@@ -1530,11 +1547,12 @@ def update_application_view(request):
             application.applicant_remarks_history = '\n'.join(
                 part for part in (existing_applicant_history, withdrawal_note) if part
             )
+            actor_name = applicant.user.full_name or applicant.user.email
             history = list(application.status_history or [])
             history.append({
                 'stage': 'Application Withdrawn',
                 'status': 'withdrawn',
-                'actor_name': applicant.user.full_name or applicant.user.email,
+                'actor_name': actor_name,
                 'actor_role': 'Applicant',
                 'timestamp': timestamp,
                 'notes': withdrawal_reason,
@@ -1547,15 +1565,32 @@ def update_application_view(request):
                 application=application,
                 status__in=['scheduled', 'rescheduled'],
             ).update(status='cancelled', updated_at=now)
-            Notification.objects.create(
-                user=application.job.employer.user,
-                title='Applicant withdrew an application',
-                message=(
-                    f'{applicant.user.full_name or applicant.user.email} withdrew their application '
-                    f'for {application.job.title}. Reason: {withdrawal_reason}'
-                ),
-                type='application',
-            )
+
+            # Notify employer via in-app notification and email
+            employer_user = getattr(getattr(application.job, 'employer', None), 'user', None)
+            if employer_user:
+                Notification.objects.create(
+                    user=employer_user,
+                    title='Applicant withdrew an application',
+                    message=(
+                        f'{actor_name} withdrew their application '
+                        f'for {application.job.title}. Reason: {withdrawal_reason}'
+                    ),
+                    type='application',
+                )
+                if employer_user.email:
+                    try:
+                        employer_name = getattr(getattr(application.job, 'employer', None), 'company_name', '') or employer_user.first_name or 'Employer'
+                        send_application_withdrawn_email(
+                            to_email=employer_user.email,
+                            employer_name=employer_name,
+                            applicant_name=actor_name,
+                            job_title=application.job.title,
+                            withdrawal_reason=withdrawal_reason,
+                        )
+                    except Exception as exc:
+                        logger.warning("Could not send withdrawal email to employer: %s", exc)
+
             return _application_action_response(
                 request,
                 'Application withdrawn successfully.',

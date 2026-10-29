@@ -975,111 +975,114 @@ def view_candidate_view(request, application_id=None):
         action = request.POST.get('action')
 
         if action == 'update_status':
-            new_status = _normalize_employer_status(
-                request.POST.get('employer_status', request.POST.get('status', '')),
-            )
-            employer_notes = request.POST.get(
-                'employer_notes',
-                request.POST.get('remarks', ''),
-            ).strip()
-
-            if new_status in ('rejected', 'not_qualified') and not employer_notes:
-                error_msg = 'Add a reason before rejecting or marking the candidate not qualified.'
-            elif new_status == 'offer_sent' and not employer_notes:
-                error_msg = 'Add the offer details before sending it to the applicant.'
-            elif new_status in _allowed_employer_statuses(application):
-                application.employer_status = new_status
-                if employer_notes:
-                    application.employer_notes = employer_notes
-                if new_status == 'offer_sent':
-                    application.offer_details = employer_notes
-                    application.offer_sent_at = timezone.now()
-                
-                # Sync overall application status
-                if new_status == 'hired':
-                    application.status = 'accepted'
-                elif new_status == 'offer_sent':
-                    application.status = 'offer_sent'
-                elif new_status == 'interview_completed':
-                    application.status = 'interview_completed'
-                elif new_status == 'rejected':
-                    application.status = 'rejected'
-                elif new_status in ['for_interview', 'interview_completed']:
-                    application.status = 'interviewed'
-                elif new_status == 'qualified':
-                    application.status = 'shortlisted'
-                elif new_status == 'not_qualified':
-                    application.status = 'reviewed'
-
-                application.reviewed_by_employer_id = employer.employer_id
-                application.reviewed_by_name = employer.company_name or 'Employer'
-
-                # Log status history event
-                status_label = new_status.replace('_', ' ').title()
-                log_status_history_event(
-                    application=application,
-                    stage_title=f"Employer Marked as {status_label}",
-                    status_key=new_status,
-                    actor_name=employer.company_name or user_obj_name(candidate_user),
-                    actor_role='Employer',
-                    notes=employer_notes
-                )
-                application.save()
-                if new_status == 'hired':
-                    _close_job_if_positions_filled(job)
-
-                # In-App Notification
-                notification_title = f"Application Update: {job.title}"
-                notification_message = (
-                    f"Your application status at {employer.company_name} "
-                    f"was updated to '{status_label}'."
-                )
-                if new_status == 'hired':
-                    applicant_name = candidate_user.full_name or candidate_user.email
-                    notification_title = f"Congratulations, {applicant_name}!"
-                    notification_message = (
-                        f"{applicant_name} has been hired for {job.title} "
-                        f"at {employer.company_name}."
-                    )
-                elif new_status == 'offer_sent':
-                    notification_title = f'Job offer: {job.title}'
-                    notification_message = f'{employer.company_name} sent you an offer. Review the details in your applications page.'
-                _notify_applicant_for_employer_application(
-                    application,
-                    notification_title,
-                    notification_message,
-                )
-
-                # Send email update
-                try:
-                    email_result = send_application_status_update_email(
-                        to_email=candidate_user.email,
-                        applicant_name=candidate_user.full_name or candidate_user.email,
-                        job_title=job.title,
-                        company_name=employer.company_name or 'Employer',
-                        new_status=new_status,
-                        remarks=employer_notes
-                    )
-                except Exception as e:
-                    print(f"[Employer Status Update Mailer] Error: {e}")
-                    email_result = {'success': False}
-
-                if new_status == 'hired':
-                    applicant_name = candidate_user.full_name or candidate_user.email
-                    messages.success(
-                        request,
-                        f"{applicant_name} has been hired.",
-                    )
-                    return redirect('employer_dashboard')
-
-                email_status = (
-                    f"Email sent to {candidate_user.email}."
-                    if email_result.get('success')
-                    else "The applicant has an in-app notification, but email delivery failed."
-                )
-                success_msg = f"Candidate moved to '{status_label}' successfully! {email_status}"
+            if application.status == 'withdrawn' or application.employer_status == 'withdrawn':
+                error_msg = 'This application was withdrawn by the applicant and cannot be modified.'
             else:
-                error_msg = 'That application stage transition is not allowed.'
+                new_status = _normalize_employer_status(
+                    request.POST.get('employer_status', request.POST.get('status', '')),
+                )
+                employer_notes = request.POST.get(
+                    'employer_notes',
+                    request.POST.get('remarks', ''),
+                ).strip()
+
+                if new_status in ('rejected', 'not_qualified') and not employer_notes:
+                    error_msg = 'Add a reason before rejecting or marking the candidate not qualified.'
+                elif new_status == 'offer_sent' and not employer_notes:
+                    error_msg = 'Add the offer details before sending it to the applicant.'
+                elif new_status in _allowed_employer_statuses(application):
+                    application.employer_status = new_status
+                    if employer_notes:
+                        application.employer_notes = employer_notes
+                    if new_status == 'offer_sent':
+                        application.offer_details = employer_notes
+                        application.offer_sent_at = timezone.now()
+                    
+                    # Sync overall application status
+                    if new_status == 'hired':
+                        application.status = 'accepted'
+                    elif new_status == 'offer_sent':
+                        application.status = 'offer_sent'
+                    elif new_status == 'interview_completed':
+                        application.status = 'interview_completed'
+                    elif new_status == 'rejected':
+                        application.status = 'rejected'
+                    elif new_status in ['for_interview', 'interview_completed']:
+                        application.status = 'interviewed'
+                    elif new_status == 'qualified':
+                        application.status = 'shortlisted'
+                    elif new_status == 'not_qualified':
+                        application.status = 'reviewed'
+
+                    application.reviewed_by_employer_id = employer.employer_id
+                    application.reviewed_by_name = employer.company_name or 'Employer'
+
+                    # Log status history event
+                    status_label = new_status.replace('_', ' ').title()
+                    log_status_history_event(
+                        application=application,
+                        stage_title=f"Employer Marked as {status_label}",
+                        status_key=new_status,
+                        actor_name=employer.company_name or user_obj_name(candidate_user),
+                        actor_role='Employer',
+                        notes=employer_notes
+                    )
+                    application.save()
+                    if new_status == 'hired':
+                        _close_job_if_positions_filled(job)
+
+                    # In-App Notification
+                    notification_title = f"Application Update: {job.title}"
+                    notification_message = (
+                        f"Your application status at {employer.company_name} "
+                        f"was updated to '{status_label}'."
+                    )
+                    if new_status == 'hired':
+                        applicant_name = candidate_user.full_name or candidate_user.email
+                        notification_title = f"Congratulations, {applicant_name}!"
+                        notification_message = (
+                            f"{applicant_name} has been hired for {job.title} "
+                            f"at {employer.company_name}."
+                        )
+                    elif new_status == 'offer_sent':
+                        notification_title = f'Job offer: {job.title}'
+                        notification_message = f'{employer.company_name} sent you an offer. Review the details in your applications page.'
+                    _notify_applicant_for_employer_application(
+                        application,
+                        notification_title,
+                        notification_message,
+                    )
+
+                    # Send email update
+                    try:
+                        email_result = send_application_status_update_email(
+                            to_email=candidate_user.email,
+                            applicant_name=candidate_user.full_name or candidate_user.email,
+                            job_title=job.title,
+                            company_name=employer.company_name or 'Employer',
+                            new_status=new_status,
+                            remarks=employer_notes
+                        )
+                    except Exception as e:
+                        print(f"[Employer Status Update Mailer] Error: {e}")
+                        email_result = {'success': False}
+
+                    if new_status == 'hired':
+                        applicant_name = candidate_user.full_name or candidate_user.email
+                        messages.success(
+                            request,
+                            f"{applicant_name} has been hired.",
+                        )
+                        return redirect('employer_dashboard')
+
+                    email_status = (
+                        f"Email sent to {candidate_user.email}."
+                        if email_result.get('success')
+                        else "The applicant has an in-app notification, but email delivery failed."
+                    )
+                    success_msg = f"Candidate moved to '{status_label}' successfully! {email_status}"
+                else:
+                    error_msg = 'That application stage transition is not allowed.'
 
         elif action == 'schedule_interview':
             interview_date = request.POST.get('interview_date', '').strip()

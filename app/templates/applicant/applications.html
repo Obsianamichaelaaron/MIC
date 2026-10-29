@@ -578,7 +578,7 @@
                                     <a class="application-action" href="job_details.php?id={{ app.job.job_id }}" title="View Job Details"><i class="fas fa-eye"></i></a>
                                     {% if app.status == 'offer_sent' %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#offerModal{{ app.application_id }}"><i class="fas fa-file-signature"></i> Review Offer</button>{% endif %}
                                     {% if interview %}{% if interview_overdue %}<a class="application-action primary" href="/applicant/chat.php?user_id={{ app.job.employer.user_id }}"><i class="fas fa-comment-dots"></i> Follow Up</a><button class="application-action" type="button" data-bs-toggle="modal" data-bs-target="#interviewModal{{ app.application_id }}"><i class="fas fa-circle-info"></i> Details</button>{% else %}<button class="application-action primary" type="button" data-bs-toggle="modal" data-bs-target="#interviewModal{{ app.application_id }}"><i class="fas fa-video"></i> Interview</button>{% endif %}{% endif %}
-                                    {% if app.status != 'accepted' and app.status != 'hired' and app.status != 'rejected' and app.status != 'withdrawn' and app.status != 'job_closed' and app.status != 'offer_declined' and app.status != 'offer_sent' %}
+                                    {% if app.status != 'withdrawn' %}
                                         <button class="application-action" type="button" title="Withdraw application" onclick="showWithdrawModal('{{ app.application_id }}', '{{ app.job.title|escapejs }}')"><i class="fas fa-xmark"></i> Withdraw</button>
                                     {% endif %}
                                 </div>
@@ -867,6 +867,12 @@
                                         data-resume="{{ app.resume_file|default:'' }}"
                                         onclick="handleUpdateBtnClick(this)">
                                     <i class="fas fa-edit"></i> Edit Application
+                                </button>
+                            {% endif %}
+                            {% if app.status != 'withdrawn' %}
+                                <button type="button" class="btn-action btn-action-secondary"
+                                        onclick="showWithdrawModal('{{ app.application_id }}', '{{ app.job.title|escapejs }}')">
+                                    <i class="fas fa-xmark"></i> Withdraw Application
                                 </button>
                             {% endif %}
                             {% if app.job.employer.user_id %}

@@ -1629,7 +1629,10 @@ def view_candidate_view(request, application_id=None):
         action = request.POST.get('action')
 
         if action == 'update_status':
-            new_status = request.POST.get('status')
+            if application.status == 'withdrawn':
+                error_msg = "This application was withdrawn by the applicant and cannot be modified."
+            else:
+                new_status = request.POST.get('status')
             remarks = request.POST.get('remarks', '').strip()
 
             if new_status in ['pending', 'reviewed', 'shortlisted', 'rejected']:
@@ -1694,62 +1697,65 @@ def view_candidate_view(request, application_id=None):
                 success_msg = "Candidate remarks & feedback submitted!"
 
         elif action == 'forward_to_employer':
-            admin_notes = request.POST.get('admin_notes', '').strip()
-            match_result = compute_job_match_result(applicant, job)
-            
-            application.forwarded_to_employer = True
-            application.forwarded_at = timezone.now()
-            application.forwarded_by_admin = admin_user
-            application.admin_notes = admin_notes
-            if not application.employer_status or application.employer_status == 'for_review':
-                application.employer_status = 'for_review'
-            if application.status in ['pending', 'reviewed']:
-                application.status = 'shortlisted'
-
-            timestamp_str = timezone.now().strftime('%Y-%m-%d %H:%M')
-            entry = f"[{timestamp_str}] Candidate forwarded to Employer by Admin."
-            if admin_notes:
-                entry += f" Notes: {admin_notes}"
-            if application.remarks_history:
-                application.remarks_history = f"{application.remarks_history}\n{entry}"
+            if application.status == 'withdrawn':
+                error_msg = "This application was withdrawn by the applicant and cannot be forwarded."
             else:
-                application.remarks_history = entry
+                admin_notes = request.POST.get('admin_notes', '').strip()
+                match_result = compute_job_match_result(applicant, job)
+                
+                application.forwarded_to_employer = True
+                application.forwarded_at = timezone.now()
+                application.forwarded_by_admin = admin_user
+                application.admin_notes = admin_notes
+                if not application.employer_status or application.employer_status == 'for_review':
+                    application.employer_status = 'for_review'
+                if application.status in ['pending', 'reviewed']:
+                    application.status = 'shortlisted'
 
-            application.save()
+                timestamp_str = timezone.now().strftime('%Y-%m-%d %H:%M')
+                entry = f"[{timestamp_str}] Candidate forwarded to Employer by Admin."
+                if admin_notes:
+                    entry += f" Notes: {admin_notes}"
+                if application.remarks_history:
+                    application.remarks_history = f"{application.remarks_history}\n{entry}"
+                else:
+                    application.remarks_history = entry
 
-            # Notify employer
-            emp_user = job.employer.user if (job.employer and job.employer.user) else None
-            candidate_name = f"{candidate_user.first_name} {candidate_user.last_name}".strip() or candidate_user.email
-            email_result = {'success': False}
-            if emp_user:
-                Notification.objects.create(
-                    user=emp_user,
-                    title=f"New Candidate Forwarded: {candidate_name}",
-                    message=f"Admin has forwarded candidate {candidate_name} for '{job.title}'. Check your Applicants dashboard to review their profile.",
-                    type='application'
-                )
-                try:
-                    email_result = send_applicant_forwarded_to_employer_email(
-                        to_email=emp_user.email,
-                        applicant_name=candidate_name,
-                        company_name=company_name,
-                        job_title=job.title,
-                        match_score=match_result['match_score'],
-                        admin_notes=admin_notes
+                application.save()
+
+                # Notify employer
+                emp_user = job.employer.user if (job.employer and job.employer.user) else None
+                candidate_name = f"{candidate_user.first_name} {candidate_user.last_name}".strip() or candidate_user.email
+                email_result = {'success': False}
+                if emp_user:
+                    Notification.objects.create(
+                        user=emp_user,
+                        title=f"New Candidate Forwarded: {candidate_name}",
+                        message=f"Admin has forwarded candidate {candidate_name} for '{job.title}'. Check your Applicants dashboard to review their profile.",
+                        type='application'
                     )
-                except Exception as e:
-                    print(f"[Admin Forward Candidate Mailer Error]: {e}")
+                    try:
+                        email_result = send_applicant_forwarded_to_employer_email(
+                            to_email=emp_user.email,
+                            applicant_name=candidate_name,
+                            company_name=company_name,
+                            job_title=job.title,
+                            match_score=match_result['match_score'],
+                            admin_notes=admin_notes
+                        )
+                    except Exception as e:
+                        print(f"[Admin Forward Candidate Mailer Error]: {e}")
 
-            log_audit_trail(request, admin_id, 'forward_candidate_to_employer', f"Forwarded candidate {candidate_name} ({candidate_user.email}) for {job.title} to {company_name}", 'application', application.application_id, candidate_name)
-            email_status = (
-                f"Email sent to {emp_user.email}."
-                if email_result.get('success') and emp_user
-                else "The employer has an in-app notification, but email delivery failed."
-            )
-            success_msg = (
-                f"Candidate {candidate_name} has been successfully forwarded to {company_name}! "
-                f"{email_status}"
-            )
+                log_audit_trail(request, admin_id, 'forward_candidate_to_employer', f"Forwarded candidate {candidate_name} ({candidate_user.email}) for {job.title} to {company_name}", 'application', application.application_id, candidate_name)
+                email_status = (
+                    f"Email sent to {emp_user.email}."
+                    if email_result.get('success') and emp_user
+                    else "The employer has an in-app notification, but email delivery failed."
+                )
+                success_msg = (
+                    f"Candidate {candidate_name} has been successfully forwarded to {company_name}! "
+                    f"{email_status}"
+                )
 
     interviews = InterviewSchedule.objects.filter(application=application).order_by('-interview_date')
     chatbot_answers = ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number')
@@ -2015,6 +2021,8 @@ def update_status_api(request):
     remarks = request.POST.get('remarks', '').strip()
 
     application = get_object_or_404(Application.objects.select_related('applicant', 'applicant__user', 'job', 'job__employer'), pk=app_id)
+    if application.status == 'withdrawn':
+        return JsonResponse({'success': False, 'message': 'This application was withdrawn by the applicant and cannot be modified.'})
     if status in ['pending', 'reviewed', 'shortlisted', 'interviewed', 'accepted', 'rejected']:
         application.status = status
         application.reviewed_by_name = f"MultiBiz Admin ({admin_user.first_name})"
