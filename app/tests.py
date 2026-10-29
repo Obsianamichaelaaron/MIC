@@ -2959,11 +2959,18 @@ class MultiBizConversionTests(TestCase):
             message__contains='Personal reasons',
         ).exists())
 
-        # Employer cannot modify a withdrawn application
+        # Switch session to employer
         emp_session = self.client.session
         emp_session['user_id'] = self.employer_user.user_id
         emp_session['role'] = 'employer'
         emp_session.save()
+
+        # Employer candidates page shows the candidate under Withdrawn tab
+        emp_candidates = self.client.get('/employer/candidates.php?tab=withdrawn')
+        self.assertEqual(emp_candidates.status_code, 200)
+        self.assertContains(emp_candidates, 'Withdrawn')
+
+        # Employer cannot modify a withdrawn application
         emp_update = self.client.post(f'/employer/view_candidate.php?id={application.application_id}', {
             'action': 'update_status',
             'employer_status': 'qualified',
@@ -2972,6 +2979,49 @@ class MultiBizConversionTests(TestCase):
         self.assertContains(emp_update, 'This application was withdrawn by the applicant and cannot be modified.')
         application.refresh_from_db()
         self.assertEqual(application.status, 'withdrawn')
+
+    def test_applicant_withdrawal_notifies_employer_company_peers_test_accounts_and_admin(self):
+        peer_user = User.objects.create(
+            email='peer_employer@example.com',
+            role='employer',
+            first_name='Peer',
+            last_name='Employer',
+            status='active',
+        )
+        Employer.objects.create(
+            user=peer_user,
+            company_name=self.employer.company_name,
+        )
+        demo_user, _ = User.objects.get_or_create(
+            email='employer@gmail.com',
+            defaults={
+                'role': 'employer',
+                'first_name': 'Demo',
+                'last_name': 'Employer',
+                'status': 'active',
+            },
+        )
+        application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+            status='pending',
+            forwarded_to_employer=True,
+        )
+        session = self.client.session
+        session['user_id'] = self.applicant_user.user_id
+        session['role'] = 'applicant'
+        session.save()
+
+        res = self.client.post('/applicant/withdraw_application.php', {
+            'application_id': application.application_id,
+            'withdrawal_reason': 'Accepted another offer elsewhere.',
+        }, HTTP_X_REQUESTED_WITH='XMLHttpRequest', HTTP_ACCEPT='application/json')
+        self.assertEqual(res.status_code, 200)
+
+        self.assertTrue(Notification.objects.filter(user=self.employer_user, title='Applicant withdrew an application').exists())
+        self.assertTrue(Notification.objects.filter(user=peer_user, title='Applicant withdrew an application').exists())
+        self.assertTrue(Notification.objects.filter(user=demo_user, title='Applicant withdrew an application').exists())
+        self.assertTrue(Notification.objects.filter(user=self.admin_user, title='Applicant withdrew an application').exists())
 
     def test_applicant_withdrawal_requires_a_reason(self):
         application = Application.objects.create(

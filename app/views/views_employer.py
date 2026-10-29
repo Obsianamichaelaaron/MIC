@@ -739,6 +739,7 @@ def candidates_view(request):
         'interview_completed': 'interview_completed',
         'hired': 'hired',
         'rejected': 'rejected',
+        'withdrawn': 'withdrawn',
     }
     selected_tab = tab_status_map.get(requested_tab, 'for_review')
     job_id = request.GET.get('job_id', '0').strip()
@@ -782,6 +783,7 @@ def candidates_view(request):
         'interview_completed': all_forwarded.filter(employer_status='interview_completed').count(),
         'hired': all_forwarded.filter(employer_status='hired').count(),
         'rejected': all_forwarded.filter(employer_status='rejected').count(),
+        'withdrawn': all_forwarded.filter(employer_status='withdrawn').count(),
         'total': all_forwarded.count(),
     }
 
@@ -879,6 +881,8 @@ def candidates_view(request):
         'interview_count': counts['for_interview'],
         'hired_count': counts['hired'],
         'not_qualified_count': counts['not_qualified'],
+        'withdrawn_count': counts['withdrawn'],
+        'rejected_count': counts['rejected'],
         'jobs': jobs_for_filter,
         'jobs_list': jobs_for_filter,
         'selected_job_id': int(job_id) if (job_id and job_id.isdigit()) else 0,

@@ -1,4 +1,4 @@
-﻿{% include 'includes/header.html' %}
+{% include 'includes/header.html' %}
 <style>
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
@@ -357,6 +357,9 @@
                 <a href="/employer/candidates.php?tab=not_qualified{% if selected_job_id %}&job_id={{ selected_job_id }}{% endif %}" class="tab-btn {% if current_tab == 'not_qualified' %}active{% endif %}">
                     Not Qualified <span class="tab-badge">{{ not_qualified_count|default:0 }}</span>
                 </a>
+                <a href="/employer/candidates.php?tab=withdrawn{% if selected_job_id %}&job_id={{ selected_job_id }}{% endif %}" class="tab-btn {% if current_tab == 'withdrawn' %}active{% endif %}">
+                    Withdrawn <span class="tab-badge">{{ withdrawn_count|default:0 }}</span>
+                </a>
             </div>
 
             <!-- Candidates List -->
@@ -402,9 +405,15 @@
                                     </div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
-                                    <span class="badge px-2.5 py-1 rounded-pill small fw-semibold" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">
-                                        {{ app.employer_status|default:"For Review"|title }}
-                                    </span>
+                                    {% if app.employer_status == 'withdrawn' %}
+                                        <span class="badge px-2.5 py-1 rounded-pill small fw-semibold" style="background:#fef2f2; color:#b91c1c; border:1px solid #fecaca;">
+                                            <i class="fa-solid fa-ban me-1"></i> Withdrawn
+                                        </span>
+                                    {% else %}
+                                        <span class="badge px-2.5 py-1 rounded-pill small fw-semibold" style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1;">
+                                            {{ app.employer_status|default:"For Review"|title }}
+                                        </span>
+                                    {% endif %}
                                     <a href="/employer/view_candidate.php?id={{ app.application_id }}" class="btn btn-sm btn-primary px-3 fw-semibold" style="background:#0056b3; border:none; border-radius:6px; font-size:0.8rem;">
                                         <i class="fa-solid fa-id-card me-1"></i> Review Candidate
                                     </a>

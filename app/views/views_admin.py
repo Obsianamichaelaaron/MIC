@@ -2743,6 +2743,7 @@ def job_candidates_view(request, job_id):
         'not_forwarded': sum(1 for c in all_candidates if not c['forwarded_to_employer']),
         'under_review': sum(1 for c in all_candidates if c['application'].status in ['pending', 'reviewed']),
         'shortlisted': sum(1 for c in all_candidates if c['application'].status == 'shortlisted'),
+        'withdrawn': sum(1 for c in all_candidates if c['application'].status == 'withdrawn'),
     }
 
     # Filter for display

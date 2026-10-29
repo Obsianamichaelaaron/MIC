@@ -1129,6 +1129,77 @@ def applications_view(request):
     return render(request, 'applicant/applications.html', context)
 
 
+def _notify_parties_of_withdrawal(application, actor_name, withdrawal_reason):
+    """
+    Ensure all relevant employer users and admin staff receive in-app notifications
+    and emails when an applicant withdraws an application.
+    """
+    job = application.job
+    job_title = job.title if job else 'the job'
+    company_name = getattr(getattr(job, 'employer', None), 'company_name', '')
+    title = 'Applicant withdrew an application'
+    message = (
+        f'{actor_name} withdrew their application for {job_title}. '
+        f'Reason: {withdrawal_reason}'
+    )
+
+    recipient_users = set()
+
+    # 1. Direct job employer user
+    direct_employer_user = getattr(getattr(job, 'employer', None), 'user', None)
+    if direct_employer_user:
+        recipient_users.add(direct_employer_user)
+
+    # 2. Any other employer user with the same company name
+    if company_name:
+        same_company_employers = Employer.objects.filter(
+            company_name__iexact=company_name
+        ).select_related('user')
+        for emp in same_company_employers:
+            if emp.user:
+                recipient_users.add(emp.user)
+
+    # 3. Default demo/test employer account(s) if active (e.g. employer@gmail.com)
+    for test_employer in User.objects.filter(email='employer@gmail.com', role='employer'):
+        recipient_users.add(test_employer)
+
+    # 4. Any employer associated with interview schedules for this application
+    for interview in InterviewSchedule.objects.filter(application=application).select_related('employer__user'):
+        if interview.employer and interview.employer.user:
+            recipient_users.add(interview.employer.user)
+
+    # 5. Active admin users so admin dashboard also receives withdrawal notice
+    for admin_user in User.objects.filter(role='admin', status='active'):
+        recipient_users.add(admin_user)
+
+    # Create notifications and clear unread count cache
+    for u in recipient_users:
+        Notification.objects.create(
+            user=u,
+            title=title,
+            message=message,
+            type='application',
+        )
+        cache.delete(f'unread_notifications_{u.user_id}')
+
+    # Send email to the employer user(s) with email
+    notified_emails = set()
+    for u in recipient_users:
+        if u.role == 'employer' and u.email and u.email not in notified_emails:
+            notified_emails.add(u.email)
+            try:
+                emp_name = company_name or u.first_name or 'Employer'
+                send_application_withdrawn_email(
+                    to_email=u.email,
+                    employer_name=emp_name,
+                    applicant_name=actor_name,
+                    job_title=job_title,
+                    withdrawal_reason=withdrawal_reason,
+                )
+            except Exception as exc:
+                logger.warning("Could not send withdrawal email to %s: %s", u.email, exc)
+
+
 @require_role('applicant')
 @require_POST
 def withdraw_application_view(request):
@@ -1189,30 +1260,8 @@ def withdraw_application_view(request):
         status__in=('scheduled', 'rescheduled'),
     ).update(status='cancelled', updated_at=now)
 
-    # Notify employer via in-app notification and email
-    employer_user = getattr(getattr(application.job, 'employer', None), 'user', None)
-    if employer_user:
-        Notification.objects.create(
-            user=employer_user,
-            title='Applicant withdrew an application',
-            message=(
-                f'{actor_name} withdrew their application for {application.job.title}. '
-                f'Reason: {withdrawal_reason}'
-            ),
-            type='application',
-        )
-        if employer_user.email:
-            try:
-                employer_name = getattr(getattr(application.job, 'employer', None), 'company_name', '') or employer_user.first_name or 'Employer'
-                send_application_withdrawn_email(
-                    to_email=employer_user.email,
-                    employer_name=employer_name,
-                    applicant_name=actor_name,
-                    job_title=application.job.title,
-                    withdrawal_reason=withdrawal_reason,
-                )
-            except Exception as exc:
-                logger.warning("Could not send withdrawal email to employer: %s", exc)
+    # Notify employer(s) and admins via in-app notifications and email
+    _notify_parties_of_withdrawal(application, actor_name, withdrawal_reason)
 
     return _application_action_response(
         request,
@@ -1566,30 +1615,8 @@ def update_application_view(request):
                 status__in=['scheduled', 'rescheduled'],
             ).update(status='cancelled', updated_at=now)
 
-            # Notify employer via in-app notification and email
-            employer_user = getattr(getattr(application.job, 'employer', None), 'user', None)
-            if employer_user:
-                Notification.objects.create(
-                    user=employer_user,
-                    title='Applicant withdrew an application',
-                    message=(
-                        f'{actor_name} withdrew their application '
-                        f'for {application.job.title}. Reason: {withdrawal_reason}'
-                    ),
-                    type='application',
-                )
-                if employer_user.email:
-                    try:
-                        employer_name = getattr(getattr(application.job, 'employer', None), 'company_name', '') or employer_user.first_name or 'Employer'
-                        send_application_withdrawn_email(
-                            to_email=employer_user.email,
-                            employer_name=employer_name,
-                            applicant_name=actor_name,
-                            job_title=application.job.title,
-                            withdrawal_reason=withdrawal_reason,
-                        )
-                    except Exception as exc:
-                        logger.warning("Could not send withdrawal email to employer: %s", exc)
+            # Notify employer(s) and admins via in-app notifications and email
+            _notify_parties_of_withdrawal(application, actor_name, withdrawal_reason)
 
             return _application_action_response(
                 request,

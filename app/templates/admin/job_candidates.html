@@ -424,6 +424,11 @@
                     <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&qual=not_qualified{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_qual == 'not_qualified' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
                         Low Match <span class="badge bg-danger text-white ms-1.5">{{ counts.not_qualified }}</span>
                     </a>
+                    {% if counts.withdrawn > 0 %}
+                    <a href="{% url 'admin_job_candidates' job.id %}?job_ids={{ job_ids_query }}&status=withdrawn{% if selected_sort %}&sort={{ selected_sort }}{% endif %}{% if query %}&q={{ query }}{% endif %}" class="filter-pill-btn {% if selected_status == 'withdrawn' %}btn btn-sm btn-primary{% else %}btn btn-sm btn-light text-dark{% endif %}">
+                        <i class="fa-solid fa-ban me-1 text-danger"></i> Withdrawn <span class="badge bg-danger text-white ms-1.5">{{ counts.withdrawn }}</span>
+                    </a>
+                    {% endif %}
                 </div>
             </div>
 
@@ -575,6 +580,12 @@
                                 <i class="fa-regular fa-clock"></i> Not Yet Sent
                             </div>
                         {% endif %}
+
+                        {% if cand.application.status == 'withdrawn' %}
+                            <div class="status-badge-pill" style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:0.75rem; font-weight:700;">
+                                <i class="fa-solid fa-ban"></i> Withdrawn
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
 
@@ -586,6 +597,7 @@
                         </a>
 
                         <!-- Send to Employer -->
+                        {% if cand.application.status != 'withdrawn' %}
                         <button type="button" class="candidate-action-btn btn btn-primary-custom shadow-xs" onclick="openSendToEmployerModal('single', '{{ cand.application.id }}', '{{ cand.applicant.user.full_name|escapejs }}')">
                             <i class="fa-solid fa-building-user"></i> Send to Employer
                         </button>
@@ -593,6 +605,7 @@
                         <button type="button" class="candidate-action-btn btn btn-light text-muted border" data-notification-url="{% url 'admin_notify_single_applicant' cand.application.pk %}" data-app-name="{{ cand.applicant.user.full_name }}" onclick="triggerSingleNotice(this)">
                             <i class="fa-solid fa-envelope"></i> Dispatch Notice
                         </button>
+                        {% endif %}
 
                         <form method="POST" action="{% url 'admin_delete_application' job.id cand.application.pk %}" onsubmit="return confirm('Remove the application for {{ cand.applicant.user.full_name|escapejs }} ({{ cand.applicant.user.email|escapejs }}) and its related interview, screening, and feedback records? Their applicant account will not be deleted.');">
                             {% csrf_token %}
