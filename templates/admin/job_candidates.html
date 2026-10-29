@@ -587,7 +587,7 @@
                         </a>
 
                         <!-- Send to Employer -->
-                        <button type="button" class="candidate-action-btn btn btn-primary-custom shadow-xs" onclick="openSendToEmployerModal('single', '{{ cand.application.id }}', '{{ cand.applicant.user.full_name|escapejs }}')">
+                        <button type="button" class="candidate-action-btn btn btn-primary-custom shadow-xs" onclick="openSendToEmployerModal('single', '{{ cand.application.application_id }}', '{{ cand.applicant.user.full_name|escapejs }}')">
                             <i class="fa-solid fa-building-user"></i> Send to Employer
                         </button>
 
@@ -965,7 +965,7 @@ function submitSendToEmployer(e) {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Sending to Employer...';
 
     const formData = new FormData();
-    formData.append('job_id', '{{ job.id }}');
+    formData.append('job_id', '{{ job.job_id }}');
     formData.append('job_ids', '{{ job_ids_query }}');
     formData.append('scope', scope === 'selected' ? 'selected' : scope);
     formData.append('admin_notes', adminNotes);
