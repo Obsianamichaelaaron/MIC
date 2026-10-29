@@ -84,12 +84,15 @@ def _allowed_employer_statuses(application):
     if application.employer_status in ('withdrawn', 'job_closed'):
         return ()
     if application.employer_status == 'offer_sent' or application.status == 'offer_sent':
-        return ('rejected',)
+        return ('rejected', 'hired')
     if _is_employer_interview_stage(application):
-        return ('offer_sent', 'hired', 'rejected')
-    if application.employer_status == 'qualified' or application.status == 'shortlisted':
-        return ('for_interview', 'not_qualified', 'rejected')
+        return ('offer_sent', 'hired', 'rejected', 'for_interview')
+    if application.employer_status in ('for_review', 'qualified', 'pending') or application.status in (
+        'pending', 'reviewed', 'shortlisted'
+    ):
+        return ('for_interview', 'qualified', 'not_qualified', 'rejected')
     return (
+        'for_interview',
         'qualified',
         'not_qualified',
         'rejected',
@@ -1298,6 +1301,27 @@ def view_candidate_view(request, application_id=None):
     )
     can_schedule_interview = 'for_interview' in _allowed_employer_statuses(application)
     
+    # Active step determination: 3 (Employer Review / Details), 4 (Interview / Schedule), 5 (Hired)
+    active_step = 3
+    requested_step = request.GET.get('step') or request.GET.get('tab')
+    if requested_step:
+        if str(requested_step) in ('3', '4', '5'):
+            active_step = int(requested_step)
+        elif requested_step == 'interview':
+            active_step = 4
+        elif requested_step in ('review', 'details'):
+            active_step = 3
+        elif requested_step in ('hire', 'offer'):
+            active_step = 5
+    elif request.method == 'POST' and action in ('schedule_interview', 'manage_interview'):
+        active_step = 4
+    elif application.employer_status == 'hired' or application.status in ('accepted', 'hired'):
+        active_step = 5
+    elif interview_stage:
+        active_step = 4
+    else:
+        active_step = 3
+
     # Chatbot assessment answers
     chatbot_answers = ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number')
 
@@ -1319,8 +1343,11 @@ def view_candidate_view(request, application_id=None):
         'job': job,
         'employer': employer,
         'interviews': interviews,
+        'latest_interview': interviews.first() if interviews.exists() else None,
         'interview_stage': interview_stage,
         'can_schedule_interview': can_schedule_interview,
+        'active_step': active_step,
+        'today_iso': timezone.localdate().isoformat(),
         'chatbot_answers': chatbot_answers,
         'ml_score': score_info['ml_ranking_score'],
         'tier': score_info['ranking_category'],

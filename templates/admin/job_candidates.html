@@ -432,8 +432,8 @@
                     {% if forwarded_filter %}<input type="hidden" name="forwarded" value="{{ forwarded_filter }}">{% endif %}
                     
                     <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()" style="min-width: 140px; max-width: 160px;" title="Sort Candidates">
-                        <option value="date" {% if selected_sort == 'date' %}selected{% endif %}>Date Applied</option>
                         <option value="score" {% if selected_sort == 'score' %}selected{% endif %}>Rank / Score</option>
+                        <option value="date" {% if selected_sort == 'date' %}selected{% endif %}>Date Applied</option>
                         <option value="experience" {% if selected_sort == 'experience' %}selected{% endif %}>Experience</option>
                     </select>
                     <div class="input-group input-group-sm" style="min-width: 180px; max-width: 240px;">
@@ -471,13 +471,13 @@
                                 </div>
                             {% endif %}
                             
-                            {% if cand.is_top_match and cand.qualification_status == 'qualified' %}
+                            {% if cand.rank == 1 and cand.qualification_status == 'qualified' %}
                                 <span class="position-absolute badge rounded-pill bg-warning text-dark border border-white shadow-xs" style="top: -6px; right: -8px; font-size: 0.62rem; font-weight: 700; padding: 2px 6px; z-index: 2;" title="Top Ranked Match">
                                     <i class="fa-solid fa-crown me-0.5" style="font-size: 0.58rem;"></i> #1
                                 </span>
                             {% else %}
                                 <span class="position-absolute badge rounded-pill bg-light text-dark border shadow-xs" style="top: -6px; right: -8px; font-size: 0.62rem; font-weight: 600; padding: 2px 5px; z-index: 2;">
-                                    #{{ forloop.counter }}
+                                    #{{ cand.rank|default:forloop.counter }}
                                 </span>
                             {% endif %}
                         </div>

@@ -47,3 +47,5 @@ scratch/
 
 .vercel
 .env*
+
+.django_cache/

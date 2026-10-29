@@ -2639,9 +2639,9 @@ def job_candidates_view(request, job_id):
         return redirect('admin_job_candidates', job_id=job_id)
     selected_status = request.GET.get('status', '').strip()
     query           = request.GET.get('q', '').strip()
-    selected_sort   = request.GET.get('sort', 'date').strip()
+    selected_sort   = request.GET.get('sort', 'score').strip()
     if selected_sort not in {'score', 'date', 'experience'}:
-        selected_sort = 'date'
+        selected_sort = 'score'
 
     apps_qs = Application.objects.filter(job_id__in=grouped_job_ids).select_related(
         'applicant', 'applicant__user', 'job'
