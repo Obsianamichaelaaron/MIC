@@ -281,36 +281,42 @@ def dashboard_view(request):
     unread_inquiries  = ContactInquiry.objects.filter(is_read=False).count()
     total_audit_logs  = AuditTrail.objects.count()
 
-    # ── 1 query: 6-month trend via GROUP BY month ─────────────────────────────
-    six_months_ago = (timezone.now() - timedelta(days=180)).replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0
-    )
-    user_trend_qs = (
-        User.objects.filter(created_at__gte=six_months_ago)
-        .annotate(month=TruncMonth('created_at'))
-        .values('month')
-        .annotate(cnt=Count('pk'))
-        .order_by('month')
-    )
-    app_trend_qs = (
-        Application.objects.filter(applied_at__gte=six_months_ago)
-        .annotate(month=TruncMonth('applied_at'))
-        .values('month')
-        .annotate(cnt=Count('pk'))
-        .order_by('month')
-    )
-    user_trend_map = {row['month']: row['cnt'] for row in user_trend_qs}
-    app_trend_map  = {row['month']: row['cnt'] for row in app_trend_qs}
-
-    # Build ordered 6-month label/data lists
+    # ── 6-month trend via GROUP BY month ──────────────────────────────────────
     month_starts = []
     month_cursor = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     for _ in range(6):
         month_starts.append(month_cursor)
         month_cursor = (month_cursor - timedelta(days=1)).replace(day=1)
     month_starts.reverse()
-    trend_users = [user_trend_map.get(m, 0) for m in month_starts]
-    trend_apps  = [app_trend_map.get(m, 0)  for m in month_starts]
+    start_date = month_starts[0]
+
+    user_trend_qs = (
+        User.objects.filter(created_at__gte=start_date)
+        .annotate(month=TruncMonth('created_at'))
+        .values('month')
+        .annotate(cnt=Count('pk'))
+        .order_by('month')
+    )
+    app_trend_qs = (
+        Application.objects.filter(applied_at__gte=start_date)
+        .annotate(month=TruncMonth('applied_at'))
+        .values('month')
+        .annotate(cnt=Count('pk'))
+        .order_by('month')
+    )
+
+    def _fmt_month(val):
+        if not val:
+            return ''
+        if hasattr(val, 'strftime'):
+            return val.strftime('%Y-%m')
+        return str(val)[:7]
+
+    user_trend_map = {_fmt_month(row['month']): row['cnt'] for row in user_trend_qs if row.get('month')}
+    app_trend_map  = {_fmt_month(row['month']): row['cnt'] for row in app_trend_qs if row.get('month')}
+
+    trend_users = [user_trend_map.get(_fmt_month(m), 0) for m in month_starts]
+    trend_apps  = [app_trend_map.get(_fmt_month(m), 0)  for m in month_starts]
 
     chart_data = {
         'trend_labels': [month.strftime('%b') for month in month_starts],

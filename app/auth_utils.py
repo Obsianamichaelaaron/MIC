@@ -1,5 +1,5 @@
 from functools import wraps
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 from django.http import HttpResponseForbidden, HttpResponseRedirect
 from django.contrib.auth.hashers import make_password, check_password
 import bcrypt
