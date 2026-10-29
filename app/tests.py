@@ -1848,6 +1848,37 @@ class MultiBizConversionTests(TestCase):
         )
         self.assertTrue(User.objects.filter(pk=self.applicant_user.user_id).exists())
         self.assertTrue(Applicant.objects.filter(pk=self.applicant.applicant_id).exists())
+        notif = Notification.objects.filter(user=self.applicant_user, type='application').last()
+        self.assertIsNotNone(notif)
+        self.assertIn('Application Removed', notif.title)
+        self.assertIn(self.job.title, notif.message)
+
+    def test_admin_remove_application_creates_applicant_notification_with_custom_reason(self):
+        target_application = Application.objects.create(
+            job=self.job,
+            applicant=self.applicant,
+        )
+        session = self.client.session
+        session['user_id'] = self.admin_user.user_id
+        session['role'] = 'admin'
+        session.save()
+
+        custom_reason = 'Duplicate candidate profile submission.'
+        response = self.client.post(
+            f'/admin/jobs/{self.job.job_id}/applications/{target_application.application_id}/delete/',
+            {
+                'job_ids': str(self.job.job_id),
+                'removal_reason': custom_reason,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Application.objects.filter(pk=target_application.application_id).exists())
+
+        notif = Notification.objects.filter(user=self.applicant_user, type='application').last()
+        self.assertIsNotNone(notif)
+        self.assertEqual(notif.title, f"Application Removed: {self.job.title}")
+        self.assertIn(custom_reason, notif.message)
+        self.assertIn(self.job.title, notif.message)
 
     def test_candidate_pipeline_counts_high_match_separately_from_high_employability(self):
         self.applicant.employability_score = Decimal('70')

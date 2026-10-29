@@ -2801,29 +2801,56 @@ def delete_application_view(request, job_id, application_id):
 
     grouped_job_ids = [grouped_job.job_id for grouped_job in grouped_jobs]
     application = get_object_or_404(
-        Application.objects.select_related('applicant__user', 'job'),
+        Application.objects.select_related('applicant__user', 'job', 'job__employer'),
         pk=application_id,
         job_id__in=grouped_job_ids,
     )
-    applicant_name = application.applicant.user.full_name
-    applicant_email = application.applicant.user.email
+    applicant_user = application.applicant.user
+    applicant_name = applicant_user.full_name
+    applicant_email = applicant_user.email
     job_title = application.job.title
+    company_name = application.job.employer.company_name if (application.job and application.job.employer) else 'MultiBiz Partner'
+
+    removal_reason = (request.POST.get('removal_reason') or request.POST.get('reason') or '').strip()
+    if not removal_reason:
+        removal_reason = "Application removed by administrator."
 
     with transaction.atomic():
         CandidateFeedback.objects.filter(application_id=application.application_id).delete()
         application.delete()
+        Notification.objects.create(
+            user=applicant_user,
+            title=f"Application Removed: {job_title}",
+            message=(
+                f"Your application for '{job_title}' at {company_name} was removed by MultiBiz Administrator.\n\n"
+                f"Reason for removal: {removal_reason}"
+            ),
+            type='application',
+        )
         log_audit_trail(
             request,
             getCurrentUserId(request),
             'delete_application',
             (
                 f"Removed application #{application_id} for {applicant_name} "
-                f"({applicant_email}) from job {job_title}."
+                f"({applicant_email}) from job {job_title}. Reason: {removal_reason}"
             ),
             'application',
             application_id,
             applicant_email,
         )
+
+    try:
+        send_application_status_update_email(
+            to_email=applicant_email,
+            applicant_name=applicant_name,
+            job_title=job_title,
+            company_name=company_name,
+            new_status='removed',
+            remarks=f"Reason for removal: {removal_reason}",
+        )
+    except Exception:
+        pass
 
     group_query = ','.join(str(grouped_job_id) for grouped_job_id in grouped_job_ids)
     return redirect(
