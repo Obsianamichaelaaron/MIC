@@ -847,7 +847,7 @@
                     <div class="cand-col-label">Posted</div>
                     <div style="font-size:.88rem;font-weight:600;color:#334155;">{{ js.posted_at|date:"M d, Y" }}</div>
                     <div class="cand-date"><i class="fas fa-users me-1"></i>{{ js.count_all }} total applicant{{ js.count_all|pluralize }}</div>
-                    <div class="cand-date"><i class="fas fa-clock me-1"></i>Latest application: {{ js.latest_applied_at|date:"M d, Y, P" }}</div>
+                    <div class="cand-date"><i class="fas fa-clock me-1"></i>{% if js.latest_applied_at %}Latest application: {{ js.latest_applied_at|date:"M d, Y, g:i A" }} <span class="text-muted" style="font-size:0.75rem;">({{ js.latest_applied_at|timesince }} ago)</span>{% else %}No applications yet{% endif %}</div>
                 </div>
 
                 <!-- Col 3: High match -->
@@ -925,10 +925,12 @@ window.addEventListener('keydown', (e) => {
             if (!Number.isInteger(data.total_application_count)) {
                 throw new Error('Application count refresh returned an invalid count.');
             }
-            countElement.textContent = data.total_application_count;
+            const newCount = data.total_application_count;
+            const prevCount = countElement.dataset.initialCount || (countElement.dataset.initialCount = String(newCount));
+            countElement.textContent = newCount;
 
             if (data.latest_application_id !== null &&
-                String(data.latest_application_id) !== countElement.dataset.latestApplicationId) {
+                (String(data.latest_application_id) !== countElement.dataset.latestApplicationId || String(newCount) !== prevCount)) {
                 window.location.reload();
             }
         } catch (error) {
@@ -938,7 +940,7 @@ window.addEventListener('keydown', (e) => {
         }
     };
 
-    window.setInterval(refreshApplicationCount, 15000);
+    window.setInterval(refreshApplicationCount, 8000);
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) refreshApplicationCount();
     });

@@ -1454,11 +1454,19 @@ def candidates_view(request):
             .values('application_id', 'applied_at')
             .first()
         )
+        if not latest_application and not search:
+            latest_application = (
+                Application.objects.order_by('-applied_at', '-application_id')
+                .values('application_id', 'applied_at')
+                .first()
+            )
         return JsonResponse({
             'high_match_count': high_match_count,
-            'total_application_count': Application.objects.filter(
-                job_id__in=groups_by_job_id
-            ).count(),
+            'total_application_count': (
+                Application.objects.filter(job_id__in=groups_by_job_id).count()
+                if search else Application.objects.count()
+            ),
+            'total_jobs_count': JobPosting.objects.count(),
             'latest_application_id': (
                 latest_application['application_id'] if latest_application else None
             ),
@@ -1575,8 +1583,8 @@ def candidates_view(request):
 
     job_summaries.sort(
         key=lambda summary: (
-            summary['latest_applied_at'],
-            summary['latest_application_id'],
+            summary.get('latest_applied_at') or summary.get('posted_at'),
+            summary.get('latest_application_id') or summary.get('job_id', 0),
         ),
         reverse=True,
     )
@@ -2623,9 +2631,9 @@ def job_candidates_view(request, job_id):
         return redirect('admin_job_candidates', job_id=job_id)
     selected_status = request.GET.get('status', '').strip()
     query           = request.GET.get('q', '').strip()
-    selected_sort   = request.GET.get('sort', 'date').strip()
-    if selected_sort not in {'date', 'score', 'experience'}:
-        selected_sort = 'date'
+    selected_sort   = request.GET.get('sort', 'score').strip()
+    if selected_sort not in {'score', 'date', 'experience'}:
+        selected_sort = 'score'
 
     apps_qs = Application.objects.filter(job_id__in=grouped_job_ids).select_related(
         'applicant', 'applicant__user', 'job'
@@ -2643,6 +2651,7 @@ def job_candidates_view(request, job_id):
                 latest_application['applied_at'].isoformat()
                 if latest_application and latest_application['applied_at'] else None
             ),
+            'candidates_count': apps_qs.count(),
         })
 
     latest_application_id = apps_qs.values_list('application_id', flat=True).first()
@@ -2679,42 +2688,37 @@ def job_candidates_view(request, job_id):
         }
         all_candidates.append(cand_info)
 
-    # Keep top-match badges tied to score, regardless of the displayed sort.
-    qualified_by_score = sorted(
-        (
-            candidate for candidate in all_candidates
-            if candidate['qualification_status'] == 'qualified'
-        ),
-        key=lambda candidate: (
-            candidate['match_score'] is not None,
-            candidate['match_score'] or 0,
+    # Strictly rank all candidates based on their employability ranking:
+    # 1. Automatic employability rating / job match score (descending)
+    # 2. General applicant profile employability score (descending)
+    # 3. Applied at timestamp (descending)
+    # 4. Application ID (descending)
+    ranked_candidates = sorted(
+        all_candidates,
+        key=lambda c: (
+            float(c['match_score']) if c['match_score'] is not None else -1.0,
+            float(c['applicant'].employability_score or 0),
+            c['application'].applied_at,
+            c['application'].application_id,
         ),
         reverse=True,
     )
-    top_match_ids = {
-        candidate['application'].application_id
-        for candidate in qualified_by_score[:3]
-    }
-    for candidate in all_candidates:
-        candidate['is_top_match'] = (
-            candidate['application'].application_id in top_match_ids
-        )
+    for index, candidate in enumerate(ranked_candidates):
+        candidate['rank'] = index + 1
+        candidate['is_top_match'] = (candidate['rank'] == 1)
 
     # Sort candidates
     if selected_sort == 'score':
         all_candidates.sort(
             key=lambda x: (
-                x['match_score'] is not None,
-                x['match_score'] or 0,
-                x['application'].applied_at,
-                x['application'].application_id,
+                x['rank'],
             ),
-            reverse=True,
         )
     elif selected_sort == 'experience':
         all_candidates.sort(
             key=lambda x: (
                 x['applicant'].experience_years or 0,
+                -x['rank'],
                 x['application'].applied_at,
                 x['application'].application_id,
             ),
