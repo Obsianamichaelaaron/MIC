@@ -49,6 +49,36 @@ MAX_JOB_MATCHES_FOR_DASHBOARD = 12
 SEMANTIC_MATCH_CACHE_TTL_SECONDS = 86400
 
 
+def _get_canonical_applicant(user):
+    """
+    Return the single canonical Applicant record for *user*, creating one if
+    none exists.  Safe even when the database has legacy duplicate rows for the
+    same user - it always picks the record with the smallest applicant_id
+    (oldest / most-likely-primary) instead of crashing with
+    MultipleObjectsReturned.
+
+    Never call Applicant.objects.get_or_create(user=user) directly; use this
+    helper everywhere so the application stays resilient to duplicates.
+    """
+    qs = Applicant.objects.filter(user=user).order_by('applicant_id')
+    applicant = qs.first()
+    if applicant is None:
+        applicant = Applicant.objects.create(user=user)
+    return applicant
+
+
+def _get_canonical_applicant_by_id(user_id):
+    """
+    Like _get_canonical_applicant but accepts a user_id integer.
+    Returns the canonical (oldest) Applicant for that user_id, or creates one.
+    """
+    qs = Applicant.objects.filter(user_id=user_id).order_by('applicant_id')
+    applicant = qs.first()
+    if applicant is None:
+        applicant = Applicant.objects.create(user_id=user_id)
+    return applicant
+
+
 def _job_match_cache_key(applicant: Applicant, job: JobPosting, resume_text: str = '') -> str:
     callable_fingerprint = hashlib.sha256(
         repr(compute_semantic_match).encode('utf-8')
@@ -208,7 +238,7 @@ def job_match_api(request):
 
     user_id   = getCurrentUserId(request)
     user      = getCurrentUser(request)
-    applicant, _ = Applicant.objects.get_or_create(user=user)
+    applicant = _get_canonical_applicant(user)
     job       = exclude_multibiz_partner_jobs(
         JobPosting.objects.filter(pk=int(job_id), status='active')
     ).select_related('employer').first()
@@ -255,11 +285,11 @@ def dashboard_view(request):
     """
     user_id = getCurrentUserId(request)
     user = getCurrentUser(request)
-    applicant, _ = Applicant.objects.get_or_create(user=user)
+    applicant = _get_canonical_applicant(user)
 
     # ── 1 query: all application status counts at once ─────────────────────────
     app_counts_qs = (
-        Application.objects.filter(applicant=applicant)
+        Application.objects.filter(applicant__user_id=user_id)
         .values('status')
         .annotate(cnt=Count('pk'))
     )
@@ -382,7 +412,7 @@ def dashboard_view(request):
 
     # Recent applications — calculate the same profile match shown in the full tracker.
     applications = list(
-        Application.objects.filter(applicant=applicant)
+        Application.objects.filter(applicant__user_id=user_id)
         .exclude(status='withdrawn')
         .select_related('job', 'job__employer')
         .prefetch_related('job__qualification_mappings__qualification')
@@ -408,7 +438,7 @@ def dashboard_view(request):
 
     # Upcoming interviews
     interviews = InterviewSchedule.objects.filter(
-        application__applicant=applicant,
+        application__applicant__user_id=user_id,
         status__in=['scheduled', 'rescheduled'],
     ).exclude(
         application__status='withdrawn',
@@ -486,7 +516,7 @@ def jobs_view(request):
     user_id = getCurrentUserId(request)
     applicant = None
     if user_id:
-        applicant, _ = Applicant.objects.get_or_create(user_id=user_id)
+        applicant = _get_canonical_applicant_by_id(user_id)
 
     search = request.GET.get('search', '').strip()
     location = request.GET.get('location', '').strip()
@@ -580,9 +610,9 @@ def jobs_view(request):
     applications_by_job = {
         job_id: status
         for job_id, status in Application.objects.filter(
-            applicant=applicant
+            applicant__user_id=user_id
         ).values_list('job_id', 'status')
-    } if applicant else {}
+    } if user_id else {}
     applied_job_ids = set(applications_by_job)
 
     company_logo_map = {
@@ -776,7 +806,7 @@ def job_details_view(request, job_id=None):
     Applicant Job Details matching applicant/job_details.php.
     """
     user_id = getCurrentUserId(request)
-    applicant, _ = Applicant.objects.get_or_create(user_id=user_id)
+    applicant = _get_canonical_applicant_by_id(user_id)
 
     j_id = job_id or request.GET.get('id') or request.GET.get('job_id')
     job = get_object_or_404(
@@ -789,7 +819,7 @@ def job_details_view(request, job_id=None):
     )
 
     is_saved = SavedJob.objects.filter(applicant=applicant, job=job).exists()
-    application = Application.objects.filter(applicant=applicant, job=job).first()
+    application = Application.objects.filter(applicant__user_id=user_id, job=job).first()
     has_application = application is not None
 
     applicant_remarks = []
@@ -867,7 +897,7 @@ def apply_job_view(request, job_id=None):
     """
     user_id = getCurrentUserId(request)
     user = getCurrentUser(request)
-    applicant, _ = Applicant.objects.get_or_create(user=user)
+    applicant = _get_canonical_applicant(user)
     chatbot_answers = list(ChatbotAnswer.objects.filter(applicant=applicant).order_by('question_number'))
 
     j_id = job_id or request.GET.get('id') or request.GET.get('job_id') or request.POST.get('job_id')
@@ -880,7 +910,7 @@ def apply_job_view(request, job_id=None):
     )
 
     # Check if already applied
-    existing_app = Application.objects.filter(applicant=applicant, job=job).first()
+    existing_app = Application.objects.filter(applicant__user_id=user_id, job=job).first()
     if existing_app:
         return redirect('/applicant/applications.php?already_applied=1')
 
@@ -1058,10 +1088,10 @@ def applications_view(request):
     Applicant Submitted Applications matching applicant/applications.php.
     """
     user_id = getCurrentUserId(request)
-    applicant, _ = Applicant.objects.get_or_create(user_id=user_id)
+    applicant = _get_canonical_applicant_by_id(user_id)
 
     status_filter = request.GET.get('status', '')
-    apps_qs = Application.objects.filter(applicant=applicant).select_related('job', 'job__employer').order_by('-applied_at')
+    apps_qs = Application.objects.filter(applicant__user_id=user_id).select_related('job', 'job__employer').order_by('-applied_at')
     apps_qs = apps_qs.prefetch_related('job__qualification_mappings__qualification')
 
     if status_filter == 'withdrawn':
@@ -1077,13 +1107,13 @@ def applications_view(request):
     if applied_success and success_application_id.isdigit():
         successful_application = Application.objects.filter(
             application_id=int(success_application_id),
-            applicant=applicant,
+            applicant__user_id=user_id,
         ).select_related('job').first()
 
     # Get interviews for these applications
     interviews_map = {}
     interviews = InterviewSchedule.objects.filter(
-        application__applicant=applicant,
+        application__applicant__user_id=user_id,
         status__in=('scheduled', 'completed'),
     ).exclude(
         application__status='withdrawn',
@@ -1204,11 +1234,11 @@ def _notify_parties_of_withdrawal(application, actor_name, withdrawal_reason):
 @require_POST
 def withdraw_application_view(request):
     user_id = getCurrentUserId(request)
-    applicant = get_object_or_404(Applicant, user_id=user_id)
+    applicant = _get_canonical_applicant_by_id(user_id)
     application = get_object_or_404(
         Application,
         pk=request.POST.get('application_id'),
-        applicant=applicant,
+        applicant__user_id=user_id,
     )
 
     if application.status == 'withdrawn':
@@ -1278,7 +1308,7 @@ def profile_view(request):
     """
     user_id = getCurrentUserId(request)
     user = getCurrentUser(request)
-    applicant, _ = Applicant.objects.get_or_create(user=user)
+    applicant = _get_canonical_applicant(user)
 
     success_msg = None
     error_msg = None
@@ -1445,7 +1475,7 @@ def save_job_view(request):
     Save / Unsave Job toggle matching applicant/save_job.php.
     """
     user_id = getCurrentUserId(request)
-    applicant, _ = Applicant.objects.get_or_create(user_id=user_id)
+    applicant = _get_canonical_applicant_by_id(user_id)
 
     if request.method == 'POST':
         job_id = request.POST.get('job_id')
@@ -1497,7 +1527,7 @@ def chatbot_view(request):
     """
     user_id = getCurrentUserId(request)
     user = getCurrentUser(request)
-    applicant, _ = Applicant.objects.get_or_create(user=user)
+    applicant = _get_canonical_applicant(user)
     qualifications = Qualification.objects.filter(status='active').order_by('name')
 
     context = {
@@ -1517,7 +1547,7 @@ def chatbot_handler_api(request):
     AJAX endpoint for Chatbot quiz logic matching applicant/chatbot_handler.php.
     """
     user_id = getCurrentUserId(request)
-    applicant, _ = Applicant.objects.get_or_create(user_id=user_id)
+    applicant = _get_canonical_applicant_by_id(user_id)
 
     action = request.POST.get('action') or request.GET.get('action') or ''
 
@@ -1572,13 +1602,13 @@ def update_application_view(request):
     Cancel or update remarks matching applicant/update_application.php.
     """
     user_id = getCurrentUserId(request)
-    applicant = get_object_or_404(Applicant, user_id=user_id)
+    applicant = _get_canonical_applicant_by_id(user_id)
 
     if request.method == 'POST':
         app_id = request.POST.get('application_id')
         action = request.POST.get('action')
 
-        application = get_object_or_404(Application, pk=app_id, applicant=applicant)
+        application = get_object_or_404(Application, pk=app_id, applicant__user_id=user_id)
         if action == 'cancel' or action == 'withdraw':
             if application.status == 'withdrawn':
                 return _application_action_response(request, 'This application has already been withdrawn.', False)
