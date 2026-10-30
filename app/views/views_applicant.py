@@ -361,10 +361,7 @@ def dashboard_view(request):
             .prefetch_related('qualification_mappings__qualification')
             .order_by('-posted_at', '-job_id')
         )
-        active_jobs = unique_company_title_job_postings(
-            active_jobs,
-            limit=MAX_JOB_MATCHES_FOR_DASHBOARD,
-        )
+        active_jobs = unique_company_title_job_postings(active_jobs)
         for job in active_jobs:
             match = get_applicant_job_match(applicant, job, '')
             recommendations.append({
