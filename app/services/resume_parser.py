@@ -13,7 +13,11 @@ COMMON_SKILL_KEYWORDS = [
     'MongoDB', 'Redis', 'Communication', 'Teamwork', 'Problem Solving', 'Leadership',
     'Project Management', 'Time Management', 'Customer Service', 'Sales', 'Marketing',
     'Accounting', 'Financial Analysis', 'Budgeting', 'Auditing', 'Excel', 'QuickBooks',
-    'Graphic Design', 'Photoshop', 'Illustrator', 'Figma', 'UI/UX', 'SEO', 'Data Analysis'
+    'Graphic Design', 'Photoshop', 'Illustrator', 'Figma', 'UI/UX', 'SEO', 'Data Analysis',
+    # Facilities, Maintenance & General Services
+    'Cleaning', 'Sanitation', 'Waste Management', 'Facility Maintenance', 'Deep Cleaning',
+    'Disinfection', 'Building Upkeep', 'Equipment Operation', 'Inventory Restocking',
+    'Housekeeping', 'Pest Control', 'Safety Protocols', 'Floor Maintenance', 'Property Care'
 ]
 
 EDUCATION_LEVELS = [
@@ -474,6 +478,17 @@ def parse_resume_text(text: str) -> dict:
             break
 
     # 3. Extract Experience Years
+    WORD_TO_NUM = {
+        'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
+        'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
+        'eleven': 11, 'twelve': 12, 'fifteen': 15, 'twenty': 20
+    }
+    word_pattern = r'\b(' + '|'.join(WORD_TO_NUM.keys()) + r')\+?\s*(?:years?|yrs?)(?:\s+of)?\s+experience'
+    explicit_word_exp = [
+        WORD_TO_NUM[w]
+        for w in re.findall(word_pattern, text_lower)
+        if w in WORD_TO_NUM
+    ]
     explicit_experience = [
         int(years)
         for years in re.findall(
@@ -482,14 +497,19 @@ def parse_resume_text(text: str) -> dict:
         )
         if int(years) < 40
     ]
-    current_year = timezone.localdate().year
-    year_ranges = DATE_RANGE_PATTERN.findall(text_lower)
-    range_experience = 0
-    for start_year, end_year in year_ranges:
-        end = current_year if end_year in {'present', 'current', 'now'} else int(end_year)
-        if end >= int(start_year):
-            range_experience += end - int(start_year)
-    detected_exp = min(max(explicit_experience + [range_experience]), 30)
+    all_explicit = explicit_experience + explicit_word_exp
+
+    if all_explicit:
+        detected_exp = min(max(all_explicit), 30)
+    else:
+        current_year = timezone.localdate().year
+        year_ranges = DATE_RANGE_PATTERN.findall(text_lower)
+        range_experience = 0
+        for start_year, end_year in year_ranges:
+            end = current_year if end_year in {'present', 'current', 'now'} else int(end_year)
+            if end >= int(start_year):
+                range_experience += end - int(start_year)
+        detected_exp = min(range_experience, 30)
 
     # 4. Extract Qualifications
     db_quals = Qualification.objects.filter(status='active') if Qualification.objects.exists() else []
