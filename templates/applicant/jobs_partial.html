@@ -71,7 +71,15 @@
                                 </p>
                             {% endif %}
                             
-                            {% if job.match_reason %}
+                            {% if job.match_score != None %}
+                                <div style="margin-top: 0.35rem;">
+                                    <span class="job-match-badge {% if job.match_score >= 80 %}match-high{% elif job.match_score >= 60 %}match-medium{% elif job.match_score >= 40 %}match-moderate{% else %}match-low{% endif %}">
+                                        <i class="fas {% if job.match_score >= 80 %}fa-bolt{% elif job.match_score >= 60 %}fa-check-circle{% elif job.match_score >= 40 %}fa-chart-line{% else %}fa-info-circle{% endif %}"></i>
+                                        <span class="match-score-val">{{ job.match_score|floatformat:0 }}%</span>
+                                        <span class="match-score-lbl">Match</span>
+                                    </span>
+                                </div>
+                            {% elif job.match_reason %}
                                 <span class="small text-muted" title="{{ job.match_reason }}">{{ job.match_reason }}</span>
                             {% endif %}
                         </div>

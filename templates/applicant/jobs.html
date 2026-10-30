@@ -3,6 +3,131 @@
 <style>
 /* Jobs portal design adapted from Old/applicant/jobs.html. */
 .old-jobs-page { display: block; }
+
+/* ── Professional AI Match Score Badge ── */
+.job-match-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .28rem .65rem;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(15,23,42,.04);
+    outline: none;
+}
+.job-match-badge:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(15,23,42,.08);
+}
+.job-match-badge i {
+    font-size: .68rem;
+}
+.job-match-badge .match-score-val {
+    font-weight: 700;
+    font-size: .76rem;
+}
+.job-match-badge .match-score-lbl {
+    font-weight: 600;
+    opacity: .92;
+}
+
+/* 80%+ High Match (Emerald) */
+.job-match-badge.match-high {
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+.job-match-badge.match-high i {
+    color: #059669;
+}
+.job-match-badge.match-high:hover {
+    background: #d1fae5;
+    border-color: #6ee7b7;
+    color: #065f46;
+}
+
+/* 60%-79% Medium / Strong Match (Corporate Blue) */
+.job-match-badge.match-medium {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+.job-match-badge.match-medium i {
+    color: #2563eb;
+}
+.job-match-badge.match-medium:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    color: #1e40af;
+}
+
+/* 40%-59% Moderate Match (Warm Amber) */
+.job-match-badge.match-moderate {
+    background: #fffbeb;
+    color: #b45309;
+    border-color: #fde68a;
+}
+.job-match-badge.match-moderate i {
+    color: #d97706;
+}
+.job-match-badge.match-moderate:hover {
+    background: #fef3c7;
+    border-color: #fcd34d;
+    color: #92400e;
+}
+
+/* <40% Low Match (Slate) */
+.job-match-badge.match-low {
+    background: #f8fafc;
+    color: #64748b;
+    border-color: #e2e8f0;
+}
+.job-match-badge.match-low i {
+    color: #94a3b8;
+}
+
+/* Neutral / Fallback */
+.job-match-badge.match-neutral {
+    background: #f1f5f9;
+    color: #64748b;
+    border-color: #e2e8f0;
+    cursor: default;
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] .job-match-badge.match-high {
+    background: rgba(16, 185, 129, 0.16);
+    color: #34d399;
+    border-color: rgba(16, 185, 129, 0.35);
+}
+[data-theme="dark"] .job-match-badge.match-medium {
+    background: rgba(59, 130, 246, 0.16);
+    color: #60a5fa;
+    border-color: rgba(59, 130, 246, 0.35);
+}
+[data-theme="dark"] .job-match-badge.match-moderate {
+    background: rgba(245, 158, 11, 0.16);
+    color: #fbbf24;
+    border-color: rgba(245, 158, 11, 0.35);
+}
+[data-theme="dark"] .job-match-badge.match-low {
+    background: rgba(148, 163, 184, 0.16);
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.3);
+}
+[data-theme="dark"] .job-match-badge.match-neutral {
+    background: rgba(255, 255, 255, 0.08);
+    color: #94a3b8;
+    border-color: rgba(255, 255, 255, 0.12);
+}
 .old-jobs-page { min-height: 100vh; padding: 1.5rem 1rem 3rem; background: #c7d1dd; font-family: 'DM Sans', sans-serif; color: #1a1a2e; }
 .old-jobs-shell { max-width: 1240px; margin: 0 auto; }
 .jobs-hero-old { position: relative; overflow: hidden; padding: 1.4rem 1.6rem; margin-bottom: 1.25rem; border-radius: 16px; background: linear-gradient(135deg, #0a3d6b 0%, #1866a3 58%, #2196f3 100%); color: #fff; box-shadow: 0 8px 22px rgba(10,61,107,.16); }
@@ -266,9 +391,44 @@
                                     </div>
                                 </div>
                                 {% if item.match_score != None %}
-                                    <span class="small text-muted">{{ item.match_score|floatformat:0 }}% profile match</span>
+                                    {% if item.match_score >= 80 %}
+                                        <button type="button" class="job-match-badge match-high" 
+                                                title="AI Match Score: {{ item.match_score|floatformat:1 }}% (Click to view match breakdown)"
+                                                onclick="event.stopPropagation(); showMatchScorePopup('{{ item.job.job_id }}', '{{ item.job.title|escapejs }}', {{ item.match_score }});">
+                                            <i class="fas fa-bolt"></i>
+                                            <span class="match-score-val">{{ item.match_score|floatformat:0 }}%</span>
+                                            <span class="match-score-lbl">Match</span>
+                                        </button>
+                                    {% elif item.match_score >= 60 %}
+                                        <button type="button" class="job-match-badge match-medium" 
+                                                title="AI Match Score: {{ item.match_score|floatformat:1 }}% (Click to view match breakdown)"
+                                                onclick="event.stopPropagation(); showMatchScorePopup('{{ item.job.job_id }}', '{{ item.job.title|escapejs }}', {{ item.match_score }});">
+                                            <i class="fas fa-check-circle"></i>
+                                            <span class="match-score-val">{{ item.match_score|floatformat:0 }}%</span>
+                                            <span class="match-score-lbl">Match</span>
+                                        </button>
+                                    {% elif item.match_score >= 40 %}
+                                        <button type="button" class="job-match-badge match-moderate" 
+                                                title="AI Match Score: {{ item.match_score|floatformat:1 }}% (Click to view match breakdown)"
+                                                onclick="event.stopPropagation(); showMatchScorePopup('{{ item.job.job_id }}', '{{ item.job.title|escapejs }}', {{ item.match_score }});">
+                                            <i class="fas fa-chart-line"></i>
+                                            <span class="match-score-val">{{ item.match_score|floatformat:0 }}%</span>
+                                            <span class="match-score-lbl">Match</span>
+                                        </button>
+                                    {% else %}
+                                        <button type="button" class="job-match-badge match-low" 
+                                                title="AI Match Score: {{ item.match_score|floatformat:1 }}% (Click to view match breakdown)"
+                                                onclick="event.stopPropagation(); showMatchScorePopup('{{ item.job.job_id }}', '{{ item.job.title|escapejs }}', {{ item.match_score }});">
+                                            <i class="fas fa-info-circle"></i>
+                                            <span class="match-score-val">{{ item.match_score|floatformat:0 }}%</span>
+                                            <span class="match-score-lbl">Match</span>
+                                        </button>
+                                    {% endif %}
                                 {% elif item.match_reason %}
-                                    <span class="small text-muted">{{ item.match_reason }}</span>
+                                    <span class="job-match-badge match-neutral" title="{{ item.match_reason }}">
+                                        <i class="fas fa-circle-notch"></i>
+                                        <span>{{ item.match_reason|truncatechars:18 }}</span>
+                                    </span>
                                 {% endif %}
                             </div>
                             <h2>{{ item.job.title }}</h2>
@@ -288,7 +448,8 @@
                     {% endfor %}
                 </div>
             </section>
-            <aside class="jobs-dossier" id="jobsDossier"><button class="dossier-close" id="closeJobDetails" type="button" aria-label="Back to jobs grid" title="Back to jobs grid">&times;</button>{% if scored_jobs.0 %}{% with first=scored_jobs.0 %}<div class="dossier-head"><div style="display:flex;gap:.7rem"><div class="dossier-avatar" id="dossierAvatar">{% if first.company_logo %}<img src="{{ first.company_logo }}" alt="{{ first.company_name }}" onerror="this.parentElement.innerHTML='{{ first.company_name|slice:':1'|upper|default:'M' }}';">{% else %}{{ first.company_name|slice:':1'|upper|default:'M' }}{% endif %}</div><div><span class="dossier-badge" id="dossierType">{{ first.job.employment_type|title }}</span><h2 id="dossierTitle">{{ first.job.title }}</h2><p><i class="fas fa-building"></i> <span id="dossierCompany">{{ first.company_name|default:'Multibiz Partner' }}</span> · <i class="fas fa-location-dot"></i> <span id="dossierLocation">{{ first.job.location }}</span></p></div></div><a class="dossier-apply" id="dossierApply" href="apply_job.php?id={{ first.job.job_id }}">Quick Apply</a></div><div class="dossier-specs"><div class="dossier-spec"><label>Compensation</label><strong id="dossierSalary">{{ first.job.salary_range|default:'Negotiable' }}</strong></div><div class="dossier-spec"><label>Work Arrangement</label><strong id="dossierWorkType">{{ first.job.employment_type|title }}</strong></div><div class="dossier-spec"><label>Date Posted</label><strong>{{ first.job.posted_at|timesince }} ago</strong></div>            <div class="dossier-spec"><label>Profile Status</label><strong id="dossierMatchScore">{% if profile_completed %}Ready{% else %}Complete profile{% endif %}</strong></div></div><div class="dossier-section"><h3><i class="fas fa-tags" style="color:#1866a3"></i> Required Skills</h3><div class="dossier-skills" id="dossierSkills">{% if first.skills_list %}{% for skill in first.skills_list %}<span class="dossier-skill">{{ skill }}</span>{% endfor %}{% else %}<span class="dossier-skill">No specific skills listed.</span>{% endif %}</div></div><div class="dossier-section"><h3><i class="fas fa-align-left" style="color:#1866a3"></i> Position Description</h3><p id="dossierDescription">{{ first.job.description|linebreaksbr }}</p></div><div class="dossier-section"><h3><i class="fas fa-circle-check" style="color:#1866a3"></i> Requirements</h3><p id="dossierRequirements">{{ first.job.requirements|linebreaksbr|default:'Demonstrated professional experience and strong problem-solving skills.' }}</p></div><div class="dossier-bottom"><strong>Ready to take the next step?</strong><a class="dossier-apply" id="dossierBottomApply" href="apply_job.php?id={{ first.job.job_id }}">Quick Apply</a></div>{% endwith %}{% else %}<div class="application-empty">Select an opening to view details.</div>{% endif %}</aside>        </div>
+            <aside class="jobs-dossier" id="jobsDossier"><button class="dossier-close" id="closeJobDetails" type="button" aria-label="Back to jobs grid" title="Back to jobs grid">&times;</button>{% if scored_jobs.0 %}{% with first=scored_jobs.0 %}<div class="dossier-head"><div style="display:flex;gap:.7rem"><div class="dossier-avatar" id="dossierAvatar">{% if first.company_logo %}<img src="{{ first.company_logo }}" alt="{{ first.company_name }}" onerror="this.parentElement.innerHTML='{{ first.company_name|slice:':1'|upper|default:'M' }}';">{% else %}{{ first.company_name|slice:':1'|upper|default:'M' }}{% endif %}</div><div><span class="dossier-badge" id="dossierType">{{ first.job.employment_type|title }}</span><h2 id="dossierTitle">{{ first.job.title }}</h2><p><i class="fas fa-building"></i> <span id="dossierCompany">{{ first.company_name|default:'Multibiz Partner' }}</span> · <i class="fas fa-location-dot"></i> <span id="dossierLocation">{{ first.job.location }}</span></p></div></div><a class="dossier-apply" id="dossierApply" href="apply_job.php?id={{ first.job.job_id }}">Quick Apply</a></div><div class="dossier-specs"><div class="dossier-spec"><label>Compensation</label><strong id="dossierSalary">{{ first.job.salary_range|default:'Negotiable' }}</strong></div><div class="dossier-spec"><label>Work Arrangement</label><strong id="dossierWorkType">{{ first.job.employment_type|title }}</strong></div><div class="dossier-spec"><label>Date Posted</label><strong>{{ first.job.posted_at|timesince }} ago</strong></div>            <div class="dossier-spec"><label>Match Rating</label><strong id="dossierMatchScore">{% if first.match_score != None %}<span class="job-match-badge {% if first.match_score >= 80 %}match-high{% elif first.match_score >= 60 %}match-medium{% elif first.match_score >= 40 %}match-moderate{% else %}match-low{% endif %}" style="font-size:0.75rem; padding: 0.2rem 0.55rem;"><i class="fas {% if first.match_score >= 80 %}fa-bolt{% elif first.match_score >= 60 %}fa-check-circle{% elif first.match_score >= 40 %}fa-chart-line{% else %}fa-info-circle{% endif %}"></i> {{ first.match_score|floatformat:0 }}% Match</span>{% else %}{% if profile_completed %}Ready{% else %}Complete profile{% endif %}{% endif %}</strong></div>
+</div><div class="dossier-section"><h3><i class="fas fa-tags" style="color:#1866a3"></i> Required Skills</h3><div class="dossier-skills" id="dossierSkills">{% if first.skills_list %}{% for skill in first.skills_list %}<span class="dossier-skill">{{ skill }}</span>{% endfor %}{% else %}<span class="dossier-skill">No specific skills listed.</span>{% endif %}</div></div><div class="dossier-section"><h3><i class="fas fa-align-left" style="color:#1866a3"></i> Position Description</h3><p id="dossierDescription">{{ first.job.description|linebreaksbr }}</p></div><div class="dossier-section"><h3><i class="fas fa-circle-check" style="color:#1866a3"></i> Requirements</h3><p id="dossierRequirements">{{ first.job.requirements|linebreaksbr|default:'Demonstrated professional experience and strong problem-solving skills.' }}</p></div><div class="dossier-bottom"><strong>Ready to take the next step?</strong><a class="dossier-apply" id="dossierBottomApply" href="apply_job.php?id={{ first.job.job_id }}">Quick Apply</a></div>{% endwith %}{% else %}<div class="application-empty">Select an opening to view details.</div>{% endif %}</aside>        </div>
     </div>
 </div>
 
@@ -344,9 +505,16 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('dossierType').textContent = meta.dataset.type;
             document.getElementById('dossierWorkType').textContent = meta.dataset.type;
             document.getElementById('dossierSalary').textContent = meta.dataset.salary;
-            document.getElementById('dossierMatchScore').textContent = meta.dataset.score
-                ? Math.round(Number(meta.dataset.score)) + '%'
-                : (meta.dataset.profileCompleted === 'true' ? 'Unavailable' : 'Complete profile');
+            var scoreVal = meta.dataset.score;
+            var dossierMatchEl = document.getElementById('dossierMatchScore');
+            if (scoreVal && !isNaN(Number(scoreVal))) {
+                var num = Math.round(Number(scoreVal));
+                var badgeClass = num >= 80 ? 'match-high' : (num >= 60 ? 'match-medium' : (num >= 40 ? 'match-moderate' : 'match-low'));
+                var iconClass = num >= 80 ? 'fa-bolt' : (num >= 60 ? 'fa-check-circle' : (num >= 40 ? 'fa-chart-line' : 'fa-info-circle'));
+                dossierMatchEl.innerHTML = '<span class="job-match-badge ' + badgeClass + '" style="font-size:0.75rem; padding: 0.2rem 0.55rem;"><i class="fas ' + iconClass + '"></i> ' + num + '% Match</span>';
+            } else {
+                dossierMatchEl.textContent = (meta.dataset.profileCompleted === 'true' ? 'Unavailable' : 'Complete profile');
+            }
             var avatar = document.getElementById('dossierAvatar');
             if (meta.dataset.companyLogo) {
                 avatar.innerHTML = '<img src="' + meta.dataset.companyLogo + '" alt="' + meta.dataset.company + '" onerror="this.parentElement.innerHTML = this.alt.charAt(0).toUpperCase();">';
