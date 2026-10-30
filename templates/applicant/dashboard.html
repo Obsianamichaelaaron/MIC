@@ -343,14 +343,35 @@
     gap: .35rem;
 }
 .portal-match {
-    padding: .25rem .6rem;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .25rem .65rem;
     border-radius: 999px;
-    background: #e8f5e9;
-    color: #2e7d32;
     font-size: .7rem;
     font-weight: 700;
     white-space: nowrap;
-    border: 1px solid #c8e6c9;
+    border: 1px solid transparent;
+}
+.portal-match.score-high {
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+.portal-match.score-medium {
+    background: #eff6ff;
+    color: #1d4ed8;
+    border-color: #bfdbfe;
+}
+.portal-match.score-moderate {
+    background: #fffbeb;
+    color: #b45309;
+    border-color: #fde68a;
+}
+.portal-match.score-low {
+    background: #f8fafc;
+    color: #64748b;
+    border-color: #e2e8f0;
 }
 .portal-job-tags {
     display: flex;
@@ -776,7 +797,11 @@
                 <section class="portal-card">
                     <div class="portal-card-heading">
                         <h2><i class="fas fa-microchip" style="color:#0056b3"></i> AI Matched Job Opportunities</h2>
-                        <a href="/applicant/jobs.php">View All ({{ recommended_jobs|length }}) <i class="fas fa-arrow-right"></i></a>
+                        {% if high_match_count > 0 %}
+                            <a href="/applicant/jobs.php?min_match=40">View All ({{ high_match_count }}) <i class="fas fa-arrow-right"></i></a>
+                        {% else %}
+                            <a href="/applicant/jobs.php">Explore All Jobs <i class="fas fa-arrow-right"></i></a>
+                        {% endif %}
                     </div>
                     <div class="portal-jobs">
                         {% for item in recommended_jobs %}
@@ -790,9 +815,12 @@
                                         </div>
                                         <div class="d-flex flex-column align-items-end gap-1">
                                             {% if item.match_score != None %}
-                                                <span class="portal-match" title="Candidate match score: {{ item.match_score|floatformat:0 }}%"><i class="{% if item.match_score_type == 'semantic_model' %}fas fa-brain{% else %}fas fa-bullseye{% endif %}"></i> {{ item.match_score|floatformat:0 }}% Match</span>
+                                                <span class="portal-match {% if item.match_score >= 80 %}score-high{% elif item.match_score >= 60 %}score-medium{% elif item.match_score >= 40 %}score-moderate{% else %}score-low{% endif %}" title="Candidate match score: {{ item.match_score|floatformat:0 }}%">
+                                                    <i class="{% if item.match_score >= 80 %}fas fa-bolt{% elif item.match_score >= 60 %}fas fa-check-circle{% elif item.match_score >= 40 %}fas fa-chart-line{% else %}fas fa-circle-info{% endif %}"></i>
+                                                    {{ item.match_score|floatformat:0 }}% Match
+                                                </span>
                                             {% else %}
-                                                <span class="portal-match" title="{{ item.match_reason }}">{{ item.match_reason|default:"Estimate unavailable" }}</span>
+                                                <span class="portal-match score-low" title="{{ item.match_reason }}">{{ item.match_reason|default:"Estimate unavailable" }}</span>
                                             {% endif %}
                                         </div>
                                     </div>
@@ -826,6 +854,9 @@
                                     {% endif %}
                                 </p>
                                 <div style="display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap;">
+                                    <a href="/applicant/jobs.php" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: #0056b3; color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 0.8rem; box-shadow: 0 2px 6px rgba(0,86,179,0.25);">
+                                        <i class="fas fa-compass"></i> Explore All Jobs
+                                    </a>
                                     <a href="/applicant/profile.php" style="display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 1rem; background: #f1f5f9; color: #334155; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 0.8rem; border: 1px solid #cbd5e1;">
                                         <i class="fas fa-user-gear"></i> Update Profile
                                     </a>

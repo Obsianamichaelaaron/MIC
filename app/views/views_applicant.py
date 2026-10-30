@@ -444,7 +444,18 @@ def dashboard_view(request):
         application__status='withdrawn',
     ).select_related('employer', 'application', 'application__job').order_by('interview_date', 'start_time')
 
-    # Recommended jobs list for the template (top 4 sorted by match score)
+    # Filter recommendations to only include opportunities 40% and above
+    high_match_recommendations = [
+        r for r in recommendations
+        if r.get('match_score') is not None and float(r['match_score']) >= 40.0
+    ]
+    high_match_recommendations.sort(
+        key=lambda r: (r['match_score'] or 0),
+        reverse=True
+    )
+    high_match_count = len(high_match_recommendations)
+
+    # Recommended jobs list for the template (top 4 sorted by match score >= 40%)
     recommended_jobs = [
         {
             'job': r['job'],
@@ -454,7 +465,7 @@ def dashboard_view(request):
             'matched_skills': [],
             'missing_skills': [],
         }
-        for r in recommendations[:4]
+        for r in high_match_recommendations[:4]
     ]
 
     context = {
@@ -494,6 +505,7 @@ def dashboard_view(request):
         'upcoming_interviews': interviews,
         'recent_applications': applications,
         'recommended_jobs': recommended_jobs,
+        'high_match_count': high_match_count,
         'candidate_skills': candidate_skills,
         'employability_score': latest_score,
         'completion_pct': completion_pct,
